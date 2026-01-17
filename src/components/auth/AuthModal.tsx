@@ -321,12 +321,12 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
 
       const { error } = await signIn(emailToUse, formData.password);
       if (!error) {
-        handleClose();
-        
-        // Redirect based on user type
+        // Redirect based on user type first, then close
         if (isCommerceLogin) {
+          handleClose();
           navigate('/commerce');
         } else {
+          handleClose();
           navigate('/minha-conta');
         }
       }
