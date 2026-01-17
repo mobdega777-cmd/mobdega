@@ -237,7 +237,10 @@ const CommerceProducts = ({ commerceId }: CommerceProductsProps) => {
 
   // Criar nova categoria inline
   const handleCreateCategory = async () => {
-    if (!newCategoryName.trim()) return;
+    if (!newCategoryName.trim()) {
+      toast({ variant: "destructive", title: "Digite o nome da categoria" });
+      return;
+    }
 
     setCreatingCategory(true);
     try {
