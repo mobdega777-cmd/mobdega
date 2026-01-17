@@ -8,8 +8,10 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import CommerceDashboard from "./pages/commerce/CommerceDashboard";
+import UserDashboard from "./pages/user/UserDashboard";
 import ProtectedAdminRoute from "./components/auth/ProtectedAdminRoute";
 import ProtectedCommerceRoute from "./components/auth/ProtectedCommerceRoute";
+import ProtectedUserRoute from "./components/auth/ProtectedUserRoute";
 
 const queryClient = new QueryClient();
 
@@ -36,6 +38,14 @@ const App = () => (
                 <ProtectedCommerceRoute>
                   <CommerceDashboard />
                 </ProtectedCommerceRoute>
+              } 
+            />
+            <Route 
+              path="/minha-conta" 
+              element={
+                <ProtectedUserRoute>
+                  <UserDashboard />
+                </ProtectedUserRoute>
               } 
             />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
