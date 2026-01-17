@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import DateFilter from "@/components/commerce/DateFilter";
 
 interface FinancialStats {
   totalIncome: number;
@@ -63,6 +64,17 @@ const AdminFinancial = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [filterDialogOpen, setFilterDialogOpen] = useState(false);
+  const [dateFilter, setDateFilter] = useState(() => {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(end.getDate() - 29);
+    return {
+      start: start.toISOString().split('T')[0],
+      end: end.toISOString().split('T')[0],
+    };
+  });
+
   const [newTransaction, setNewTransaction] = useState({
     type: 'income',
     category: '',
@@ -72,59 +84,119 @@ const AdminFinancial = () => {
   });
   const { toast } = useToast();
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  const handleDateChange = (start: Date, end: Date) => {
+    setDateFilter({
+      start: start.toISOString().split('T')[0],
+      end: end.toISOString().split('T')[0],
+    });
+    setFilterDialogOpen(false);
+  };
 
   const fetchData = async () => {
     setIsLoading(true);
-    
-    // Fetch transactions
-    const { data: transactionsData } = await supabase
-      .from('financial_transactions')
-      .select('*')
-      .order('transaction_date', { ascending: false });
 
-    // Fetch invoices for receivables stats
-    const { data: invoicesData } = await supabase
-      .from('invoices')
-      .select('amount, status, type');
+    const startISO = dateFilter.start;
+    const endISO = dateFilter.end;
 
-    if (transactionsData) {
-      setTransactions(transactionsData);
+    const [transactionsRes, invoicesRes] = await Promise.all([
+      supabase
+        .from('financial_transactions')
+        .select('*')
+        .gte('transaction_date', startISO)
+        .lte('transaction_date', endISO)
+        .order('transaction_date', { ascending: false }),
+      supabase
+        .from('invoices')
+        .select('amount, status, type, created_at')
+        .gte('created_at', `${startISO}T00:00:00.000Z`)
+        .lte('created_at', `${endISO}T23:59:59.999Z`),
+    ]);
 
-      const income = transactionsData
-        .filter(t => t.type === 'income')
-        .reduce((sum, t) => sum + Number(t.amount), 0);
-      
-      const expense = transactionsData
-        .filter(t => t.type === 'expense')
-        .reduce((sum, t) => sum + Number(t.amount), 0);
-
-      const pendingReceivables = invoicesData
-        ?.filter(i => i.type === 'receivable' && i.status === 'pending')
-        .reduce((sum, i) => sum + Number(i.amount), 0) || 0;
-
-      const paidInvoices = invoicesData
-        ?.filter(i => i.status === 'paid')
-        .reduce((sum, i) => sum + Number(i.amount), 0) || 0;
-
-      const overdueInvoices = invoicesData
-        ?.filter(i => i.status === 'overdue')
-        .reduce((sum, i) => sum + Number(i.amount), 0) || 0;
-
-      setStats({
-        totalIncome: income,
-        totalExpense: expense,
-        balance: income - expense,
-        pendingReceivables,
-        paidInvoices,
-        overdueInvoices,
+    if (transactionsRes.error) {
+      console.error('Error fetching financial_transactions:', transactionsRes.error);
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao carregar transações',
+        description: transactionsRes.error.message,
       });
     }
 
+    if (invoicesRes.error) {
+      console.error('Error fetching invoices:', invoicesRes.error);
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao carregar faturas',
+        description: invoicesRes.error.message,
+      });
+    }
+
+    const transactionsData = transactionsRes.data || [];
+    const invoicesData = invoicesRes.data || [];
+
+    setTransactions(transactionsData);
+
+    const incomeFromTransactions = transactionsData
+      .filter((t) => t.type === 'income')
+      .reduce((sum, t) => sum + Number(t.amount), 0);
+
+    const expenseFromTransactions = transactionsData
+      .filter((t) => t.type === 'expense')
+      .reduce((sum, t) => sum + Number(t.amount), 0);
+
+    // Important: even if there are no manual transactions, the financial cards must reflect invoices
+    const pendingReceivables = invoicesData
+      .filter((i) => i.type === 'receivable' && i.status === 'pending')
+      .reduce((sum, i) => sum + Number(i.amount), 0);
+
+    const paidInvoices = invoicesData
+      .filter((i) => i.type === 'receivable' && i.status === 'paid')
+      .reduce((sum, i) => sum + Number(i.amount), 0);
+
+    const overdueInvoices = invoicesData
+      .filter((i) => i.type === 'receivable' && i.status === 'overdue')
+      .reduce((sum, i) => sum + Number(i.amount), 0);
+
+    const totalIncome = incomeFromTransactions + paidInvoices;
+    const totalExpense = expenseFromTransactions;
+
+    setStats({
+      totalIncome,
+      totalExpense,
+      balance: totalIncome - totalExpense,
+      pendingReceivables,
+      paidInvoices,
+      overdueInvoices,
+    });
+
     setIsLoading(false);
   };
+
+  useEffect(() => {
+    fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateFilter.start, dateFilter.end]);
+
+  useEffect(() => {
+    // Real-time refresh for zero-delay dashboards
+    const channel = supabase
+      .channel('admin-financial-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'financial_transactions' },
+        () => fetchData()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'invoices' },
+        () => fetchData()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleAddTransaction = async () => {
     if (!newTransaction.category || !newTransaction.description || !newTransaction.amount) {
@@ -209,7 +281,11 @@ const AdminFinancial = () => {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" className="gap-2">
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={() => setFilterDialogOpen(true)}
+          >
             <Filter className="w-4 h-4" />
             Filtrar
           </Button>
@@ -356,6 +432,23 @@ const AdminFinancial = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Filter Dialog */}
+      <Dialog open={filterDialogOpen} onOpenChange={setFilterDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Filtrar por período</DialogTitle>
+          </DialogHeader>
+          <div className="flex justify-center">
+            <DateFilter onDateChange={handleDateChange} defaultValue="30days" />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setFilterDialogOpen(false)}>
+              Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Add Transaction Dialog */}
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
