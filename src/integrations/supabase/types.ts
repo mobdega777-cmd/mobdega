@@ -291,6 +291,53 @@ export type Database = {
           },
         ]
       }
+      delivery_zones: {
+        Row: {
+          cep_end: string
+          cep_start: string
+          commerce_id: string
+          created_at: string
+          delivery_fee: number
+          estimated_time: number
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          cep_end: string
+          cep_start: string
+          commerce_id: string
+          created_at?: string
+          delivery_fee?: number
+          estimated_time?: number
+          id?: string
+          is_active?: boolean
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          cep_end?: string
+          cep_start?: string
+          commerce_id?: string
+          created_at?: string
+          delivery_fee?: number
+          estimated_time?: number
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_zones_commerce_id_fkey"
+            columns: ["commerce_id"]
+            isOneToOne: false
+            referencedRelation: "commerces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       financial_transactions: {
         Row: {
           amount: number

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, User, Store, Eye, EyeOff, Loader2 } from "lucide-react";
@@ -9,6 +9,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { fetchAddressByCep, formatCep } from "@/lib/viaCepService";
 type AuthMode = "login" | "register";
 type UserType = "user" | "commerce";
 type DocumentType = "cpf" | "cnpj";
@@ -29,7 +30,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
   const [showPassword, setShowPassword] = useState(false);
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
+  const [loadingCep, setLoadingCep] = useState(false);
   // Form states
   const [formData, setFormData] = useState({
     name: "",
@@ -51,7 +52,36 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
   });
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    
+    // Handle CEP with formatting and auto-lookup
+    if (name === 'cep') {
+      const formatted = formatCep(value);
+      setFormData(prev => ({ ...prev, cep: formatted }));
+      
+      // Auto-lookup when 8 digits entered
+      if (formatted.replace(/\D/g, '').length === 8) {
+        handleCepLookup(formatted);
+      }
+      return;
+    }
+    
+    setFormData({ ...formData, [name]: value });
+  };
+
+  const handleCepLookup = async (cep: string) => {
+    setLoadingCep(true);
+    const address = await fetchAddressByCep(cep);
+    setLoadingCep(false);
+    
+    if (address) {
+      setFormData(prev => ({
+        ...prev,
+        city: address.city,
+        neighborhood: address.neighborhood,
+        address: address.street,
+      }));
+    }
   };
 
   const resetForm = () => {
@@ -566,14 +596,20 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="cep">CEP</Label>
-                        <Input
-                          id="cep"
-                          name="cep"
-                          value={formData.cep}
-                          onChange={handleInputChange}
-                          placeholder="00000-000"
-                          className="h-11"
-                        />
+                        <div className="relative">
+                          <Input
+                            id="cep"
+                            name="cep"
+                            value={formData.cep}
+                            onChange={handleInputChange}
+                            placeholder="00000-000"
+                            className="h-11"
+                            maxLength={9}
+                          />
+                          {loadingCep && (
+                            <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />
+                          )}
+                        </div>
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="city">Cidade</Label>
@@ -584,8 +620,22 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
                           onChange={handleInputChange}
                           placeholder="São Paulo"
                           className="h-11"
+                          readOnly={loadingCep}
                         />
                       </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="neighborhood">Bairro</Label>
+                      <Input
+                        id="neighborhood"
+                        name="neighborhood"
+                        value={formData.neighborhood}
+                        onChange={handleInputChange}
+                        placeholder="Centro"
+                        className="h-11"
+                        readOnly={loadingCep}
+                      />
                     </div>
 
                     <div className="space-y-2">
@@ -597,6 +647,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
                         onChange={handleInputChange}
                         placeholder="Rua, Avenida..."
                         className="h-11"
+                        readOnly={loadingCep}
                       />
                     </div>
 
@@ -787,14 +838,20 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="commerce-cep">CEP</Label>
-                        <Input
-                          id="commerce-cep"
-                          name="cep"
-                          value={formData.cep}
-                          onChange={handleInputChange}
-                          placeholder="00000-000"
-                          className="h-11"
-                        />
+                        <div className="relative">
+                          <Input
+                            id="commerce-cep"
+                            name="cep"
+                            value={formData.cep}
+                            onChange={handleInputChange}
+                            placeholder="00000-000"
+                            className="h-11"
+                            maxLength={9}
+                          />
+                          {loadingCep && (
+                            <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />
+                          )}
+                        </div>
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="commerce-city">Cidade</Label>
@@ -805,8 +862,22 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
                           onChange={handleInputChange}
                           placeholder="São Paulo"
                           className="h-11"
+                          readOnly={loadingCep}
                         />
                       </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="commerce-neighborhood">Bairro</Label>
+                      <Input
+                        id="commerce-neighborhood"
+                        name="neighborhood"
+                        value={formData.neighborhood}
+                        onChange={handleInputChange}
+                        placeholder="Centro"
+                        className="h-11"
+                        readOnly={loadingCep}
+                      />
                     </div>
 
                     <div className="space-y-2">
@@ -818,6 +889,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
                         onChange={handleInputChange}
                         placeholder="Rua, Avenida..."
                         className="h-11"
+                        readOnly={loadingCep}
                       />
                     </div>
 
