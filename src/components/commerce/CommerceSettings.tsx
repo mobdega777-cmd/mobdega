@@ -1,20 +1,20 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { 
   Store, 
   MapPin, 
-  Phone, 
-  Mail, 
   FileText,
   Clock,
   Save,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  Upload,
+  X,
+  Camera
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -49,6 +49,9 @@ const CommerceSettings = ({ commerce }: CommerceSettingsProps) => {
   const [commerceData, setCommerceData] = useState<CommerceData | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const [formData, setFormData] = useState({
@@ -90,12 +93,51 @@ const CommerceSettings = ({ commerce }: CommerceSettingsProps) => {
           cep: data.cep || "",
           logo_url: data.logo_url || "",
         });
+        setLogoPreview(data.logo_url || null);
       }
       setLoading(false);
     };
 
     fetchCommerce();
   }, [commerce.id]);
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingLogo(true);
+
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${commerce.id}/logo/${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('commerce-assets')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('commerce-assets')
+        .getPublicUrl(fileName);
+
+      setFormData({ ...formData, logo_url: publicUrl });
+      setLogoPreview(publicUrl);
+      toast({ title: "Logo enviado com sucesso!" });
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "Erro ao enviar logo", description: error.message });
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
+  const removeLogo = () => {
+    setFormData({ ...formData, logo_url: "" });
+    setLogoPreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -122,6 +164,10 @@ const CommerceSettings = ({ commerce }: CommerceSettingsProps) => {
       toast({ variant: "destructive", title: "Erro ao salvar", description: error.message });
     } else {
       toast({ title: "Configurações salvas com sucesso!" });
+      // Atualiza o state local para refletir no sidebar
+      if (commerceData) {
+        setCommerceData({ ...commerceData, logo_url: formData.logo_url });
+      }
     }
     setSaving(false);
   };
@@ -179,6 +225,78 @@ const CommerceSettings = ({ commerce }: CommerceSettingsProps) => {
       </Card>
 
       <form onSubmit={handleSubmit}>
+        {/* Logo Upload */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Camera className="w-5 h-5" />
+              Logo do Comércio
+            </CardTitle>
+            <CardDescription>
+              Faça upload da logo que aparecerá no painel e no cardápio digital
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-6">
+              {logoPreview || formData.logo_url ? (
+                <div className="relative">
+                  <img 
+                    src={logoPreview || formData.logo_url} 
+                    alt="Logo do comércio" 
+                    className="w-24 h-24 object-cover rounded-xl border-2 border-primary/20"
+                  />
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="destructive"
+                    className="absolute -top-2 -right-2 w-6 h-6"
+                    onClick={removeLogo}
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              ) : (
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-24 h-24 border-2 border-dashed rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-primary transition-colors bg-muted/30"
+                >
+                  {uploadingLogo ? (
+                    <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-primary" />
+                  ) : (
+                    <>
+                      <Upload className="w-8 h-8 text-muted-foreground mb-1" />
+                      <span className="text-xs text-muted-foreground">Upload</span>
+                    </>
+                  )}
+                </div>
+              )}
+              <div>
+                <p className="text-sm font-medium mb-1">Imagem de perfil</p>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Recomendado: 200x200px, formato PNG ou JPG
+                </p>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingLogo}
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  {uploadingLogo ? "Enviando..." : "Selecionar Imagem"}
+                </Button>
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleLogoUpload}
+                className="hidden"
+              />
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Basic Info */}
         <Card className="mb-6">
           <CardHeader>
@@ -232,16 +350,6 @@ const CommerceSettings = ({ commerce }: CommerceSettingsProps) => {
                   required
                 />
               </div>
-            </div>
-
-            <div>
-              <Label htmlFor="logo_url">URL do Logo</Label>
-              <Input
-                id="logo_url"
-                value={formData.logo_url}
-                onChange={(e) => setFormData({ ...formData, logo_url: e.target.value })}
-                placeholder="https://..."
-              />
             </div>
 
             <div className="p-4 rounded-lg bg-muted/30">

@@ -44,12 +44,13 @@ type CommerceSection =
   | "delivery"
   | "settings";
 
+// Ordem atualizada: Caixa/PDV agora é a segunda opção (logo após Visão Geral)
 const menuItems = [
   { id: "overview" as CommerceSection, label: "Visão Geral", icon: LayoutDashboard },
+  { id: "cashregister" as CommerceSection, label: "Caixa/PDV", icon: Calculator },
   { id: "orders" as CommerceSection, label: "Pedidos", icon: ShoppingCart },
   { id: "delivery" as CommerceSection, label: "Delivery", icon: Truck },
   { id: "tables" as CommerceSection, label: "Mesas/Comandas", icon: Utensils },
-  { id: "cashregister" as CommerceSection, label: "Caixa/PDV", icon: Calculator },
   { id: "products" as CommerceSection, label: "Produtos", icon: Package },
   { id: "categories" as CommerceSection, label: "Categorias", icon: FolderOpen },
   { id: "financial" as CommerceSection, label: "Financeiro", icon: DollarSign },
@@ -71,26 +72,33 @@ const CommerceDashboard = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const fetchCommerce = async () => {
-      if (!user) return;
-      
-      const { data, error } = await supabase
-        .from('commerces')
-        .select('id, fantasy_name, logo_url, status')
-        .eq('owner_id', user.id)
-        .maybeSingle();
-      
-      if (error) {
-        console.error('Error fetching commerce:', error);
-      } else {
-        setCommerce(data);
-      }
-      setLoading(false);
-    };
+  const fetchCommerce = async () => {
+    if (!user) return;
+    
+    const { data, error } = await supabase
+      .from('commerces')
+      .select('id, fantasy_name, logo_url, status')
+      .eq('owner_id', user.id)
+      .maybeSingle();
+    
+    if (error) {
+      console.error('Error fetching commerce:', error);
+    } else {
+      setCommerce(data);
+    }
+    setLoading(false);
+  };
 
+  useEffect(() => {
     fetchCommerce();
   }, [user]);
+
+  // Refetch commerce data when settings are changed
+  useEffect(() => {
+    if (activeSection === "overview") {
+      fetchCommerce();
+    }
+  }, [activeSection]);
 
   const handleLogout = async () => {
     await signOut();
@@ -164,13 +172,13 @@ const CommerceDashboard = () => {
               <img 
                 src={commerce?.logo_url || logoMobdega} 
                 alt={commerce?.fantasy_name || "Mobdega"} 
-                className="h-10 w-10 rounded-lg object-cover" 
+                className="h-12 w-12 rounded-lg object-cover border border-border/50" 
               />
               <div className="min-w-0">
-                <h1 className="font-display text-lg font-bold text-primary-foreground truncate">
+                <h1 className="font-display text-base font-bold text-primary-foreground truncate">
                   {commerce?.fantasy_name || "Meu Comércio"}
                 </h1>
-                <p className="text-xs text-primary-foreground/60">Painel do Comerciante</p>
+                <p className="text-[10px] text-primary-foreground/60">Painel</p>
               </div>
             </motion.div>
           )}
