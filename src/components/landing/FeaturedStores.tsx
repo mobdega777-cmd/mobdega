@@ -1,10 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { MapPin, Star, Clock, Search, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
 import { fetchAddressByCep, formatCep, getCepProximityScore } from "@/lib/viaCepService";
 
 interface Commerce {
@@ -17,7 +16,6 @@ interface Commerce {
 }
 
 const FeaturedStores = () => {
-  const { user } = useAuth();
   const [stores, setStores] = useState<Commerce[]>([]);
   const [loading, setLoading] = useState(true);
   const [userCep, setUserCep] = useState("");
@@ -25,32 +23,7 @@ const FeaturedStores = () => {
   const [lookingUpCep, setLookingUpCep] = useState(false);
   const [locationInfo, setLocationInfo] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchUserCepAndStores();
-  }, [user]);
-
-  const fetchUserCepAndStores = async () => {
-    setLoading(true);
-
-    // If user is logged in, try to get their CEP from profile
-    if (user) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('cep, city')
-        .eq('user_id', user.id)
-        .single();
-
-      if (profile?.cep) {
-        setUserCep(profile.cep);
-        setSearchCep(formatCep(profile.cep));
-        setLocationInfo(profile.city || null);
-      }
-    }
-
-    await fetchStores(user ? undefined : undefined);
-  };
-
-  const fetchStores = async (cepFilter?: string) => {
+  const fetchStores = useCallback(async (cepFilter?: string) => {
     setLoading(true);
 
     // Fetch approved commerces
@@ -84,7 +57,11 @@ const FeaturedStores = () => {
     }
 
     setLoading(false);
-  };
+  }, [userCep]);
+
+  useEffect(() => {
+    fetchStores();
+  }, [fetchStores]);
 
   const handleCepSearch = async () => {
     const cleanCep = searchCep.replace(/\D/g, '');
