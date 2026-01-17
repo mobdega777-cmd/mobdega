@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, User, Store, Eye, EyeOff, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,7 @@ interface AuthModalProps {
 }
 
 const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) => {
+  const navigate = useNavigate();
   const { signUp, signIn } = useAuth();
   const { toast } = useToast();
   const [mode, setMode] = useState<AuthMode>(initialMode);
@@ -248,6 +250,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
 
     try {
       let emailToUse = formData.email;
+      let isCommerceLogin = userType === 'commerce';
 
       // If commerce login with document, lookup email from commerces table
       if (userType === 'commerce' && formData.email) {
@@ -288,6 +291,11 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
       const { error } = await signIn(emailToUse, formData.password);
       if (!error) {
         handleClose();
+        
+        // Redirect based on user type
+        if (isCommerceLogin) {
+          navigate('/commerce');
+        }
       }
     } finally {
       setIsSubmitting(false);
