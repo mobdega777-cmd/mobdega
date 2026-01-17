@@ -5,7 +5,15 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import { fetchAddressByCep, formatCep, getCepProximityScore } from "@/lib/viaCepService";
+import { fetchAddressByCep, formatCep, getCepProximityScore, isCepInRange } from "@/lib/viaCepService";
+
+interface DeliveryZone {
+  id: string;
+  commerce_id: string;
+  cep_start: string;
+  cep_end: string;
+  is_active: boolean;
+}
 
 interface OpeningHours {
   [key: string]: {
@@ -70,26 +78,55 @@ const FeaturedStores = () => {
   const [lookingUpCep, setLookingUpCep] = useState(false);
   const [locationInfo, setLocationInfo] = useState<string | null>(null);
 
+  const [deliveryZones, setDeliveryZones] = useState<DeliveryZone[]>([]);
+  const [noStoresInArea, setNoStoresInArea] = useState(false);
+
+  const fetchDeliveryZones = async () => {
+    const { data } = await supabase
+      .from('delivery_zones')
+      .select('id, commerce_id, cep_start, cep_end, is_active')
+      .eq('is_active', true);
+    
+    setDeliveryZones((data || []) as DeliveryZone[]);
+    return (data || []) as DeliveryZone[];
+  };
+
+  const isCommerceDeliveringToCep = (commerceId: string, userCep: string, zones: DeliveryZone[]): boolean => {
+    const commerceZones = zones.filter(z => z.commerce_id === commerceId);
+    if (commerceZones.length === 0) return true; // No zones configured = delivers everywhere
+    return commerceZones.some(zone => isCepInRange(userCep, zone.cep_start, zone.cep_end));
+  };
+
   const fetchStores = useCallback(async (cepFilter?: string) => {
     setLoading(true);
+    setNoStoresInArea(false);
 
-    // Fetch approved commerces
+    // Fetch delivery zones first
+    const zones = await fetchDeliveryZones();
+
+    // Fetch approved commerces that are open
     const { data: commerces, error } = await supabase
       .from('commerces')
       .select('id, fantasy_name, city, cep, logo_url, cover_url, neighborhood, is_open, opening_hours, whatsapp, phone')
       .eq('status', 'approved')
-      .limit(12);
+      .eq('is_open', true)
+      .limit(50);
 
     if (error) {
       console.error('Error fetching stores:', error);
       setStores([]);
     } else {
-      let sortedStores = (commerces || []) as Commerce[];
+      let filteredStores = (commerces || []) as Commerce[];
 
-      // If we have a CEP to compare, sort by proximity
+      // If user provided a CEP, filter stores that deliver to that area
       const compareCep = cepFilter || userCep;
       if (compareCep) {
-        sortedStores = sortedStores.sort((a, b) => {
+        filteredStores = filteredStores.filter(store => 
+          isCommerceDeliveringToCep(store.id, compareCep, zones)
+        );
+
+        // Sort by proximity
+        filteredStores = filteredStores.sort((a, b) => {
           if (!a.cep && !b.cep) return 0;
           if (!a.cep) return 1;
           if (!b.cep) return -1;
@@ -98,9 +135,18 @@ const FeaturedStores = () => {
           const scoreB = getCepProximityScore(compareCep, b.cep);
           return scoreA - scoreB;
         });
+
+        if (filteredStores.length === 0) {
+          setNoStoresInArea(true);
+        }
       }
 
-      setStores(sortedStores);
+      // Also filter by actual open status based on hours
+      filteredStores = filteredStores.filter(store => 
+        isStoreOpen(store.is_open, store.opening_hours as OpeningHours)
+      );
+
+      setStores(filteredStores.slice(0, 12));
     }
 
     setLoading(false);
@@ -201,8 +247,16 @@ const FeaturedStores = () => {
         ) : stores.length === 0 ? (
           <div className="text-center py-16 text-muted-foreground">
             <MapPin className="w-12 h-12 mx-auto mb-4 opacity-50" />
-            <p className="text-lg">Nenhum comércio encontrado</p>
-            <p className="text-sm">Seja o primeiro a se cadastrar na plataforma!</p>
+            <p className="text-lg">
+              {noStoresInArea 
+                ? "Nenhum comércio entrega na sua região" 
+                : "Nenhum comércio aberto no momento"}
+            </p>
+            <p className="text-sm">
+              {noStoresInArea 
+                ? "Tente buscar com outro CEP ou aguarde novos parceiros" 
+                : "Volte mais tarde ou cadastre seu comércio!"}
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
