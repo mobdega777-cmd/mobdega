@@ -1,9 +1,12 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Shield, Eye, EyeOff } from "lucide-react";
+import { X, Shield, Eye, EyeOff, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { useNavigate } from "react-router-dom";
 
 interface MasterAdminModalProps {
   isOpen: boolean;
@@ -14,6 +17,78 @@ const MasterAdminModal = ({ isOpen, onClose }: MasterAdminModalProps) => {
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
+  const navigate = useNavigate();
+
+  const handleLogin = async () => {
+    if (!email || !password) {
+      toast({
+        variant: "destructive",
+        title: "Preencha todos os campos",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        toast({
+          variant: "destructive",
+          title: "Erro ao entrar",
+          description: error.message,
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      // Check if user is master admin
+      const { data: roleData, error: roleError } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", data.user.id)
+        .maybeSingle();
+
+      if (roleError || roleData?.role !== "master_admin") {
+        toast({
+          variant: "destructive",
+          title: "Acesso negado",
+          description: "Você não tem permissão de administrador.",
+        });
+        await supabase.auth.signOut();
+        setIsLoading(false);
+        return;
+      }
+
+      toast({
+        title: "Bem-vindo, Admin!",
+        description: "Acesso autorizado ao painel master.",
+      });
+
+      onClose();
+      navigate("/admin");
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Erro inesperado",
+        description: "Tente novamente mais tarde.",
+      });
+    }
+
+    setIsLoading(false);
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      handleLogin();
+    }
+  };
 
   return (
     <AnimatePresence>
@@ -61,8 +136,10 @@ const MasterAdminModal = ({ isOpen, onClose }: MasterAdminModalProps) => {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  onKeyPress={handleKeyPress}
                   placeholder="admin@mobdega.com"
                   className="h-12 bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground placeholder:text-primary-foreground/40"
+                  disabled={isLoading}
                 />
               </div>
 
@@ -76,8 +153,10 @@ const MasterAdminModal = ({ isOpen, onClose }: MasterAdminModalProps) => {
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    onKeyPress={handleKeyPress}
                     placeholder="••••••••"
                     className="h-12 pr-12 bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground placeholder:text-primary-foreground/40"
+                    disabled={isLoading}
                   />
                   <button
                     type="button"
@@ -89,8 +168,21 @@ const MasterAdminModal = ({ isOpen, onClose }: MasterAdminModalProps) => {
                 </div>
               </div>
 
-              <Button variant="hero" className="w-full" size="lg">
-                Acessar Painel
+              <Button 
+                variant="hero" 
+                className="w-full" 
+                size="lg" 
+                onClick={handleLogin}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Verificando...
+                  </>
+                ) : (
+                  "Acessar Painel"
+                )}
               </Button>
 
               <p className="text-xs text-center text-primary-foreground/40">
