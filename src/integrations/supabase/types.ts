@@ -350,6 +350,35 @@ export type Database = {
           },
         ]
       }
+      favorites: {
+        Row: {
+          commerce_id: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          commerce_id: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          commerce_id?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "favorites_commerce_id_fkey"
+            columns: ["commerce_id"]
+            isOneToOne: false
+            referencedRelation: "commerces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       financial_transactions: {
         Row: {
           amount: number
@@ -699,6 +728,8 @@ export type Database = {
           address: string | null
           address_number: string | null
           avatar_url: string | null
+          bio: string | null
+          birthday: string | null
           cep: string | null
           city: string | null
           complement: string | null
@@ -716,6 +747,8 @@ export type Database = {
           address?: string | null
           address_number?: string | null
           avatar_url?: string | null
+          bio?: string | null
+          birthday?: string | null
           cep?: string | null
           city?: string | null
           complement?: string | null
@@ -733,6 +766,8 @@ export type Database = {
           address?: string | null
           address_number?: string | null
           avatar_url?: string | null
+          bio?: string | null
+          birthday?: string | null
           cep?: string | null
           city?: string | null
           complement?: string | null
@@ -747,6 +782,44 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      reviews: {
+        Row: {
+          comment: string | null
+          commerce_id: string
+          created_at: string
+          id: string
+          rating: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          comment?: string | null
+          commerce_id: string
+          created_at?: string
+          id?: string
+          rating: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          comment?: string | null
+          commerce_id?: string
+          created_at?: string
+          id?: string
+          rating?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reviews_commerce_id_fkey"
+            columns: ["commerce_id"]
+            isOneToOne: false
+            referencedRelation: "commerces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       site_customizations: {
         Row: {
