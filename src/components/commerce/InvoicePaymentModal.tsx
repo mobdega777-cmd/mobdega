@@ -75,7 +75,7 @@ const InvoicePaymentModal = ({ isOpen, onClose, invoice, commerceStats }: Invoic
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Wallet className="w-5 h-5 text-primary" />
@@ -83,7 +83,7 @@ const InvoicePaymentModal = ({ isOpen, onClose, invoice, commerceStats }: Invoic
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6">
+        <div className="space-y-4">
           {/* Resumo do mês */}
           <Card className="border-primary/20 bg-primary/5">
             <CardContent className="p-4">
