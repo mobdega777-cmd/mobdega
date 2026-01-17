@@ -1,10 +1,52 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { MapPin, Star, Clock, Search, Loader2 } from "lucide-react";
+import { MapPin, Star, Clock, Search, Loader2, Phone } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAddressByCep, formatCep, getCepProximityScore } from "@/lib/viaCepService";
+
+interface OpeningHours {
+  [key: string]: {
+    open: string;
+    close: string;
+    enabled: boolean;
+  };
+}
+
+const getDayKey = (date: Date): string => {
+  const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+  return days[date.getDay()];
+};
+
+const isStoreOpen = (isOpen: boolean | null, openingHours: OpeningHours | null): boolean => {
+  if (isOpen === false) return false;
+  if (!openingHours) return true;
+  
+  const now = new Date();
+  const dayKey = getDayKey(now);
+  const todayHours = openingHours[dayKey];
+  
+  if (!todayHours || !todayHours.enabled) return false;
+  
+  const currentTime = now.getHours() * 60 + now.getMinutes();
+  const [openHour, openMinute] = todayHours.open.split(':').map(Number);
+  const [closeHour, closeMinute] = todayHours.close.split(':').map(Number);
+  const openTime = openHour * 60 + openMinute;
+  const closeTime = closeHour * 60 + closeMinute;
+  
+  return currentTime >= openTime && currentTime <= closeTime;
+};
+
+const getTodayHours = (openingHours: OpeningHours | null): string => {
+  if (!openingHours) return '';
+  const dayKey = getDayKey(new Date());
+  const todayHours = openingHours[dayKey];
+  if (!todayHours || !todayHours.enabled) return 'Fechado hoje';
+  return `${todayHours.open} - ${todayHours.close}`;
+};
+
 
 interface Commerce {
   id: string;
@@ -12,7 +54,12 @@ interface Commerce {
   city: string | null;
   cep: string | null;
   logo_url: string | null;
+  cover_url: string | null;
   neighborhood: string | null;
+  is_open: boolean | null;
+  opening_hours: OpeningHours | null;
+  whatsapp: string | null;
+  phone: string | null;
 }
 
 const FeaturedStores = () => {
@@ -29,7 +76,7 @@ const FeaturedStores = () => {
     // Fetch approved commerces
     const { data: commerces, error } = await supabase
       .from('commerces')
-      .select('id, fantasy_name, city, cep, logo_url, neighborhood')
+      .select('id, fantasy_name, city, cep, logo_url, cover_url, neighborhood, is_open, opening_hours, whatsapp, phone')
       .eq('status', 'approved')
       .limit(12);
 
@@ -37,7 +84,7 @@ const FeaturedStores = () => {
       console.error('Error fetching stores:', error);
       setStores([]);
     } else {
-      let sortedStores = commerces || [];
+      let sortedStores = (commerces || []) as Commerce[];
 
       // If we have a CEP to compare, sort by proximity
       const compareCep = cepFilter || userCep;
@@ -104,7 +151,7 @@ const FeaturedStores = () => {
             Destaques
           </span>
           <h2 className="font-display text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-4">
-            Comércios <span className="text-gradient-primary">perto de você</span>
+            Adegas e Tabacarias <span className="text-gradient-primary">perto de você</span>
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-8">
             Encontre as melhores adegas e tabacarias que entregam na sua região.
@@ -169,9 +216,15 @@ const FeaturedStores = () => {
                 whileHover={{ y: -8 }}
                 className="bg-card rounded-2xl overflow-hidden shadow-card hover:shadow-elevated transition-all duration-300 cursor-pointer group"
               >
-                {/* Store Image */}
+                {/* Store Cover Image */}
                 <div className="relative h-40 overflow-hidden bg-gradient-to-br from-primary/20 to-secondary/20">
-                  {store.logo_url ? (
+                  {store.cover_url ? (
+                    <img
+                      src={store.cover_url}
+                      alt={store.fantasy_name}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                    />
+                  ) : store.logo_url ? (
                     <img
                       src={store.logo_url}
                       alt={store.fantasy_name}
@@ -197,10 +250,19 @@ const FeaturedStores = () => {
                     </div>
                   )}
 
-                  {/* Rating placeholder */}
-                  <div className="absolute top-3 right-3 bg-card/95 backdrop-blur-sm rounded-lg px-2 py-1 flex items-center gap-1">
-                    <Star className="w-4 h-4 text-accent fill-accent" />
-                    <span className="text-sm font-semibold text-foreground">Novo</span>
+                  {/* Status badge */}
+                  <div className="absolute top-3 right-3 flex items-center gap-2">
+                    <Badge 
+                      className={`${isStoreOpen(store.is_open, store.opening_hours as OpeningHours) 
+                        ? 'bg-green-500/90 text-white' 
+                        : 'bg-red-500/90 text-white'} border-0`}
+                    >
+                      {isStoreOpen(store.is_open, store.opening_hours as OpeningHours) ? 'Aberto' : 'Fechado'}
+                    </Badge>
+                    <div className="bg-card/95 backdrop-blur-sm rounded-lg px-2 py-1 flex items-center gap-1">
+                      <Star className="w-4 h-4 text-accent fill-accent" />
+                      <span className="text-sm font-semibold text-foreground">Novo</span>
+                    </div>
                   </div>
                 </div>
 
@@ -210,11 +272,16 @@ const FeaturedStores = () => {
                     {store.fantasy_name}
                   </h3>
                   
-                  <div className="flex items-center gap-1 text-muted-foreground text-sm mb-3">
+                  <div className="flex items-center gap-1 text-muted-foreground text-sm mb-2">
                     <MapPin className="w-4 h-4 flex-shrink-0" />
                     <span className="truncate">
                       {store.neighborhood ? `${store.neighborhood}, ` : ''}{store.city || 'Localização não informada'}
                     </span>
+                  </div>
+
+                  <div className="flex items-center gap-1 text-muted-foreground text-sm mb-3">
+                    <Clock className="w-4 h-4 flex-shrink-0" />
+                    <span>{getTodayHours(store.opening_hours as OpeningHours) || 'Horário não informado'}</span>
                   </div>
 
                   <div className="flex items-center justify-between">
@@ -222,6 +289,17 @@ const FeaturedStores = () => {
                       <Clock className="w-4 h-4" />
                       Entrega rápida
                     </div>
+                    {(store.whatsapp || store.phone) && (
+                      <a 
+                        href={`https://wa.me/55${(store.whatsapp || store.phone)?.replace(/\D/g, '')}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-green-600 hover:text-green-500 transition-colors"
+                      >
+                        <Phone className="w-5 h-5" />
+                      </a>
+                    )}
                   </div>
                 </div>
               </motion.div>
