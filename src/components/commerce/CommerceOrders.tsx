@@ -81,9 +81,15 @@ interface CashMovement {
   payment_method: string;
   description: string | null;
   created_at: string;
+  isMovement?: true;
 }
 
-type CombinedOrder = Order | (CashMovement & { isMovement: true });
+type CombinedOrder = (Order & { isMovement?: false }) | (CashMovement & { isMovement: true });
+
+// Helper function to check if item is a cash movement
+const isCashMovement = (order: CombinedOrder): order is (CashMovement & { isMovement: true }) => {
+  return 'isMovement' in order && order.isMovement === true;
+};
 
 const statusConfig: Record<string, { label: string; color: string; icon: React.ElementType }> = {
   pending: { label: "Pendente", color: "bg-yellow-500/20 text-yellow-500", icon: Clock },
@@ -113,7 +119,7 @@ type OrderStatus = "pending" | "confirmed" | "preparing" | "delivering" | "deliv
 const ITEMS_PER_PAGE = 10;
 
 const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [orders, setOrders] = useState<CombinedOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -134,8 +140,8 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
   const fetchOrders = async () => {
     setLoading(true);
     
-    // Fetch orders
-    let query = supabase
+    // Fetch orders from orders table
+    let ordersQuery = supabase
       .from('orders')
       .select('*')
       .eq('commerce_id', commerceId)
@@ -144,16 +150,48 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
       .order('created_at', { ascending: false });
 
     if (statusFilter !== 'all') {
-      query = query.eq('status', statusFilter as OrderStatus);
+      ordersQuery = ordersQuery.eq('status', statusFilter as OrderStatus);
     }
 
-    const { data, error } = await query;
-
-    if (error) {
-      console.error('Error fetching orders:', error);
-    } else {
-      setOrders(data || []);
+    // Fetch cash movements (PDV sales) - only if not filtering by order status
+    const { data: ordersData, error: ordersError } = await ordersQuery;
+    
+    if (ordersError) {
+      console.error('Error fetching orders:', ordersError);
     }
+
+    // Convert orders to combined format
+    const combinedOrders: CombinedOrder[] = (ordersData || []).map(order => order as Order);
+
+    // Fetch cash movements (PDV sales) only if status filter is 'all' or 'delivered'
+    if (statusFilter === 'all' || statusFilter === 'delivered') {
+      const { data: movementsData, error: movementsError } = await supabase
+        .from('cash_movements')
+        .select('*')
+        .eq('commerce_id', commerceId)
+        .eq('type', 'sale')
+        .gte('created_at', dateFilter.start.toISOString())
+        .lte('created_at', dateFilter.end.toISOString())
+        .order('created_at', { ascending: false });
+
+      if (movementsError) {
+        console.error('Error fetching cash movements:', movementsError);
+      } else if (movementsData) {
+        // Convert cash movements to combined format
+        const movementOrders: CombinedOrder[] = movementsData.map(movement => ({
+          ...movement,
+          isMovement: true as const,
+        }));
+        combinedOrders.push(...movementOrders);
+      }
+    }
+
+    // Sort by created_at descending
+    combinedOrders.sort((a, b) => 
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+
+    setOrders(combinedOrders);
     setLoading(false);
   };
 
@@ -173,7 +211,7 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
     }
 
     const order = orders.find(o => o.id === orderId);
-    if (order) {
+    if (order && !isCashMovement(order)) {
       setSelectedOrder({ ...order, order_items: items || [] });
       setIsDetailsOpen(true);
     }
@@ -212,11 +250,16 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
     return flow[currentStatus] || null;
   };
 
-  const filteredOrders = orders.filter(order =>
-    order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    order.customer_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    order.customer_phone?.includes(searchTerm)
-  );
+  const filteredOrders = orders.filter(order => {
+    const searchLower = searchTerm.toLowerCase();
+    if (isCashMovement(order)) {
+      return order.id.toLowerCase().includes(searchLower) ||
+        order.description?.toLowerCase().includes(searchLower);
+    }
+    return order.id.toLowerCase().includes(searchLower) ||
+      order.customer_name?.toLowerCase().includes(searchLower) ||
+      order.customer_phone?.includes(searchTerm);
+  });
 
   // Pagination
   const totalPages = Math.ceil(filteredOrders.length / ITEMS_PER_PAGE);
@@ -291,9 +334,12 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
                 </TableHeader>
                 <TableBody>
                   {paginatedOrders.map((order) => {
-                    const status = statusConfig[order.status] || statusConfig.pending;
+                    const isMovement = isCashMovement(order);
+                    const status = isMovement 
+                      ? statusConfig.delivered 
+                      : (statusConfig[order.status] || statusConfig.pending);
                     const StatusIcon = status.icon;
-                    const nextStatus = getNextStatus(order.status);
+                    const nextStatus = isMovement ? null : getNextStatus(order.status);
 
                     return (
                       <TableRow key={order.id}>
@@ -302,15 +348,17 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
                         </TableCell>
                         <TableCell>
                           <div>
-                            <p className="font-medium">{order.customer_name || "Cliente"}</p>
-                            {order.customer_phone && (
+                            <p className="font-medium">
+                              {isMovement ? (order.description || "Venda PDV") : (order.customer_name || "Cliente")}
+                            </p>
+                            {!isMovement && order.customer_phone && (
                               <p className="text-xs text-muted-foreground">{order.customer_phone}</p>
                             )}
                           </div>
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline">
-                            {orderTypeLabels[order.order_type || 'delivery']}
+                            {isMovement ? "PDV/Caixa" : orderTypeLabels[order.order_type || 'delivery']}
                           </Badge>
                         </TableCell>
                         <TableCell>
@@ -320,12 +368,12 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
                           </div>
                         </TableCell>
                         <TableCell className="font-medium">
-                          R$ {Number(order.total).toFixed(2)}
+                          R$ {Number(isMovement ? order.amount : order.total).toFixed(2)}
                         </TableCell>
                         <TableCell>
                           <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${status.color}`}>
                             <StatusIcon className="w-3 h-3" />
-                            {status.label}
+                            {isMovement ? "Finalizado" : status.label}
                           </span>
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
@@ -336,29 +384,33 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => fetchOrderDetails(order.id)}
-                            >
-                              <Eye className="w-4 h-4" />
-                            </Button>
-                            {nextStatus && (
-                              <Button
-                                size="sm"
-                                onClick={() => updateOrderStatus(order.id, nextStatus)}
-                              >
-                                {statusConfig[nextStatus]?.label}
-                              </Button>
-                            )}
-                            {order.status !== 'cancelled' && order.status !== 'delivered' && (
-                              <Button
-                                variant="destructive"
-                                size="sm"
-                                onClick={() => updateOrderStatus(order.id, 'cancelled')}
-                              >
-                                <XCircle className="w-4 h-4" />
-                              </Button>
+                            {!isMovement && (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => fetchOrderDetails(order.id)}
+                                >
+                                  <Eye className="w-4 h-4" />
+                                </Button>
+                                {nextStatus && (
+                                  <Button
+                                    size="sm"
+                                    onClick={() => updateOrderStatus(order.id, nextStatus)}
+                                  >
+                                    {statusConfig[nextStatus]?.label}
+                                  </Button>
+                                )}
+                                {order.status !== 'cancelled' && order.status !== 'delivered' && (
+                                  <Button
+                                    variant="destructive"
+                                    size="sm"
+                                    onClick={() => updateOrderStatus(order.id, 'cancelled')}
+                                  >
+                                    <XCircle className="w-4 h-4" />
+                                  </Button>
+                                )}
+                              </>
                             )}
                           </div>
                         </TableCell>
