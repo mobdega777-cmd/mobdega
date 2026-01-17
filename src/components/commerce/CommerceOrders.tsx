@@ -83,6 +83,8 @@ const orderTypeLabels: Record<string, string> = {
   table: "Mesa",
 };
 
+type OrderStatus = "pending" | "confirmed" | "preparing" | "delivering" | "delivered" | "cancelled";
+
 const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -100,7 +102,7 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
       .order('created_at', { ascending: false });
 
     if (statusFilter !== 'all') {
-      query = query.eq('status', statusFilter);
+      query = query.eq('status', statusFilter as OrderStatus);
     }
 
     const { data, error } = await query;
@@ -158,8 +160,8 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
     }
   };
 
-  const getNextStatus = (currentStatus: string): string | null => {
-    const flow: Record<string, string> = {
+  const getNextStatus = (currentStatus: string): OrderStatus | null => {
+    const flow: Record<string, OrderStatus> = {
       pending: 'confirmed',
       confirmed: 'preparing',
       preparing: 'delivering',
