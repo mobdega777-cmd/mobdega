@@ -37,7 +37,11 @@ import {
   ArrowDownCircle,
   Banknote,
   CreditCard,
-  Smartphone
+  Smartphone,
+  ShoppingCart,
+  Search,
+  Pencil,
+  Trash2
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -66,6 +70,15 @@ interface CashMovement {
   payment_method: string;
   description: string | null;
   created_at: string;
+  order_id: string | null;
+}
+
+interface Product {
+  id: string;
+  name: string;
+  price: number;
+  promotional_price: number | null;
+  stock: number | null;
 }
 
 const paymentMethods = [
@@ -78,22 +91,33 @@ const paymentMethods = [
 const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
   const [currentRegister, setCurrentRegister] = useState<CashRegister | null>(null);
   const [movements, setMovements] = useState<CashMovement[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [isOpenDialogOpen, setIsOpenDialogOpen] = useState(false);
   const [isCloseDialogOpen, setIsCloseDialogOpen] = useState(false);
-  const [isMovementDialogOpen, setIsMovementDialogOpen] = useState(false);
+  const [isSaleDialogOpen, setIsSaleDialogOpen] = useState(false);
+  const [isEditMovementDialogOpen, setIsEditMovementDialogOpen] = useState(false);
+  const [editingMovement, setEditingMovement] = useState<CashMovement | null>(null);
   const { user } = useAuth();
   const { toast } = useToast();
 
   const [openingAmount, setOpeningAmount] = useState("");
   const [closingAmount, setClosingAmount] = useState("");
   const [closingNotes, setClosingNotes] = useState("");
+  const [productSearch, setProductSearch] = useState("");
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [amountPaid, setAmountPaid] = useState("");
   
-  const [movementForm, setMovementForm] = useState({
-    type: "deposit",
+  const [saleForm, setSaleForm] = useState({
+    product_id: "",
     amount: "",
     payment_method: "cash",
-    description: "",
+    quantity: "1",
+  });
+
+  const [editForm, setEditForm] = useState({
+    amount: "",
+    payment_method: "cash",
   });
 
   const fetchData = async () => {
@@ -117,6 +141,16 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
 
       setMovements(movementsData || []);
     }
+
+    // Fetch products
+    const { data: productsData } = await supabase
+      .from('products')
+      .select('id, name, price, promotional_price, stock')
+      .eq('commerce_id', commerceId)
+      .eq('is_active', true)
+      .order('name');
+
+    setProducts(productsData || []);
 
     setLoading(false);
   };
@@ -192,33 +226,132 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
     }
   };
 
-  const addMovement = async (e: React.FormEvent) => {
+  const addSale = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !currentRegister) return;
+    if (!user || !currentRegister || !selectedProduct) return;
+
+    const saleAmount = parseFloat(saleForm.amount);
+    const quantity = parseInt(saleForm.quantity) || 1;
+
+    // Update product stock
+    if (selectedProduct.stock !== null) {
+      await supabase
+        .from('products')
+        .update({ stock: selectedProduct.stock - quantity })
+        .eq('id', selectedProduct.id);
+    }
 
     const { error } = await supabase
       .from('cash_movements')
       .insert({
         cash_register_id: currentRegister.id,
         commerce_id: commerceId,
-        type: movementForm.type,
-        amount: parseFloat(movementForm.amount),
-        payment_method: movementForm.payment_method,
-        description: movementForm.description || null,
+        type: 'sale',
+        amount: saleAmount,
+        payment_method: saleForm.payment_method,
+        description: `Venda: ${selectedProduct.name} (x${quantity})`,
         created_by: user.id,
       });
 
     if (error) {
-      toast({ variant: "destructive", title: "Erro ao registrar movimentação", description: error.message });
+      toast({ variant: "destructive", title: "Erro ao registrar venda", description: error.message });
     } else {
-      toast({ title: "Movimentação registrada!" });
-      setIsMovementDialogOpen(false);
-      setMovementForm({
-        type: "deposit",
-        amount: "",
-        payment_method: "cash",
-        description: "",
+      toast({ title: "Venda registrada!" });
+      setIsSaleDialogOpen(false);
+      resetSaleForm();
+      fetchData();
+    }
+  };
+
+  const resetSaleForm = () => {
+    setSaleForm({
+      product_id: "",
+      amount: "",
+      payment_method: "cash",
+      quantity: "1",
+    });
+    setSelectedProduct(null);
+    setProductSearch("");
+    setAmountPaid("");
+  };
+
+  const handleSelectProduct = (product: Product) => {
+    setSelectedProduct(product);
+    const salePrice = product.promotional_price || product.price;
+    setSaleForm({
+      ...saleForm,
+      product_id: product.id,
+      amount: salePrice.toString(),
+    });
+    setProductSearch(product.name);
+  };
+
+  const updateSaleAmount = (quantity: string) => {
+    const qty = parseInt(quantity) || 1;
+    if (selectedProduct) {
+      const salePrice = selectedProduct.promotional_price || selectedProduct.price;
+      setSaleForm({
+        ...saleForm,
+        quantity,
+        amount: (salePrice * qty).toString(),
       });
+    } else {
+      setSaleForm({ ...saleForm, quantity });
+    }
+  };
+
+  // Cálculo de troco
+  const calculateChange = (): number => {
+    const paid = parseFloat(amountPaid) || 0;
+    const total = parseFloat(saleForm.amount) || 0;
+    return paid - total;
+  };
+
+  const change = calculateChange();
+
+  const handleEditMovement = (movement: CashMovement) => {
+    setEditingMovement(movement);
+    setEditForm({
+      amount: movement.amount.toString(),
+      payment_method: movement.payment_method,
+    });
+    setIsEditMovementDialogOpen(true);
+  };
+
+  const updateMovement = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingMovement) return;
+
+    const { error } = await supabase
+      .from('cash_movements')
+      .update({
+        amount: parseFloat(editForm.amount),
+        payment_method: editForm.payment_method,
+      })
+      .eq('id', editingMovement.id);
+
+    if (error) {
+      toast({ variant: "destructive", title: "Erro ao atualizar movimentação", description: error.message });
+    } else {
+      toast({ title: "Movimentação atualizada!" });
+      setIsEditMovementDialogOpen(false);
+      setEditingMovement(null);
+      fetchData();
+    }
+  };
+
+  const deleteMovement = async (movementId: string) => {
+    if (!confirm('Tem certeza que deseja excluir esta movimentação?')) return;
+
+    const { error } = await supabase
+      .from('cash_movements')
+      .delete()
+      .eq('id', movementId);
+
+    if (error) {
+      toast({ variant: "destructive", title: "Erro ao excluir movimentação", description: error.message });
+    } else {
+      toast({ title: "Movimentação excluída!" });
       fetchData();
     }
   };
@@ -236,6 +369,10 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
   };
 
   const totals = calculateTotals();
+
+  const filteredProducts = products.filter(p => 
+    p.name.toLowerCase().includes(productSearch.toLowerCase())
+  );
 
   if (loading) {
     return (
@@ -287,50 +424,95 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
           </Dialog>
         ) : (
           <div className="flex gap-2">
-            <Dialog open={isMovementDialogOpen} onOpenChange={setIsMovementDialogOpen}>
+            {/* Lançar Venda Dialog */}
+            <Dialog open={isSaleDialogOpen} onOpenChange={(open) => {
+              setIsSaleDialogOpen(open);
+              if (!open) resetSaleForm();
+            }}>
               <DialogTrigger asChild>
                 <Button variant="outline" className="gap-2">
-                  <Plus className="w-4 h-4" />
-                  Movimentação
+                  <ShoppingCart className="w-4 h-4" />
+                  Lançar Venda
                 </Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Nova Movimentação</DialogTitle>
+                  <DialogTitle>Lançar Venda</DialogTitle>
                 </DialogHeader>
-                <form onSubmit={addMovement} className="space-y-4">
+                <form onSubmit={addSale} className="space-y-4">
                   <div>
-                    <Label>Tipo</Label>
-                    <Select
-                      value={movementForm.type}
-                      onValueChange={(value) => setMovementForm({ ...movementForm, type: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="deposit">Entrada/Suprimento</SelectItem>
-                        <SelectItem value="withdrawal">Sangria</SelectItem>
-                        <SelectItem value="expense">Despesa</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Label>Produto</Label>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        value={productSearch}
+                        onChange={(e) => {
+                          setProductSearch(e.target.value);
+                          if (selectedProduct && e.target.value !== selectedProduct.name) {
+                            setSelectedProduct(null);
+                            setSaleForm({ ...saleForm, product_id: "", amount: "" });
+                          }
+                        }}
+                        placeholder="Buscar produto..."
+                        className="pl-10"
+                      />
+                    </div>
+                    {productSearch && !selectedProduct && (
+                      <div className="mt-2 max-h-40 overflow-y-auto border rounded-lg">
+                        {filteredProducts.length === 0 ? (
+                          <p className="text-sm text-muted-foreground p-3">Nenhum produto encontrado</p>
+                        ) : (
+                          filteredProducts.map((product) => (
+                            <button
+                              key={product.id}
+                              type="button"
+                              className="w-full p-3 text-left hover:bg-muted/50 flex justify-between items-center border-b last:border-b-0"
+                              onClick={() => handleSelectProduct(product)}
+                            >
+                              <span>{product.name}</span>
+                              <span className="text-primary font-medium">
+                                R$ {(product.promotional_price || product.price).toFixed(2)}
+                              </span>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    )}
+                    {selectedProduct && (
+                      <p className="text-sm text-green-600 mt-1">
+                        ✓ Produto selecionado: R$ {(selectedProduct.promotional_price || selectedProduct.price).toFixed(2)} / un
+                      </p>
+                    )}
                   </div>
-                  <div>
-                    <Label htmlFor="amount">Valor (R$)</Label>
-                    <Input
-                      id="amount"
-                      type="number"
-                      step="0.01"
-                      value={movementForm.amount}
-                      onChange={(e) => setMovementForm({ ...movementForm, amount: e.target.value })}
-                      required
-                    />
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Quantidade</Label>
+                      <Input
+                        type="number"
+                        min="1"
+                        value={saleForm.quantity}
+                        onChange={(e) => updateSaleAmount(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>Valor Total (R$)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={saleForm.amount}
+                        onChange={(e) => setSaleForm({ ...saleForm, amount: e.target.value })}
+                        readOnly={!!selectedProduct}
+                        className={selectedProduct ? "bg-muted" : ""}
+                      />
+                    </div>
                   </div>
+
                   <div>
                     <Label>Forma de Pagamento</Label>
                     <Select
-                      value={movementForm.payment_method}
-                      onValueChange={(value) => setMovementForm({ ...movementForm, payment_method: value })}
+                      value={saleForm.payment_method}
+                      onValueChange={(value) => setSaleForm({ ...saleForm, payment_method: value })}
                     >
                       <SelectTrigger>
                         <SelectValue />
@@ -344,19 +526,47 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div>
-                    <Label htmlFor="description">Descrição</Label>
-                    <Input
-                      id="description"
-                      value={movementForm.description}
-                      onChange={(e) => setMovementForm({ ...movementForm, description: e.target.value })}
-                    />
-                  </div>
+
+                  {/* Sistema de Troco - apenas para Dinheiro */}
+                  {saleForm.payment_method === 'cash' && saleForm.amount && (
+                    <div className="space-y-3 p-4 rounded-lg border bg-muted/30">
+                      <div>
+                        <Label>Valor Pago (R$)</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={amountPaid}
+                          onChange={(e) => setAmountPaid(e.target.value)}
+                          placeholder="Valor recebido do cliente"
+                        />
+                      </div>
+                      {amountPaid && (
+                        <div className={`p-3 rounded-lg ${change >= 0 ? 'bg-green-500/10 border border-green-500/30' : 'bg-red-500/10 border border-red-500/30'}`}>
+                          <p className="text-sm text-muted-foreground">Troco a devolver</p>
+                          <p className={`text-2xl font-bold ${change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                            R$ {change.toFixed(2)}
+                          </p>
+                          {change < 0 && (
+                            <p className="text-xs text-red-500 mt-1">Valor insuficiente!</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div className="flex justify-end gap-2">
-                    <Button type="button" variant="outline" onClick={() => setIsMovementDialogOpen(false)}>
+                    <Button type="button" variant="outline" onClick={() => {
+                      setIsSaleDialogOpen(false);
+                      resetSaleForm();
+                    }}>
                       Cancelar
                     </Button>
-                    <Button type="submit">Registrar</Button>
+                    <Button 
+                      type="submit" 
+                      disabled={!selectedProduct || !saleForm.amount || (saleForm.payment_method === 'cash' && amountPaid && change < 0)}
+                    >
+                      Registrar Venda
+                    </Button>
                   </div>
                 </form>
               </DialogContent>
@@ -410,6 +620,51 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
           </div>
         )}
       </div>
+
+      {/* Edit Movement Dialog */}
+      <Dialog open={isEditMovementDialogOpen} onOpenChange={setIsEditMovementDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Movimentação</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={updateMovement} className="space-y-4">
+            <div>
+              <Label>Valor (R$)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={editForm.amount}
+                onChange={(e) => setEditForm({ ...editForm, amount: e.target.value })}
+                required
+              />
+            </div>
+            <div>
+              <Label>Forma de Pagamento</Label>
+              <Select
+                value={editForm.payment_method}
+                onValueChange={(value) => setEditForm({ ...editForm, payment_method: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {paymentMethods.map((method) => (
+                    <SelectItem key={method.value} value={method.value}>
+                      {method.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setIsEditMovementDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit">Salvar</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {currentRegister && (
         <>
@@ -502,6 +757,7 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
                       <TableHead>Forma Pgto.</TableHead>
                       <TableHead>Valor</TableHead>
                       <TableHead>Hora</TableHead>
+                      <TableHead className="text-right">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -537,6 +793,25 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
                               hour: '2-digit',
                               minute: '2-digit'
                             })}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEditMovement(movement)}
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => deleteMovement(movement.id)}
+                                className="text-red-500 hover:text-red-600"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       );
