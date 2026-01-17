@@ -219,14 +219,17 @@ export type Database = {
           cep: string | null
           city: string | null
           complement: string | null
+          cover_url: string | null
           created_at: string
           document: string
           document_type: string
           email: string
           fantasy_name: string
           id: string
+          is_open: boolean | null
           logo_url: string | null
           neighborhood: string | null
+          opening_hours: Json | null
           owner_id: string
           owner_name: string
           phone: string
@@ -234,6 +237,7 @@ export type Database = {
           rejection_reason: string | null
           status: Database["public"]["Enums"]["commerce_status"]
           updated_at: string
+          whatsapp: string | null
         }
         Insert: {
           address?: string | null
@@ -242,14 +246,17 @@ export type Database = {
           cep?: string | null
           city?: string | null
           complement?: string | null
+          cover_url?: string | null
           created_at?: string
           document: string
           document_type: string
           email: string
           fantasy_name: string
           id?: string
+          is_open?: boolean | null
           logo_url?: string | null
           neighborhood?: string | null
+          opening_hours?: Json | null
           owner_id: string
           owner_name: string
           phone: string
@@ -257,6 +264,7 @@ export type Database = {
           rejection_reason?: string | null
           status?: Database["public"]["Enums"]["commerce_status"]
           updated_at?: string
+          whatsapp?: string | null
         }
         Update: {
           address?: string | null
@@ -265,14 +273,17 @@ export type Database = {
           cep?: string | null
           city?: string | null
           complement?: string | null
+          cover_url?: string | null
           created_at?: string
           document?: string
           document_type?: string
           email?: string
           fantasy_name?: string
           id?: string
+          is_open?: boolean | null
           logo_url?: string | null
           neighborhood?: string | null
+          opening_hours?: Json | null
           owner_id?: string
           owner_name?: string
           phone?: string
@@ -280,6 +291,7 @@ export type Database = {
           rejection_reason?: string | null
           status?: Database["public"]["Enums"]["commerce_status"]
           updated_at?: string
+          whatsapp?: string | null
         }
         Relationships: [
           {

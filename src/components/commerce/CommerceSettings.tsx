@@ -43,6 +43,8 @@ interface CommerceData {
   city: string | null;
   cep: string | null;
   logo_url: string | null;
+  cover_url: string | null;
+  whatsapp: string | null;
   status: string;
 }
 
@@ -51,8 +53,11 @@ const CommerceSettings = ({ commerce }: CommerceSettingsProps) => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const [formData, setFormData] = useState({
@@ -67,6 +72,8 @@ const CommerceSettings = ({ commerce }: CommerceSettingsProps) => {
     city: "",
     cep: "",
     logo_url: "",
+    cover_url: "",
+    whatsapp: "",
   });
 
   useEffect(() => {
@@ -80,7 +87,7 @@ const CommerceSettings = ({ commerce }: CommerceSettingsProps) => {
       if (error) {
         console.error('Error fetching commerce:', error);
       } else {
-        setCommerceData(data);
+        setCommerceData(data as CommerceData);
         setFormData({
           fantasy_name: data.fantasy_name,
           owner_name: data.owner_name,
@@ -93,8 +100,11 @@ const CommerceSettings = ({ commerce }: CommerceSettingsProps) => {
           city: data.city || "",
           cep: data.cep || "",
           logo_url: data.logo_url || "",
+          cover_url: data.cover_url || "",
+          whatsapp: data.whatsapp || "",
         });
         setLogoPreview(data.logo_url || null);
+        setCoverPreview(data.cover_url || null);
       }
       setLoading(false);
     };
@@ -140,6 +150,44 @@ const CommerceSettings = ({ commerce }: CommerceSettingsProps) => {
     }
   };
 
+  const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingCover(true);
+
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${commerce.id}/cover/${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('commerce-assets')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('commerce-assets')
+        .getPublicUrl(fileName);
+
+      setFormData({ ...formData, cover_url: publicUrl });
+      setCoverPreview(publicUrl);
+      toast({ title: "Foto de capa enviada com sucesso!" });
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "Erro ao enviar foto de capa", description: error.message });
+    } finally {
+      setUploadingCover(false);
+    }
+  };
+
+  const removeCover = () => {
+    setFormData({ ...formData, cover_url: "" });
+    setCoverPreview(null);
+    if (coverInputRef.current) {
+      coverInputRef.current.value = "";
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -158,6 +206,8 @@ const CommerceSettings = ({ commerce }: CommerceSettingsProps) => {
         city: formData.city || null,
         cep: formData.cep || null,
         logo_url: formData.logo_url || null,
+        cover_url: formData.cover_url || null,
+        whatsapp: formData.whatsapp || null,
       })
       .eq('id', commerce.id);
 
@@ -312,7 +362,78 @@ const CommerceSettings = ({ commerce }: CommerceSettingsProps) => {
           </CardContent>
         </Card>
 
-        {/* Basic Info */}
+        {/* Cover Image Upload */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Camera className="w-5 h-5" />
+              Foto de Capa
+            </CardTitle>
+            <CardDescription>
+              Essa foto será exibida como banner na vitrine do seu comércio para os clientes
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col md:flex-row items-start gap-6">
+              {coverPreview || formData.cover_url ? (
+                <div className="relative w-full md:w-80">
+                  <img 
+                    src={coverPreview || formData.cover_url} 
+                    alt="Foto de capa" 
+                    className="w-full h-40 object-cover rounded-xl border-2 border-primary/20"
+                  />
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="destructive"
+                    className="absolute -top-2 -right-2 w-6 h-6"
+                    onClick={removeCover}
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              ) : (
+                <div
+                  onClick={() => coverInputRef.current?.click()}
+                  className="w-full md:w-80 h-40 border-2 border-dashed rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-primary transition-colors bg-muted/30"
+                >
+                  {uploadingCover ? (
+                    <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-primary" />
+                  ) : (
+                    <>
+                      <Upload className="w-8 h-8 text-muted-foreground mb-1" />
+                      <span className="text-sm text-muted-foreground">Clique para enviar foto de capa</span>
+                    </>
+                  )}
+                </div>
+              )}
+              <div className="flex-1">
+                <p className="text-sm font-medium mb-1">Imagem de capa</p>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Recomendado: 1280x400px, formato PNG ou JPG. Esta imagem aparecerá como banner na listagem de comércios.
+                </p>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => coverInputRef.current?.click()}
+                  disabled={uploadingCover}
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  {uploadingCover ? "Enviando..." : "Selecionar Foto de Capa"}
+                </Button>
+              </div>
+              <input
+                ref={coverInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleCoverUpload}
+                className="hidden"
+              />
+            </div>
+          </CardContent>
+        </Card>
+
         <Card className="mb-6">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -363,6 +484,18 @@ const CommerceSettings = ({ commerce }: CommerceSettingsProps) => {
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                   required
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="whatsapp">WhatsApp (para contato dos clientes)</Label>
+                <Input
+                  id="whatsapp"
+                  value={formData.whatsapp}
+                  onChange={(e) => setFormData({ ...formData, whatsapp: e.target.value })}
+                  placeholder="Ex: 11999998888"
                 />
               </div>
             </div>

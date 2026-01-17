@@ -56,8 +56,8 @@ const Index = () => {
       
       <main>
         <Hero onRegisterClick={handleRegisterClick} />
-        <Benefits />
         <FeaturedStores />
+        <Benefits />
       </main>
 
       <Footer />
