@@ -9,6 +9,7 @@ import {
   DollarSign,
   Calculator,
   Truck,
+  MapPin,
   Settings, 
   LogOut,
   Menu,
@@ -33,6 +34,7 @@ import CommerceFinancial from "@/components/commerce/CommerceFinancial";
 import CommerceCashRegister from "@/components/commerce/CommerceCashRegister";
 import CommerceDelivery from "@/components/commerce/CommerceDelivery";
 import CommerceSettings from "@/components/commerce/CommerceSettings";
+import DeliveryZonesConfig from "@/components/commerce/DeliveryZonesConfig";
 
 type CommerceSection = 
   | "overview" 
@@ -43,6 +45,7 @@ type CommerceSection =
   | "financial" 
   | "cashregister"
   | "delivery"
+  | "deliveryzones"
   | "settings";
 
 // Ordem atualizada: Caixa/PDV agora é a segunda opção (logo após Visão Geral)
@@ -51,6 +54,7 @@ const menuItems = [
   { id: "cashregister" as CommerceSection, label: "Caixa/PDV", icon: Calculator },
   { id: "orders" as CommerceSection, label: "Pedidos", icon: ShoppingCart },
   { id: "delivery" as CommerceSection, label: "Delivery", icon: Truck },
+  { id: "deliveryzones" as CommerceSection, label: "Áreas de Entrega", icon: MapPin },
   { id: "tables" as CommerceSection, label: "Mesas/Comandas", icon: Utensils },
   { id: "products" as CommerceSection, label: "Produtos", icon: Package },
   { id: "categories" as CommerceSection, label: "Categorias", icon: FolderOpen },
@@ -171,6 +175,8 @@ const CommerceDashboard = () => {
         return <CommerceCashRegister commerceId={commerce.id} />;
       case "delivery":
         return <CommerceDelivery commerceId={commerce.id} />;
+      case "deliveryzones":
+        return <DeliveryZonesConfig commerceId={commerce.id} />;
       case "settings":
         return <CommerceSettings commerce={commerce} />;
       default:
