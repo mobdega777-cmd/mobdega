@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      billing_config: {
+        Row: {
+          account_holder: string
+          bank_name: string | null
+          cnpj: string | null
+          created_at: string
+          id: string
+          pix_key: string
+          pix_key_type: string
+          qr_code_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_holder: string
+          bank_name?: string | null
+          cnpj?: string | null
+          created_at?: string
+          id?: string
+          pix_key: string
+          pix_key_type?: string
+          qr_code_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_holder?: string
+          bank_name?: string | null
+          cnpj?: string | null
+          created_at?: string
+          id?: string
+          pix_key?: string
+          pix_key_type?: string
+          qr_code_url?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       cash_movements: {
         Row: {
           amount: number
@@ -315,6 +351,8 @@ export type Database = {
           id: string
           notes: string | null
           paid_at: string | null
+          payment_confirmed_at: string | null
+          payment_confirmed_by_commerce: boolean | null
           payment_method: string | null
           reference_month: string
           status: Database["public"]["Enums"]["invoice_status"]
@@ -329,6 +367,8 @@ export type Database = {
           id?: string
           notes?: string | null
           paid_at?: string | null
+          payment_confirmed_at?: string | null
+          payment_confirmed_by_commerce?: boolean | null
           payment_method?: string | null
           reference_month: string
           status?: Database["public"]["Enums"]["invoice_status"]
@@ -343,6 +383,8 @@ export type Database = {
           id?: string
           notes?: string | null
           paid_at?: string | null
+          payment_confirmed_at?: string | null
+          payment_confirmed_by_commerce?: boolean | null
           payment_method?: string | null
           reference_month?: string
           status?: Database["public"]["Enums"]["invoice_status"]
