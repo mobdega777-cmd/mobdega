@@ -42,7 +42,15 @@ const isStoreOpen = (isOpen: boolean | null, openingHours: OpeningHours | null):
   const [openHour, openMinute] = todayHours.open.split(':').map(Number);
   const [closeHour, closeMinute] = todayHours.close.split(':').map(Number);
   const openTime = openHour * 60 + openMinute;
-  const closeTime = closeHour * 60 + closeMinute;
+  let closeTime = closeHour * 60 + closeMinute;
+  
+  // Handle overnight hours (e.g., 18:00 - 00:00 or 18:00 - 02:00)
+  if (closeTime <= openTime) {
+    // Closing time crosses midnight
+    closeTime += 24 * 60; // Add 24 hours
+    const adjustedCurrentTime = currentTime < openTime ? currentTime + 24 * 60 : currentTime;
+    return adjustedCurrentTime >= openTime && adjustedCurrentTime <= closeTime;
+  }
   
   return currentTime >= openTime && currentTime <= closeTime;
 };
