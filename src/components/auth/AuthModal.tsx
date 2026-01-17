@@ -93,7 +93,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
     setIsSubmitting(true);
 
     try {
-      // 1. Create the user account
+      // 1. Create the user account - triggers will auto-create role and profile
       const { error: signUpError } = await signUp(formData.email, formData.password, {
         full_name: formData.ownerName,
         user_type: 'commerce',
@@ -103,6 +103,9 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
         setIsSubmitting(false);
         return;
       }
+
+      // Wait a moment for the auth to complete
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       // Get the user that was just created
       const { data: { user } } = await supabase.auth.getUser();
@@ -148,25 +151,10 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
         return;
       }
 
-      // 3. Create user role as commerce
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .insert({
-          user_id: user.id,
-          role: 'commerce',
-        });
-
-      if (roleError) {
-        console.error('Error creating user role:', roleError);
-      }
-
-      // 4. Create profile
-      const { error: profileError } = await supabase
+      // 3. Update profile with additional data (trigger creates basic profile)
+      await supabase
         .from('profiles')
-        .insert({
-          user_id: user.id,
-          full_name: formData.ownerName,
-          email: formData.email,
+        .update({
           phone: formData.whatsapp,
           address: formData.address,
           address_number: formData.number,
@@ -174,11 +162,8 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
           city: formData.city,
           neighborhood: formData.neighborhood,
           complement: formData.complement,
-        });
-
-      if (profileError) {
-        console.error('Error creating profile:', profileError);
-      }
+        })
+        .eq('user_id', user.id);
 
       toast({
         title: "Cadastro realizado com sucesso!",
@@ -211,6 +196,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
     setIsSubmitting(true);
 
     try {
+      // Trigger will auto-create role and profile
       const { error: signUpError } = await signUp(formData.email, formData.password, {
         full_name: formData.name,
         user_type: 'user',
@@ -221,20 +207,14 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
         return;
       }
 
+      // Wait a moment for auth to complete
+      await new Promise(resolve => setTimeout(resolve, 500));
+
       const { data: { user } } = await supabase.auth.getUser();
       
       if (user) {
-        // Create user role
-        await supabase.from('user_roles').insert({
-          user_id: user.id,
-          role: 'user',
-        });
-
-        // Create profile
-        await supabase.from('profiles').insert({
-          user_id: user.id,
-          full_name: formData.name,
-          email: formData.email,
+        // Update profile with additional data (trigger creates basic profile)
+        await supabase.from('profiles').update({
           phone: formData.whatsapp,
           address: formData.address,
           address_number: formData.number,
@@ -242,8 +222,13 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
           city: formData.city,
           neighborhood: formData.neighborhood,
           complement: formData.complement,
-        });
+        }).eq('user_id', user.id);
       }
+
+      toast({
+        title: "Conta criada com sucesso!",
+        description: "Você já está logado.",
+      });
 
       handleClose();
     } catch (error) {
@@ -259,19 +244,48 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
   };
 
   const handleLogin = async () => {
-    if (!formData.email || !formData.password) {
-      toast({
-        variant: "destructive",
-        title: "Campos obrigatórios",
-        description: "Por favor, preencha email e senha.",
-      });
-      return;
-    }
-
     setIsSubmitting(true);
 
     try {
-      const { error } = await signIn(formData.email, formData.password);
+      let emailToUse = formData.email;
+
+      // If commerce login with document, lookup email from commerces table
+      if (userType === 'commerce' && formData.email) {
+        // Check if input looks like a document (numbers only)
+        const cleanInput = formData.email.replace(/\D/g, '');
+        if (cleanInput.length >= 11) {
+          // Lookup email by document
+          const { data: commerce } = await supabase
+            .from('commerces')
+            .select('email')
+            .eq('document', formData.email)
+            .maybeSingle();
+          
+          if (commerce?.email) {
+            emailToUse = commerce.email;
+          } else {
+            toast({
+              variant: "destructive",
+              title: "Comércio não encontrado",
+              description: "Não encontramos um comércio com este documento.",
+            });
+            setIsSubmitting(false);
+            return;
+          }
+        }
+      }
+
+      if (!emailToUse || !formData.password) {
+        toast({
+          variant: "destructive",
+          title: "Campos obrigatórios",
+          description: "Por favor, preencha email/documento e senha.",
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
+      const { error } = await signIn(emailToUse, formData.password);
       if (!error) {
         handleClose();
       }
