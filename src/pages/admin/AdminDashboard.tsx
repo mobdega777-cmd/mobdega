@@ -80,13 +80,14 @@ const AdminDashboard = () => {
   }, []);
 
   const fetchPendingConfirmations = async () => {
-    const { count } = await supabase
+    // Count invoices where commerce has confirmed payment (awaiting admin validation)
+    const { count: confirmedCount } = await supabase
       .from('invoices')
       .select('*', { count: 'exact', head: true })
       .eq('payment_confirmed_by_commerce', true)
       .eq('status', 'pending');
     
-    setPendingPaymentConfirmations(count || 0);
+    setPendingPaymentConfirmations(confirmedCount || 0);
   };
 
   const handleLogout = async () => {

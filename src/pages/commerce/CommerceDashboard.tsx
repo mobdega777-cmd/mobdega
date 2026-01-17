@@ -17,6 +17,7 @@ import {
   Store
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -53,7 +54,7 @@ const menuItems = [
   { id: "tables" as CommerceSection, label: "Mesas/Comandas", icon: Utensils },
   { id: "products" as CommerceSection, label: "Produtos", icon: Package },
   { id: "categories" as CommerceSection, label: "Categorias", icon: FolderOpen },
-  { id: "financial" as CommerceSection, label: "Financeiro", icon: DollarSign },
+  { id: "financial" as CommerceSection, label: "Financeiro", icon: DollarSign, showBadge: true },
   { id: "settings" as CommerceSection, label: "Configurações", icon: Settings },
 ];
 
@@ -69,6 +70,7 @@ const CommerceDashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [commerce, setCommerce] = useState<Commerce | null>(null);
   const [loading, setLoading] = useState(true);
+  const [pendingInvoicesCount, setPendingInvoicesCount] = useState(0);
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
 
@@ -89,9 +91,40 @@ const CommerceDashboard = () => {
     setLoading(false);
   };
 
+  const fetchPendingInvoices = async (commerceId: string) => {
+    const { count } = await supabase
+      .from('invoices')
+      .select('*', { count: 'exact', head: true })
+      .eq('commerce_id', commerceId)
+      .eq('status', 'pending')
+      .eq('payment_confirmed_by_commerce', false);
+    
+    setPendingInvoicesCount(count || 0);
+  };
+
   useEffect(() => {
     fetchCommerce();
   }, [user]);
+
+  useEffect(() => {
+    if (commerce?.id) {
+      fetchPendingInvoices(commerce.id);
+
+      // Subscribe to invoice changes for this commerce
+      const channel = supabase
+        .channel('commerce-invoices-changes')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'invoices', filter: `commerce_id=eq.${commerce.id}` },
+          () => fetchPendingInvoices(commerce.id)
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+  }, [commerce?.id]);
 
   // Refetch commerce data when settings are changed
   useEffect(() => {
@@ -212,6 +245,11 @@ const CommerceDashboard = () => {
                 {sidebarOpen && (
                   <>
                     <span className="flex-1 text-left font-medium">{item.label}</span>
+                    {item.showBadge && pendingInvoicesCount > 0 && (
+                      <Badge variant="destructive" className="text-xs px-2 py-0.5">
+                        {pendingInvoicesCount}
+                      </Badge>
+                    )}
                     {isActive && <ChevronRight className="w-4 h-4" />}
                   </>
                 )}
