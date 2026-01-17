@@ -263,6 +263,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
       });
 
       handleClose();
+      navigate('/minha-conta');
     } catch (error) {
       console.error('Registration error:', error);
       toast({
@@ -325,6 +326,8 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
         // Redirect based on user type
         if (isCommerceLogin) {
           navigate('/commerce');
+        } else {
+          navigate('/minha-conta');
         }
       }
     } finally {
