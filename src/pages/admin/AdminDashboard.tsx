@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { 
   LayoutDashboard, 
@@ -17,8 +17,10 @@ import {
   ChevronRight
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 import logoMobdega from "@/assets/logo-mobdega.png";
 
 // Admin sections
@@ -29,6 +31,7 @@ import AdminFinancial from "@/components/admin/AdminFinancial";
 import AdminInvoices from "@/components/admin/AdminInvoices";
 import AdminCustomization from "@/components/admin/AdminCustomization";
 import AdminSettings from "@/components/admin/AdminSettings";
+import AdminBillingConfig from "@/components/admin/AdminBillingConfig";
 
 type AdminSection = 
   | "overview" 
@@ -36,13 +39,15 @@ type AdminSection =
   | "commerces" 
   | "financial" 
   | "invoices" 
+  | "billing-config"
   | "customization" 
   | "settings";
 
 const menuItems = [
   { id: "overview" as AdminSection, label: "Visão Geral", icon: LayoutDashboard },
   { id: "financial" as AdminSection, label: "Financeiro", icon: DollarSign },
-  { id: "invoices" as AdminSection, label: "Faturas", icon: Receipt },
+  { id: "invoices" as AdminSection, label: "Faturas", icon: Receipt, showBadge: true },
+  { id: "billing-config" as AdminSection, label: "Configurar Cobrança", icon: CreditCard },
   { id: "users" as AdminSection, label: "Usuários", icon: Users },
   { id: "commerces" as AdminSection, label: "Adegas/Tabacarias", icon: Store },
   { id: "customization" as AdminSection, label: "Personalização", icon: Palette },
@@ -52,8 +57,37 @@ const menuItems = [
 const AdminDashboard = () => {
   const [activeSection, setActiveSection] = useState<AdminSection>("overview");
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [pendingPaymentConfirmations, setPendingPaymentConfirmations] = useState(0);
   const { signOut } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    fetchPendingConfirmations();
+
+    // Subscribe to invoice changes
+    const channel = supabase
+      .channel('invoices-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'invoices' },
+        () => fetchPendingConfirmations()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const fetchPendingConfirmations = async () => {
+    const { count } = await supabase
+      .from('invoices')
+      .select('*', { count: 'exact', head: true })
+      .eq('payment_confirmed_by_commerce', true)
+      .eq('status', 'pending');
+    
+    setPendingPaymentConfirmations(count || 0);
+  };
 
   const handleLogout = async () => {
     await signOut();
@@ -72,6 +106,8 @@ const AdminDashboard = () => {
         return <AdminFinancial />;
       case "invoices":
         return <AdminInvoices />;
+      case "billing-config":
+        return <AdminBillingConfig />;
       case "customization":
         return <AdminCustomization />;
       case "settings":
@@ -136,6 +172,11 @@ const AdminDashboard = () => {
                 {sidebarOpen && (
                   <>
                     <span className="flex-1 text-left font-medium">{item.label}</span>
+                    {item.showBadge && pendingPaymentConfirmations > 0 && (
+                      <Badge variant="destructive" className="text-xs px-2 py-0.5">
+                        {pendingPaymentConfirmations}
+                      </Badge>
+                    )}
                     {isActive && <ChevronRight className="w-4 h-4" />}
                   </>
                 )}

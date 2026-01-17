@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -19,6 +19,7 @@ import {
   MessageCircle
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface InvoicePaymentModalProps {
   isOpen: boolean;
@@ -37,24 +38,68 @@ interface InvoicePaymentModalProps {
   };
 }
 
-const PIX_KEY = "44.072.657/0001-30";
-const PIX_RECEIVER = "MOBDEGA TECNOLOGIA LTDA";
+interface BillingConfig {
+  pix_key: string;
+  pix_key_type: string;
+  qr_code_url: string | null;
+  bank_name: string | null;
+  account_holder: string;
+  cnpj: string | null;
+}
 
 const InvoicePaymentModal = ({ isOpen, onClose, invoice, commerceStats }: InvoicePaymentModalProps) => {
   const [copied, setCopied] = useState(false);
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
+  const [billingConfig, setBillingConfig] = useState<BillingConfig | null>(null);
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchBillingConfig();
+    }
+  }, [isOpen]);
+
+  const fetchBillingConfig = async () => {
+    const { data } = await supabase
+      .from('billing_config')
+      .select('*')
+      .limit(1)
+      .single();
+    
+    if (data) {
+      setBillingConfig(data);
+    }
+  };
 
   if (!invoice) return null;
 
   const handleCopyPix = () => {
-    navigator.clipboard.writeText(PIX_KEY);
+    if (!billingConfig) return;
+    navigator.clipboard.writeText(billingConfig.pix_key);
     setCopied(true);
     toast({ title: "Chave PIX copiada!" });
     setTimeout(() => setCopied(false), 3000);
   };
 
-  const handlePaymentConfirmation = () => {
+  const handlePaymentConfirmation = async () => {
+    // Update invoice to mark payment as confirmed by commerce
+    const { error } = await supabase
+      .from('invoices')
+      .update({ 
+        payment_confirmed_by_commerce: true,
+        payment_confirmed_at: new Date().toISOString()
+      })
+      .eq('id', invoice.id);
+
+    if (error) {
+      toast({ 
+        variant: 'destructive',
+        title: "Erro ao informar pagamento", 
+        description: error.message 
+      });
+      return;
+    }
+
     setPaymentConfirmed(true);
     toast({ 
       title: "Pagamento informado!", 
@@ -72,6 +117,8 @@ const InvoicePaymentModal = ({ isOpen, onClose, invoice, commerceStats }: Invoic
     avgTicket: 0,
     totalProducts: 0,
   };
+
+  const pixKeyType = billingConfig?.pix_key_type?.toUpperCase() || 'CNPJ';
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -141,41 +188,67 @@ const InvoicePaymentModal = ({ isOpen, onClose, invoice, commerceStats }: Invoic
           {/* QR Code e Chave PIX */}
           <div className="space-y-4">
             <div className="flex flex-col items-center gap-4">
-              <div className="p-6 bg-white rounded-xl border">
-                <QrCode className="w-32 h-32 text-gray-800" />
+              <div className="p-4 bg-white rounded-xl border">
+                {billingConfig?.qr_code_url ? (
+                  <img 
+                    src={billingConfig.qr_code_url} 
+                    alt="QR Code PIX" 
+                    className="w-32 h-32 object-contain"
+                  />
+                ) : (
+                  <QrCode className="w-32 h-32 text-gray-800" />
+                )}
               </div>
               <p className="text-sm text-muted-foreground text-center">
                 Escaneie o QR Code ou use a chave PIX abaixo
               </p>
             </div>
 
-            <div className="p-4 rounded-lg bg-muted/30 border">
-              <p className="text-xs text-muted-foreground mb-1">Chave PIX (CNPJ)</p>
-              <div className="flex items-center justify-between gap-2">
-                <code className="text-sm font-mono">{PIX_KEY}</code>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={handleCopyPix}
-                  className="gap-2"
-                >
-                  {copied ? (
-                    <>
-                      <Check className="w-4 h-4 text-green-500" />
-                      Copiado
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-4 h-4" />
-                      Copiar
-                    </>
-                  )}
-                </Button>
+            {billingConfig ? (
+              <div className="p-4 rounded-lg bg-muted/30 border">
+                <p className="text-xs text-muted-foreground mb-1">Chave PIX ({pixKeyType})</p>
+                <div className="flex items-center justify-between gap-2">
+                  <code className="text-sm font-mono">{billingConfig.pix_key}</code>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleCopyPix}
+                    className="gap-2"
+                  >
+                    {copied ? (
+                      <>
+                        <Check className="w-4 h-4 text-green-500" />
+                        Copiado
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-4 h-4" />
+                        Copiar
+                      </>
+                    )}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Favorecido: {billingConfig.account_holder}
+                </p>
+                {billingConfig.cnpj && (
+                  <p className="text-xs text-muted-foreground">
+                    CNPJ: {billingConfig.cnpj}
+                  </p>
+                )}
+                {billingConfig.bank_name && (
+                  <p className="text-xs text-muted-foreground">
+                    Banco: {billingConfig.bank_name}
+                  </p>
+                )}
               </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                Favorecido: {PIX_RECEIVER}
-              </p>
-            </div>
+            ) : (
+              <div className="p-4 rounded-lg bg-muted/30 border text-center">
+                <p className="text-sm text-muted-foreground">
+                  Dados de pagamento não configurados. Entre em contato com o suporte.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Botões de ação */}

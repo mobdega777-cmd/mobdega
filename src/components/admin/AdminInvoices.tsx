@@ -55,6 +55,8 @@ interface Invoice {
   paid_at: string | null;
   status: InvoiceStatus;
   created_at: string;
+  payment_confirmed_by_commerce: boolean | null;
+  payment_confirmed_at: string | null;
   commerces: { fantasy_name: string } | null;
 }
 
@@ -90,6 +92,7 @@ const AdminInvoices = () => {
     const { data, error } = await supabase
       .from('invoices')
       .select('*, commerces(fantasy_name)')
+      .order('payment_confirmed_by_commerce', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -191,7 +194,10 @@ const AdminInvoices = () => {
   };
 
   const updateInvoiceStatus = async (invoiceId: string, status: InvoiceStatus) => {
-    const updateData: any = { status };
+    const updateData: any = { 
+      status,
+      payment_confirmed_by_commerce: false // Reset confirmation when admin marks as paid
+    };
     if (status === 'paid') {
       updateData.paid_at = new Date().toISOString();
     }
@@ -212,6 +218,10 @@ const AdminInvoices = () => {
       fetchInvoices();
     }
   };
+
+  const pendingConfirmations = invoices.filter(
+    i => i.payment_confirmed_by_commerce && i.status === 'pending'
+  ).length;
 
   const filteredInvoices = invoices.filter(invoice => {
     const matchesSearch = invoice.commerces?.fantasy_name
@@ -241,13 +251,20 @@ const AdminInvoices = () => {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-display font-bold text-foreground">
-            Faturas
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Gerencie faturas e cobranças dos comércios
-          </p>
+        <div className="flex items-center gap-3">
+          <div>
+            <h1 className="text-3xl font-display font-bold text-foreground">
+              Faturas
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              Gerencie faturas e cobranças dos comércios
+            </p>
+          </div>
+          {pendingConfirmations > 0 && (
+            <Badge variant="destructive" className="text-sm px-3 py-1">
+              {pendingConfirmations} aguardando confirmação
+            </Badge>
+          )}
         </div>
         <div className="flex gap-2">
           <Button variant="outline" className="gap-2" onClick={handleGenerateBulkInvoices}>
@@ -323,9 +340,22 @@ const AdminInvoices = () => {
                 </TableHeader>
                 <TableBody>
                   {filteredInvoices.map((invoice) => (
-                    <TableRow key={invoice.id}>
+                    <TableRow 
+                      key={invoice.id}
+                      className={invoice.payment_confirmed_by_commerce && invoice.status === 'pending' 
+                        ? 'bg-yellow-500/10 border-l-4 border-l-yellow-500' 
+                        : ''
+                      }
+                    >
                       <TableCell className="font-medium">
-                        {invoice.commerces?.fantasy_name || '-'}
+                        <div className="flex items-center gap-2">
+                          {invoice.commerces?.fantasy_name || '-'}
+                          {invoice.payment_confirmed_by_commerce && invoice.status === 'pending' && (
+                            <Badge variant="warning" className="text-xs">
+                              Pagamento Informado
+                            </Badge>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>{invoice.reference_month}</TableCell>
                       <TableCell>
