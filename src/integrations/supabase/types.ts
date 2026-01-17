@@ -14,6 +14,123 @@ export type Database = {
   }
   public: {
     Tables: {
+      cash_movements: {
+        Row: {
+          amount: number
+          cash_register_id: string
+          commerce_id: string
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          order_id: string | null
+          payment_method: string
+          type: string
+        }
+        Insert: {
+          amount: number
+          cash_register_id: string
+          commerce_id: string
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          order_id?: string | null
+          payment_method: string
+          type: string
+        }
+        Update: {
+          amount?: number
+          cash_register_id?: string
+          commerce_id?: string
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          order_id?: string | null
+          payment_method?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cash_movements_cash_register_id_fkey"
+            columns: ["cash_register_id"]
+            isOneToOne: false
+            referencedRelation: "cash_registers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cash_movements_commerce_id_fkey"
+            columns: ["commerce_id"]
+            isOneToOne: false
+            referencedRelation: "commerces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cash_movements_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cash_registers: {
+        Row: {
+          closed_at: string | null
+          closed_by: string | null
+          closing_amount: number | null
+          commerce_id: string
+          created_at: string
+          difference: number | null
+          expected_amount: number | null
+          id: string
+          notes: string | null
+          opened_at: string
+          opened_by: string
+          opening_amount: number
+          status: string
+        }
+        Insert: {
+          closed_at?: string | null
+          closed_by?: string | null
+          closing_amount?: number | null
+          commerce_id: string
+          created_at?: string
+          difference?: number | null
+          expected_amount?: number | null
+          id?: string
+          notes?: string | null
+          opened_at?: string
+          opened_by: string
+          opening_amount?: number
+          status?: string
+        }
+        Update: {
+          closed_at?: string | null
+          closed_by?: string | null
+          closing_amount?: number | null
+          commerce_id?: string
+          created_at?: string
+          difference?: number | null
+          expected_amount?: number | null
+          id?: string
+          notes?: string | null
+          opened_at?: string
+          opened_by?: string
+          opening_amount?: number
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cash_registers_commerce_id_fkey"
+            columns: ["commerce_id"]
+            isOneToOne: false
+            referencedRelation: "commerces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       categories: {
         Row: {
           commerce_id: string
@@ -297,6 +414,8 @@ export type Database = {
         Row: {
           commerce_id: string
           created_at: string
+          customer_name: string | null
+          customer_phone: string | null
           delivered_at: string | null
           delivery_address: string | null
           delivery_fee: number | null
@@ -304,8 +423,11 @@ export type Database = {
           estimated_delivery: string | null
           id: string
           notes: string | null
+          order_type: string | null
+          payment_method: string | null
           status: Database["public"]["Enums"]["order_status"]
           subtotal: number
+          table_id: string | null
           total: number
           updated_at: string
           user_id: string
@@ -313,6 +435,8 @@ export type Database = {
         Insert: {
           commerce_id: string
           created_at?: string
+          customer_name?: string | null
+          customer_phone?: string | null
           delivered_at?: string | null
           delivery_address?: string | null
           delivery_fee?: number | null
@@ -320,8 +444,11 @@ export type Database = {
           estimated_delivery?: string | null
           id?: string
           notes?: string | null
+          order_type?: string | null
+          payment_method?: string | null
           status?: Database["public"]["Enums"]["order_status"]
           subtotal: number
+          table_id?: string | null
           total: number
           updated_at?: string
           user_id: string
@@ -329,6 +456,8 @@ export type Database = {
         Update: {
           commerce_id?: string
           created_at?: string
+          customer_name?: string | null
+          customer_phone?: string | null
           delivered_at?: string | null
           delivery_address?: string | null
           delivery_fee?: number | null
@@ -336,8 +465,11 @@ export type Database = {
           estimated_delivery?: string | null
           id?: string
           notes?: string | null
+          order_type?: string | null
+          payment_method?: string | null
           status?: Database["public"]["Enums"]["order_status"]
           subtotal?: number
+          table_id?: string | null
           total?: number
           updated_at?: string
           user_id?: string
@@ -348,6 +480,13 @@ export type Database = {
             columns: ["commerce_id"]
             isOneToOne: false
             referencedRelation: "commerces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_table_id_fkey"
+            columns: ["table_id"]
+            isOneToOne: false
+            referencedRelation: "tables"
             referencedColumns: ["id"]
           },
         ]
@@ -553,6 +692,56 @@ export type Database = {
         }
         Relationships: []
       }
+      tables: {
+        Row: {
+          capacity: number | null
+          closed_at: string | null
+          commerce_id: string
+          created_at: string
+          current_order_id: string | null
+          id: string
+          name: string | null
+          number: number
+          opened_at: string | null
+          status: Database["public"]["Enums"]["table_status"] | null
+          updated_at: string
+        }
+        Insert: {
+          capacity?: number | null
+          closed_at?: string | null
+          commerce_id: string
+          created_at?: string
+          current_order_id?: string | null
+          id?: string
+          name?: string | null
+          number: number
+          opened_at?: string | null
+          status?: Database["public"]["Enums"]["table_status"] | null
+          updated_at?: string
+        }
+        Update: {
+          capacity?: number | null
+          closed_at?: string | null
+          commerce_id?: string
+          created_at?: string
+          current_order_id?: string | null
+          id?: string
+          name?: string | null
+          number?: number
+          opened_at?: string | null
+          status?: Database["public"]["Enums"]["table_status"] | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tables_commerce_id_fkey"
+            columns: ["commerce_id"]
+            isOneToOne: false
+            referencedRelation: "commerces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -605,6 +794,7 @@ export type Database = {
         | "delivered"
         | "cancelled"
       plan_type: "basic" | "startup" | "business"
+      table_status: "available" | "occupied" | "reserved" | "closed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -745,6 +935,7 @@ export const Constants = {
         "cancelled",
       ],
       plan_type: ["basic", "startup", "business"],
+      table_status: ["available", "occupied", "reserved", "closed"],
     },
   },
 } as const

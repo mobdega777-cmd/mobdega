@@ -7,7 +7,9 @@ import { AuthProvider } from "@/hooks/useAuth";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import AdminDashboard from "./pages/admin/AdminDashboard";
+import CommerceDashboard from "./pages/commerce/CommerceDashboard";
 import ProtectedAdminRoute from "./components/auth/ProtectedAdminRoute";
+import ProtectedCommerceRoute from "./components/auth/ProtectedCommerceRoute";
 
 const queryClient = new QueryClient();
 
@@ -26,6 +28,14 @@ const App = () => (
                 <ProtectedAdminRoute>
                   <AdminDashboard />
                 </ProtectedAdminRoute>
+              } 
+            />
+            <Route 
+              path="/commerce" 
+              element={
+                <ProtectedCommerceRoute>
+                  <CommerceDashboard />
+                </ProtectedCommerceRoute>
               } 
             />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
