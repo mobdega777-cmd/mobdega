@@ -33,10 +33,16 @@ import {
   XCircle,
   Truck,
   ChefHat,
-  Package
+  Package,
+  ChevronLeft,
+  ChevronRight,
+  Receipt,
+  CreditCard
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import DateFilter from "./DateFilter";
+import { startOfDay, endOfDay, subDays } from "date-fns";
 
 interface CommerceOrdersProps {
   commerceId: string;
@@ -68,6 +74,17 @@ interface Order {
   order_items?: OrderItem[];
 }
 
+interface CashMovement {
+  id: string;
+  type: string;
+  amount: number;
+  payment_method: string;
+  description: string | null;
+  created_at: string;
+}
+
+type CombinedOrder = Order | (CashMovement & { isMovement: true });
+
 const statusConfig: Record<string, { label: string; color: string; icon: React.ElementType }> = {
   pending: { label: "Pendente", color: "bg-yellow-500/20 text-yellow-500", icon: Clock },
   confirmed: { label: "Confirmado", color: "bg-blue-500/20 text-blue-500", icon: CheckCircle },
@@ -81,9 +98,19 @@ const orderTypeLabels: Record<string, string> = {
   delivery: "Delivery",
   pickup: "Retirada",
   table: "Mesa",
+  pos: "PDV/Caixa",
+};
+
+const paymentMethodLabels: Record<string, string> = {
+  cash: "Dinheiro",
+  credit: "Crédito",
+  debit: "Débito",
+  pix: "PIX",
 };
 
 type OrderStatus = "pending" | "confirmed" | "preparing" | "delivering" | "delivered" | "cancelled";
+
+const ITEMS_PER_PAGE = 10;
 
 const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -92,13 +119,28 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [dateFilter, setDateFilter] = useState({ 
+    start: startOfDay(subDays(new Date(), 29)), 
+    end: endOfDay(new Date()) 
+  });
   const { toast } = useToast();
 
+  const handleDateChange = (start: Date, end: Date) => {
+    setDateFilter({ start, end });
+    setCurrentPage(1);
+  };
+
   const fetchOrders = async () => {
+    setLoading(true);
+    
+    // Fetch orders
     let query = supabase
       .from('orders')
       .select('*')
       .eq('commerce_id', commerceId)
+      .gte('created_at', dateFilter.start.toISOString())
+      .lte('created_at', dateFilter.end.toISOString())
       .order('created_at', { ascending: false });
 
     if (statusFilter !== 'all') {
@@ -117,7 +159,7 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
 
   useEffect(() => {
     fetchOrders();
-  }, [commerceId, statusFilter]);
+  }, [commerceId, statusFilter, dateFilter]);
 
   const fetchOrderDetails = async (orderId: string) => {
     const { data: items, error } = await supabase
@@ -137,7 +179,7 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
     }
   };
 
-  const updateOrderStatus = async (orderId: string, newStatus: "pending" | "confirmed" | "preparing" | "delivering" | "delivered" | "cancelled") => {
+  const updateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
     const updateData: { status: typeof newStatus; delivered_at?: string } = { status: newStatus };
     
     if (newStatus === 'delivered') {
@@ -176,6 +218,13 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
     order.customer_phone?.includes(searchTerm)
   );
 
+  // Pagination
+  const totalPages = Math.ceil(filteredOrders.length / ITEMS_PER_PAGE);
+  const paginatedOrders = filteredOrders.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -188,7 +237,7 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Pedidos</h1>
-        <p className="text-muted-foreground">Gerencie todos os pedidos do seu comércio</p>
+        <p className="text-muted-foreground">Gerencie todos os pedidos do seu comércio (Delivery, PDV, Mesas)</p>
       </div>
 
       <Card>
@@ -203,112 +252,154 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
                 className="pl-10"
               />
             </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full md:w-48">
-                <SelectValue placeholder="Filtrar por status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                {Object.entries(statusConfig).map(([key, config]) => (
-                  <SelectItem key={key} value={key}>{config.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex gap-2">
+              <DateFilter onDateChange={handleDateChange} defaultValue="30days" />
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-full md:w-48">
+                  <SelectValue placeholder="Filtrar por status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  {Object.entries(statusConfig).map(([key, config]) => (
+                    <SelectItem key={key} value={key}>{config.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
-          {filteredOrders.length === 0 ? (
+          {paginatedOrders.length === 0 ? (
             <div className="text-center py-12">
               <ShoppingCart className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
               <p className="text-muted-foreground">Nenhum pedido encontrado</p>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Pedido</TableHead>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Total</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Data</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredOrders.map((order) => {
-                  const status = statusConfig[order.status] || statusConfig.pending;
-                  const StatusIcon = status.icon;
-                  const nextStatus = getNextStatus(order.status);
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Pedido</TableHead>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>Pagamento</TableHead>
+                    <TableHead>Total</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Data/Hora</TableHead>
+                    <TableHead className="text-right">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paginatedOrders.map((order) => {
+                    const status = statusConfig[order.status] || statusConfig.pending;
+                    const StatusIcon = status.icon;
+                    const nextStatus = getNextStatus(order.status);
 
-                  return (
-                    <TableRow key={order.id}>
-                      <TableCell className="font-mono text-sm">
-                        #{order.id.slice(0, 8)}
-                      </TableCell>
-                      <TableCell>
-                        <div>
-                          <p className="font-medium">{order.customer_name || "Cliente"}</p>
-                          {order.customer_phone && (
-                            <p className="text-xs text-muted-foreground">{order.customer_phone}</p>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">
-                          {orderTypeLabels[order.order_type || 'delivery']}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        R$ {Number(order.total).toFixed(2)}
-                      </TableCell>
-                      <TableCell>
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${status.color}`}>
-                          <StatusIcon className="w-3 h-3" />
-                          {status.label}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {new Date(order.created_at).toLocaleString('pt-BR', {
-                          day: '2-digit',
-                          month: '2-digit',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => fetchOrderDetails(order.id)}
-                          >
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                          {nextStatus && (
+                    return (
+                      <TableRow key={order.id}>
+                        <TableCell className="font-mono text-sm">
+                          #{order.id.slice(0, 8)}
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <p className="font-medium">{order.customer_name || "Cliente"}</p>
+                            {order.customer_phone && (
+                              <p className="text-xs text-muted-foreground">{order.customer_phone}</p>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {orderTypeLabels[order.order_type || 'delivery']}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1 text-sm">
+                            <CreditCard className="w-3 h-3" />
+                            {paymentMethodLabels[order.payment_method || ''] || order.payment_method || 'N/A'}
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          R$ {Number(order.total).toFixed(2)}
+                        </TableCell>
+                        <TableCell>
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${status.color}`}>
+                            <StatusIcon className="w-3 h-3" />
+                            {status.label}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          <div>
+                            <p>{new Date(order.created_at).toLocaleDateString('pt-BR')}</p>
+                            <p className="text-xs">{new Date(order.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
                             <Button
+                              variant="ghost"
                               size="sm"
-                              onClick={() => updateOrderStatus(order.id, nextStatus)}
+                              onClick={() => fetchOrderDetails(order.id)}
                             >
-                              {statusConfig[nextStatus]?.label}
+                              <Eye className="w-4 h-4" />
                             </Button>
-                          )}
-                          {order.status !== 'cancelled' && order.status !== 'delivered' && (
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={() => updateOrderStatus(order.id, 'cancelled')}
-                            >
-                              <XCircle className="w-4 h-4" />
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                            {nextStatus && (
+                              <Button
+                                size="sm"
+                                onClick={() => updateOrderStatus(order.id, nextStatus)}
+                              >
+                                {statusConfig[nextStatus]?.label}
+                              </Button>
+                            )}
+                            {order.status !== 'cancelled' && order.status !== 'delivered' && (
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => updateOrderStatus(order.id, 'cancelled')}
+                              >
+                                <XCircle className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                  <p className="text-sm text-muted-foreground">
+                    Mostrando {((currentPage - 1) * ITEMS_PER_PAGE) + 1} a {Math.min(currentPage * ITEMS_PER_PAGE, filteredOrders.length)} de {filteredOrders.length} pedidos
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                      Anterior
+                    </Button>
+                    <span className="text-sm px-3">
+                      {currentPage} de {totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      Próxima
+                      <ChevronRight className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
@@ -317,7 +408,8 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Receipt className="w-5 h-5" />
               Pedido #{selectedOrder?.id.slice(0, 8)}
             </DialogTitle>
           </DialogHeader>
@@ -338,7 +430,7 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Pagamento</p>
-                  <p className="font-medium">{selectedOrder.payment_method || "Não informado"}</p>
+                  <p className="font-medium">{paymentMethodLabels[selectedOrder.payment_method || ''] || selectedOrder.payment_method || "Não informado"}</p>
                 </div>
                 {selectedOrder.delivery_address && (
                   <div className="col-span-2">

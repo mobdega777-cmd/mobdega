@@ -14,7 +14,8 @@ import {
   AlertCircle,
   Upload,
   X,
-  Camera
+  Camera,
+  MessageCircle
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -172,6 +173,10 @@ const CommerceSettings = ({ commerce }: CommerceSettingsProps) => {
     setSaving(false);
   };
 
+  const handleWhatsAppSupport = () => {
+    window.open('https://wa.me/5511949830010?text=Olá! Preciso de suporte com meu comércio na Mobdega.', '_blank');
+  };
+
   const getStatusBadge = (status: string) => {
     const config: Record<string, { label: string; color: string; icon: React.ElementType }> = {
       pending: { label: "Pendente", color: "bg-yellow-500/20 text-yellow-500", icon: Clock },
@@ -195,9 +200,19 @@ const CommerceSettings = ({ commerce }: CommerceSettingsProps) => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Configurações</h1>
-        <p className="text-muted-foreground">Gerencie as informações do seu comércio</p>
+      <div className="flex justify-between items-start">
+        <div>
+          <h1 className="text-3xl font-bold">Configurações</h1>
+          <p className="text-muted-foreground">Gerencie as informações do seu comércio</p>
+        </div>
+        <Button 
+          variant="outline" 
+          onClick={handleWhatsAppSupport}
+          className="gap-2 text-green-600 border-green-600 hover:bg-green-50"
+        >
+          <MessageCircle className="w-4 h-4" />
+          Contato Suporte
+        </Button>
       </div>
 
       {/* Status Card */}
