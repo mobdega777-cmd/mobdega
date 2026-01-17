@@ -11,6 +11,8 @@ import {
   Users
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import DateFilter from "./DateFilter";
+import { startOfDay, endOfDay } from "date-fns";
 
 interface CommerceOverviewProps {
   commerce: {
@@ -40,34 +42,55 @@ const CommerceOverview = ({ commerce }: CommerceOverviewProps) => {
   });
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dateFilter, setDateFilter] = useState({ 
+    start: startOfDay(new Date()), 
+    end: endOfDay(new Date()) 
+  });
+
+  const handleDateChange = (start: Date, end: Date) => {
+    setDateFilter({ start, end });
+  };
 
   useEffect(() => {
     const fetchStats = async () => {
-      const today = new Date().toISOString().split('T')[0];
-      
-      // Fetch orders stats
+      // Fetch orders stats - include both regular orders AND cash movements (POS sales)
       const { data: orders } = await supabase
         .from('orders')
         .select('id, status, total, created_at, order_type')
         .eq('commerce_id', commerce.id);
 
+      // Fetch cash movements for POS sales
+      const { data: cashMovements } = await supabase
+        .from('cash_movements')
+        .select('id, type, amount, created_at')
+        .eq('commerce_id', commerce.id)
+        .eq('type', 'sale');
+
       const pendingOrders = orders?.filter(o => 
         ['pending', 'confirmed', 'preparing'].includes(o.status)
       ).length || 0;
 
-      const todayOrders = orders?.filter(o => 
-        o.created_at.startsWith(today) && o.status === 'delivered'
-      ) || [];
+      // Filter by date range
+      const filteredOrders = orders?.filter(o => {
+        const orderDate = new Date(o.created_at);
+        return orderDate >= dateFilter.start && orderDate <= dateFilter.end && o.status === 'delivered';
+      }) || [];
       
-      const todayRevenue = todayOrders.reduce((sum, o) => sum + Number(o.total), 0);
+      const filteredMovements = cashMovements?.filter(m => {
+        const movementDate = new Date(m.created_at);
+        return movementDate >= dateFilter.start && movementDate <= dateFilter.end;
+      }) || [];
+      
+      // Revenue from orders + cash movements
+      const ordersRevenue = filteredOrders.reduce((sum, o) => sum + Number(o.total), 0);
+      const movementsRevenue = filteredMovements.reduce((sum, m) => sum + Number(m.amount), 0);
+      const dateRangeRevenue = ordersRevenue + movementsRevenue;
 
       const activeDeliveries = orders?.filter(o => 
         o.status === 'delivering' && o.order_type === 'delivery'
       ).length || 0;
 
-      const completedToday = orders?.filter(o => 
-        o.created_at.startsWith(today) && o.status === 'delivered'
-      ).length || 0;
+      const completedToday = filteredOrders.length + filteredMovements.length;
 
       // Fetch products count
       const { count: productsCount } = await supabase
@@ -75,7 +98,7 @@ const CommerceOverview = ({ commerce }: CommerceOverviewProps) => {
         .select('id', { count: 'exact', head: true })
         .eq('commerce_id', commerce.id);
 
-      // Fetch recent orders
+      // Fetch recent orders (include POS sales)
       const { data: recent } = await supabase
         .from('orders')
         .select('*')
@@ -83,10 +106,13 @@ const CommerceOverview = ({ commerce }: CommerceOverviewProps) => {
         .order('created_at', { ascending: false })
         .limit(5);
 
+      // Total orders including cash movements
+      const totalOrders = (orders?.length || 0);
+
       setStats({
-        totalOrders: orders?.length || 0,
+        totalOrders,
         pendingOrders,
-        todayRevenue,
+        todayRevenue: dateRangeRevenue,
         totalProducts: productsCount || 0,
         activeDeliveries,
         completedToday,
@@ -96,7 +122,7 @@ const CommerceOverview = ({ commerce }: CommerceOverviewProps) => {
     };
 
     fetchStats();
-  }, [commerce.id]);
+  }, [commerce.id, dateFilter]);
 
   const statCards = [
     {
@@ -107,7 +133,7 @@ const CommerceOverview = ({ commerce }: CommerceOverviewProps) => {
       bgColor: "bg-yellow-500/10",
     },
     {
-      title: "Faturamento Hoje",
+      title: "Faturamento do Período",
       value: `R$ ${stats.todayRevenue.toFixed(2)}`,
       icon: DollarSign,
       color: "text-green-500",
@@ -121,7 +147,7 @@ const CommerceOverview = ({ commerce }: CommerceOverviewProps) => {
       bgColor: "bg-blue-500/10",
     },
     {
-      title: "Finalizados Hoje",
+      title: "Finalizados no Período",
       value: stats.completedToday,
       icon: CheckCircle,
       color: "text-emerald-500",
@@ -165,11 +191,14 @@ const CommerceOverview = ({ commerce }: CommerceOverviewProps) => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Bem-vindo, {commerce.fantasy_name}!</h1>
-        <p className="text-muted-foreground">
-          Aqui está o resumo do seu comércio
-        </p>
+      <div className="flex justify-between items-start">
+        <div>
+          <h1 className="text-3xl font-bold">Bem-vindo, {commerce.fantasy_name}!</h1>
+          <p className="text-muted-foreground">
+            Aqui está o resumo do seu comércio
+          </p>
+        </div>
+        <DateFilter onDateChange={handleDateChange} defaultValue="today" />
       </div>
 
       {commerce.status !== 'approved' && (

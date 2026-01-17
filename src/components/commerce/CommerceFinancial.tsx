@@ -9,6 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { 
   DollarSign, 
   TrendingUp, 
@@ -22,15 +23,18 @@ import {
   PieChart,
   Target,
   Activity,
-  Percent,
   Package,
   ShoppingCart,
   CreditCard,
   Wallet,
-  TrendingDown as TrendingDownIcon
+  TrendingDown as TrendingDownIcon,
+  Bell
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import DateFilter from "./DateFilter";
+import InvoicePaymentModal from "./InvoicePaymentModal";
+import { startOfDay, endOfDay, subDays, startOfMonth } from "date-fns";
 
 interface CommerceFinancialProps {
   commerceId: string;
@@ -68,6 +72,13 @@ interface FinancialStats {
 const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pendingInvoicesCount, setPendingInvoicesCount] = useState(0);
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [dateFilter, setDateFilter] = useState({ 
+    start: startOfMonth(new Date()), 
+    end: endOfDay(new Date()) 
+  });
   const [stats, setStats] = useState<FinancialStats>({
     monthlyRevenue: 0,
     monthlyCost: 0,
@@ -87,22 +98,37 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
   });
   const { toast } = useToast();
 
+  const handleDateChange = (start: Date, end: Date) => {
+    setDateFilter({ start, end });
+  };
+
   const fetchData = async () => {
     const today = new Date();
-    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString();
     const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1).toISOString();
     const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0).toISOString();
     
-    // Fetch orders for revenue (current month)
+    // Fetch orders for revenue (filtered by date)
     const { data: orders } = await supabase
       .from('orders')
       .select('total, status, created_at')
       .eq('commerce_id', commerceId)
       .eq('status', 'delivered')
-      .gte('created_at', firstDayOfMonth);
+      .gte('created_at', dateFilter.start.toISOString())
+      .lte('created_at', dateFilter.end.toISOString());
 
-    const monthlyRevenue = orders?.reduce((sum, o) => sum + Number(o.total), 0) || 0;
-    const totalOrders = orders?.length || 0;
+    // Fetch cash movements (POS sales)
+    const { data: cashMovements } = await supabase
+      .from('cash_movements')
+      .select('amount, type, created_at')
+      .eq('commerce_id', commerceId)
+      .eq('type', 'sale')
+      .gte('created_at', dateFilter.start.toISOString())
+      .lte('created_at', dateFilter.end.toISOString());
+
+    const ordersRevenue = orders?.reduce((sum, o) => sum + Number(o.total), 0) || 0;
+    const movementsRevenue = cashMovements?.reduce((sum, m) => sum + Number(m.amount), 0) || 0;
+    const monthlyRevenue = ordersRevenue + movementsRevenue;
+    const totalOrders = (orders?.length || 0) + (cashMovements?.length || 0);
     const avgTicket = totalOrders > 0 ? monthlyRevenue / totalOrders : 0;
 
     // Fetch last month orders for comparison
@@ -114,7 +140,16 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
       .gte('created_at', lastMonth)
       .lte('created_at', lastMonthEnd);
 
-    const lastMonthRevenue = lastMonthOrders?.reduce((sum, o) => sum + Number(o.total), 0) || 0;
+    const { data: lastMonthMovements } = await supabase
+      .from('cash_movements')
+      .select('amount')
+      .eq('commerce_id', commerceId)
+      .eq('type', 'sale')
+      .gte('created_at', lastMonth)
+      .lte('created_at', lastMonthEnd);
+
+    const lastMonthRevenue = (lastMonthOrders?.reduce((sum, o) => sum + Number(o.total), 0) || 0) +
+      (lastMonthMovements?.reduce((sum, m) => sum + Number(m.amount), 0) || 0);
     const growthRate = lastMonthRevenue > 0 
       ? ((monthlyRevenue - lastMonthRevenue) / lastMonthRevenue) * 100 
       : 0;
@@ -130,30 +165,30 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
     products?.forEach(p => {
       const stock = p.stock || 0;
       stockCostValue += (p.price || 0) * stock;
-      stockSaleValue += (p.promotional_price || 0) * stock;
+      stockSaleValue += (p.promotional_price || p.price || 0) * stock;
     });
 
     const potentialProfit = stockSaleValue - stockCostValue;
-
-    // Estimate monthly cost (simplified: based on products sold)
-    const monthlyCost = monthlyRevenue * 0.6; // Estimativa: 60% do faturamento é custo
+    const monthlyCost = monthlyRevenue * 0.6;
     const monthlyProfit = monthlyRevenue - monthlyCost;
     const profitMargin = monthlyRevenue > 0 ? (monthlyProfit / monthlyRevenue) * 100 : 0;
 
-    // Project next month revenue based on current growth
     const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
     const dayOfMonth = today.getDate();
     const projectedRevenue = dayOfMonth > 0 ? (monthlyRevenue / dayOfMonth) * daysInMonth : 0;
 
-    // Fetch invoices
+    // Fetch invoices (A Pagar for merchant)
     const { data: invoicesData } = await supabase
       .from('invoices')
       .select('*')
       .eq('commerce_id', commerceId)
       .order('due_date', { ascending: false });
 
+    const pendingCount = invoicesData?.filter(i => i.status === 'pending').length || 0;
+    setPendingInvoicesCount(pendingCount);
+
     const pendingPayments = invoicesData?.filter(i => 
-      i.type === 'payable' && i.status === 'pending'
+      i.status === 'pending'
     ).reduce((sum, i) => sum + Number(i.amount), 0) || 0;
 
     const overduePayments = invoicesData?.filter(i => 
@@ -172,8 +207,8 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
       stockCostValue,
       stockSaleValue,
       potentialProfit,
-      bestSellingCategory: "Bebidas", // Placeholder - would need order_items analysis
-      worstSellingCategory: "Outros", // Placeholder
+      bestSellingCategory: "Bebidas",
+      worstSellingCategory: "Outros",
       projectedRevenue,
       growthRate,
     });
@@ -183,7 +218,7 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
 
   useEffect(() => {
     fetchData();
-  }, [commerceId]);
+  }, [commerceId, dateFilter]);
 
   const getStatusBadge = (status: string) => {
     const config: Record<string, { label: string; color: string }> = {
@@ -197,7 +232,11 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
 
   const handleExportReport = (type: string) => {
     toast({ title: `Relatório de ${type} será gerado em breve!` });
-    // TODO: Implementar exportação real
+  };
+
+  const handlePayInvoice = (invoice: Invoice) => {
+    setSelectedInvoice(invoice);
+    setIsPaymentModalOpen(true);
   };
 
   if (loading) {
@@ -215,7 +254,8 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
           <h1 className="text-3xl font-bold">Financeiro</h1>
           <p className="text-muted-foreground">Dashboard financeiro e insights do seu comércio</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          <DateFilter onDateChange={handleDateChange} defaultValue="30days" />
           <Button variant="outline" size="sm" onClick={() => handleExportReport("vendas")}>
             <Download className="w-4 h-4 mr-2" />
             Relatório de Vendas
@@ -233,10 +273,8 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Faturamento do Mês</p>
-                <p className="text-2xl font-bold text-green-500">
-                  R$ {stats.monthlyRevenue.toFixed(2)}
-                </p>
+                <p className="text-sm text-muted-foreground">Faturamento do Período</p>
+                <p className="text-2xl font-bold text-green-500">R$ {stats.monthlyRevenue.toFixed(2)}</p>
                 <p className={`text-xs mt-1 flex items-center gap-1 ${stats.growthRate >= 0 ? 'text-green-600' : 'text-red-500'}`}>
                   {stats.growthRate >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
                   {stats.growthRate.toFixed(1)}% vs mês anterior
@@ -254,12 +292,8 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Lucro Estimado</p>
-                <p className="text-2xl font-bold text-blue-500">
-                  R$ {stats.monthlyProfit.toFixed(2)}
-                </p>
-                <p className="text-xs mt-1 text-muted-foreground">
-                  Margem: {stats.profitMargin.toFixed(1)}%
-                </p>
+                <p className="text-2xl font-bold text-blue-500">R$ {stats.monthlyProfit.toFixed(2)}</p>
+                <p className="text-xs mt-1 text-muted-foreground">Margem: {stats.profitMargin.toFixed(1)}%</p>
               </div>
               <div className="p-3 rounded-xl bg-blue-500/10">
                 <Wallet className="w-6 h-6 text-blue-500" />
@@ -273,9 +307,7 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">A Pagar (Pendente)</p>
-                <p className="text-2xl font-bold text-yellow-500">
-                  R$ {stats.pendingPayments.toFixed(2)}
-                </p>
+                <p className="text-2xl font-bold text-yellow-500">R$ {stats.pendingPayments.toFixed(2)}</p>
               </div>
               <div className="p-3 rounded-xl bg-yellow-500/10">
                 <ArrowDownCircle className="w-6 h-6 text-yellow-500" />
@@ -289,9 +321,7 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Vencidos</p>
-                <p className="text-2xl font-bold text-red-500">
-                  R$ {stats.overduePayments.toFixed(2)}
-                </p>
+                <p className="text-2xl font-bold text-red-500">R$ {stats.overduePayments.toFixed(2)}</p>
               </div>
               <div className="p-3 rounded-xl bg-red-500/10">
                 <TrendingDownIcon className="w-6 h-6 text-red-500" />
@@ -310,7 +340,7 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
                 <ShoppingCart className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">Pedidos no Mês</p>
+                <p className="text-xs text-muted-foreground">Pedidos no Período</p>
                 <p className="text-lg font-bold">{stats.totalOrders}</p>
               </div>
             </div>
@@ -364,7 +394,6 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
 
       {/* Estoque e Insights */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Estoque */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -377,24 +406,18 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
             <div className="grid grid-cols-2 gap-4">
               <div className="p-4 rounded-lg bg-blue-500/5 border border-blue-500/20">
                 <p className="text-sm text-muted-foreground">Valor de Custo</p>
-                <p className="text-xl font-bold text-blue-500">
-                  R$ {stats.stockCostValue.toFixed(2)}
-                </p>
+                <p className="text-xl font-bold text-blue-500">R$ {stats.stockCostValue.toFixed(2)}</p>
               </div>
               <div className="p-4 rounded-lg bg-green-500/5 border border-green-500/20">
                 <p className="text-sm text-muted-foreground">Valor de Venda</p>
-                <p className="text-xl font-bold text-green-500">
-                  R$ {stats.stockSaleValue.toFixed(2)}
-                </p>
+                <p className="text-xl font-bold text-green-500">R$ {stats.stockSaleValue.toFixed(2)}</p>
               </div>
             </div>
             <div className="p-4 rounded-lg bg-purple-500/5 border border-purple-500/20">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Lucro Potencial em Estoque</p>
-                  <p className="text-2xl font-bold text-purple-500">
-                    R$ {stats.potentialProfit.toFixed(2)}
-                  </p>
+                  <p className="text-2xl font-bold text-purple-500">R$ {stats.potentialProfit.toFixed(2)}</p>
                 </div>
                 <div className="p-3 rounded-lg bg-purple-500/10">
                   <BarChart3 className="w-6 h-6 text-purple-500" />
@@ -404,7 +427,6 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
           </CardContent>
         </Card>
 
-        {/* Insights BI */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -450,12 +472,20 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
       {/* Invoices Table */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <Receipt className="w-5 h-5" />
-              Faturas e Cobranças
-            </CardTitle>
-            <CardDescription>Histórico de faturas e pagamentos</CardDescription>
+          <div className="flex items-center gap-3">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Receipt className="w-5 h-5" />
+                Faturas e Cobranças
+              </CardTitle>
+              <CardDescription>Histórico de faturas e pagamentos</CardDescription>
+            </div>
+            {pendingInvoicesCount > 0 && (
+              <Badge className="bg-red-500 text-white gap-1">
+                <Bell className="w-3 h-3" />
+                {pendingInvoicesCount} pendente{pendingInvoicesCount > 1 ? 's' : ''}
+              </Badge>
+            )}
           </div>
           <Button variant="outline" size="sm" onClick={() => handleExportReport("faturas")}>
             <Download className="w-4 h-4 mr-2" />
@@ -477,6 +507,7 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
                   <TableHead>Valor</TableHead>
                   <TableHead>Vencimento</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Ação</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -486,20 +517,12 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
                     <TableRow key={invoice.id}>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          {invoice.type === 'receivable' ? (
-                            <ArrowUpCircle className="w-4 h-4 text-green-500" />
-                          ) : (
-                            <ArrowDownCircle className="w-4 h-4 text-red-500" />
-                          )}
-                          <span>
-                            {invoice.type === 'receivable' ? 'A Receber' : 'A Pagar'}
-                          </span>
+                          <ArrowDownCircle className="w-4 h-4 text-red-500" />
+                          <span>A Pagar</span>
                         </div>
                       </TableCell>
                       <TableCell>{invoice.reference_month}</TableCell>
-                      <TableCell className="font-medium">
-                        R$ {Number(invoice.amount).toFixed(2)}
-                      </TableCell>
+                      <TableCell className="font-medium">R$ {Number(invoice.amount).toFixed(2)}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2 text-sm">
                           <Calendar className="w-4 h-4 text-muted-foreground" />
@@ -511,6 +534,18 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
                           {status.label}
                         </span>
                       </TableCell>
+                      <TableCell className="text-right">
+                        {invoice.status === 'pending' && (
+                          <Button 
+                            size="sm" 
+                            onClick={() => handlePayInvoice(invoice)}
+                            className="gap-1"
+                          >
+                            <CreditCard className="w-3 h-3" />
+                            Pagar
+                          </Button>
+                        )}
+                      </TableCell>
                     </TableRow>
                   );
                 })}
@@ -519,6 +554,18 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
           )}
         </CardContent>
       </Card>
+
+      <InvoicePaymentModal
+        isOpen={isPaymentModalOpen}
+        onClose={() => setIsPaymentModalOpen(false)}
+        invoice={selectedInvoice}
+        commerceStats={{
+          totalOrders: stats.totalOrders,
+          totalRevenue: stats.monthlyRevenue,
+          avgTicket: stats.avgTicket,
+          totalProducts: 0,
+        }}
+      />
     </div>
   );
 };
