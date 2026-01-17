@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, User, Store, Eye, EyeOff } from "lucide-react";
+import { X, User, Store, Eye, EyeOff, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 type AuthMode = "login" | "register";
 type UserType = "user" | "commerce";
 type DocumentType = "cpf" | "cnpj";
@@ -17,11 +19,14 @@ interface AuthModalProps {
 }
 
 const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) => {
+  const { signUp, signIn } = useAuth();
+  const { toast } = useToast();
   const [mode, setMode] = useState<AuthMode>(initialMode);
   const [userType, setUserType] = useState<UserType>("user");
   const [documentType, setDocumentType] = useState<DocumentType>("cpf");
   const [showPassword, setShowPassword] = useState(false);
   const [step, setStep] = useState(1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Form states
   const [formData, setFormData] = useState({
@@ -73,6 +78,206 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
   const handleClose = () => {
     resetForm();
     onClose();
+  };
+
+  const handleCommerceRegister = async () => {
+    if (!formData.email || !formData.password || !formData.tradeName || !formData.ownerName || !formData.document) {
+      toast({
+        variant: "destructive",
+        title: "Campos obrigatórios",
+        description: "Por favor, preencha todos os campos obrigatórios.",
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // 1. Create the user account
+      const { error: signUpError } = await signUp(formData.email, formData.password, {
+        full_name: formData.ownerName,
+        user_type: 'commerce',
+      });
+
+      if (signUpError) {
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Get the user that was just created
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        toast({
+          variant: "destructive",
+          title: "Erro ao criar conta",
+          description: "Não foi possível obter os dados do usuário.",
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
+      // 2. Create the commerce record
+      const { error: commerceError } = await supabase
+        .from('commerces')
+        .insert({
+          owner_id: user.id,
+          fantasy_name: formData.tradeName,
+          owner_name: formData.ownerName,
+          document: formData.document,
+          document_type: documentType,
+          email: formData.email,
+          phone: formData.whatsapp,
+          address: formData.address,
+          address_number: formData.number,
+          cep: formData.cep,
+          city: formData.city,
+          neighborhood: formData.neighborhood,
+          complement: formData.complement,
+          status: 'pending',
+        });
+
+      if (commerceError) {
+        console.error('Error creating commerce:', commerceError);
+        toast({
+          variant: "destructive",
+          title: "Erro ao criar comércio",
+          description: commerceError.message,
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
+      // 3. Create user role as commerce
+      const { error: roleError } = await supabase
+        .from('user_roles')
+        .insert({
+          user_id: user.id,
+          role: 'commerce',
+        });
+
+      if (roleError) {
+        console.error('Error creating user role:', roleError);
+      }
+
+      // 4. Create profile
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .insert({
+          user_id: user.id,
+          full_name: formData.ownerName,
+          email: formData.email,
+          phone: formData.whatsapp,
+          address: formData.address,
+          address_number: formData.number,
+          cep: formData.cep,
+          city: formData.city,
+          neighborhood: formData.neighborhood,
+          complement: formData.complement,
+        });
+
+      if (profileError) {
+        console.error('Error creating profile:', profileError);
+      }
+
+      toast({
+        title: "Cadastro realizado com sucesso!",
+        description: "Seu comércio foi registrado e está aguardando aprovação.",
+      });
+
+      handleClose();
+    } catch (error) {
+      console.error('Registration error:', error);
+      toast({
+        variant: "destructive",
+        title: "Erro ao cadastrar",
+        description: "Ocorreu um erro inesperado. Tente novamente.",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleUserRegister = async () => {
+    if (!formData.email || !formData.password || !formData.name) {
+      toast({
+        variant: "destructive",
+        title: "Campos obrigatórios",
+        description: "Por favor, preencha todos os campos obrigatórios.",
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const { error: signUpError } = await signUp(formData.email, formData.password, {
+        full_name: formData.name,
+        user_type: 'user',
+      });
+
+      if (signUpError) {
+        setIsSubmitting(false);
+        return;
+      }
+
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (user) {
+        // Create user role
+        await supabase.from('user_roles').insert({
+          user_id: user.id,
+          role: 'user',
+        });
+
+        // Create profile
+        await supabase.from('profiles').insert({
+          user_id: user.id,
+          full_name: formData.name,
+          email: formData.email,
+          phone: formData.whatsapp,
+          address: formData.address,
+          address_number: formData.number,
+          cep: formData.cep,
+          city: formData.city,
+          neighborhood: formData.neighborhood,
+          complement: formData.complement,
+        });
+      }
+
+      handleClose();
+    } catch (error) {
+      console.error('Registration error:', error);
+      toast({
+        variant: "destructive",
+        title: "Erro ao cadastrar",
+        description: "Ocorreu um erro inesperado. Tente novamente.",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleLogin = async () => {
+    if (!formData.email || !formData.password) {
+      toast({
+        variant: "destructive",
+        title: "Campos obrigatórios",
+        description: "Por favor, preencha email e senha.",
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const { error } = await signIn(formData.email, formData.password);
+      if (!error) {
+        handleClose();
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -172,7 +377,10 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
                     </Label>
                     <Input
                       id="login-email"
+                      name="email"
                       type={userType === "user" ? "email" : "text"}
+                      value={formData.email}
+                      onChange={handleInputChange}
                       placeholder={userType === "user" ? "seu@email.com" : "000.000.000-00"}
                       className="h-12"
                     />
@@ -184,7 +392,10 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
                     <div className="relative">
                       <Input
                         id="login-password"
+                        name="password"
                         type={showPassword ? "text" : "password"}
+                        value={formData.password}
+                        onChange={handleInputChange}
                         placeholder="••••••••"
                         className="h-12 pr-12"
                       />
@@ -198,8 +409,14 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
                     </div>
                   </div>
 
-                  <Button variant="hero" className="w-full" size="lg">
-                    Entrar
+                  <Button 
+                    variant="hero" 
+                    className="w-full" 
+                    size="lg"
+                    onClick={handleLogin}
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Entrar"}
                   </Button>
 
                   <p className="text-center text-sm text-muted-foreground">
@@ -409,8 +626,14 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
                     </div>
                   </div>
 
-                  <Button variant="hero" className="w-full" size="lg">
-                    Criar conta
+                  <Button 
+                    variant="hero" 
+                    className="w-full" 
+                    size="lg"
+                    onClick={handleUserRegister}
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Criar conta"}
                   </Button>
                 </motion.div>
               )}
@@ -635,8 +858,14 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
                     </div>
                   </div>
 
-                  <Button variant="success" className="w-full" size="lg">
-                    Finalizar cadastro
+                  <Button 
+                    variant="success" 
+                    className="w-full" 
+                    size="lg"
+                    onClick={handleCommerceRegister}
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Finalizar cadastro"}
                   </Button>
 
                   <p className="text-xs text-center text-muted-foreground">
