@@ -194,7 +194,19 @@ const CommerceDetailsModal: React.FC<CommerceDetailsModalProps> = ({
                     {commerce.fantasy_name?.charAt(0)}
                   </div>
                   <div>
-                    <DialogTitle className="text-2xl">{commerce.fantasy_name}</DialogTitle>
+                    <div className="flex items-center gap-3">
+                      <DialogTitle className="text-2xl">{commerce.fantasy_name}</DialogTitle>
+                      {plan ? (
+                        <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 text-white border-0 gap-1">
+                          <Crown className="w-3 h-3" />
+                          {plan.name}
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-muted-foreground">
+                          Sem plano
+                        </Badge>
+                      )}
+                    </div>
                     <p className="text-muted-foreground">{commerce.owner_name}</p>
                     <Badge variant={statusConfig.variant} className="mt-2 gap-1">
                       <StatusIcon className="w-3 h-3" />
