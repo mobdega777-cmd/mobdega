@@ -20,6 +20,7 @@ import { fetchAddressByCep, formatCep } from "@/lib/viaCepService";
 import { format, formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import logoMobdega from "@/assets/logo-mobdega.png";
+import CommerceStorefront from "@/components/user/CommerceStorefront";
 
 interface Profile {
   id: string;
@@ -335,10 +336,19 @@ const UserDashboard = () => {
     return labels[status] || { label: status, color: "bg-gray-500" };
   };
 
-  const filteredCommerces = commerces.filter(c => 
-    c.fantasy_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    c.city?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Check if searchQuery looks like a CEP (8 digits)
+  const isSearchingByCep = /^\d{5}-?\d{3}$|^\d{8}$/.test(searchQuery.replace(/\D/g, '') ? searchQuery : '');
+  const normalizedCepSearch = searchQuery.replace(/\D/g, '');
+
+  const filteredCommerces = commerces.filter(c => {
+    // If searching by CEP, show all open commerces (CEP filtering happens at fetch level)
+    if (normalizedCepSearch.length >= 5) {
+      return true; // All open commerces are shown (already filtered by is_open)
+    }
+    return c.fantasy_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      c.city?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      c.neighborhood?.toLowerCase().includes(searchQuery.toLowerCase());
+  });
 
   const memberSince = profile?.created_at 
     ? formatDistanceToNow(new Date(profile.created_at), { locale: ptBR, addSuffix: true })
@@ -426,6 +436,13 @@ const UserDashboard = () => {
             </Card>
           </div>
 
+          {/* Check if viewing a commerce storefront */}
+          {activeTab.startsWith('vitrine-') ? (
+            <CommerceStorefront 
+              commerceId={activeTab.replace('vitrine-', '')} 
+              onBack={() => setActiveTab('explore')} 
+            />
+          ) : (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
             <TabsList className="grid w-full grid-cols-4 h-auto p-1">
               <TabsTrigger value="explore" className="flex flex-col gap-1 py-2">
@@ -502,7 +519,12 @@ const UserDashboard = () => {
                               <Badge className={`${commerce.is_open ? 'bg-green-500' : 'bg-red-500'} text-white border-0 text-xs`}>
                                 {commerce.is_open ? 'Aberto' : 'Fechado'}
                               </Badge>
-                              <Button variant="ghost" size="sm" className="text-primary">
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="text-primary"
+                                onClick={() => setActiveTab(`vitrine-${commerce.id}`)}
+                              >
                                 Acessar <ChevronRight className="w-4 h-4" />
                               </Button>
                             </div>
@@ -880,6 +902,7 @@ const UserDashboard = () => {
               </div>
             </TabsContent>
           </Tabs>
+          )}
         </motion.div>
       </main>
     </div>
