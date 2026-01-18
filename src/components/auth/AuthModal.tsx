@@ -152,6 +152,14 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
         return;
       }
 
+      // Get the plan ID based on selected plan type
+      const { data: planData } = await supabase
+        .from('plans')
+        .select('id')
+        .eq('type', formData.plan as 'basic' | 'startup' | 'business')
+        .eq('is_active', true)
+        .single();
+
       // 2. Create the commerce record
       const { error: commerceError } = await supabase
         .from('commerces')
@@ -170,6 +178,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
           neighborhood: formData.neighborhood,
           complement: formData.complement,
           status: 'pending',
+          plan_id: planData?.id || null,
         });
 
       if (commerceError) {
