@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { 
   Search, 
   Filter, 
@@ -12,7 +12,9 @@ import {
   MapPin,
   Calendar,
   Ban,
-  Eye
+  Eye,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -37,6 +39,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Database } from "@/integrations/supabase/types";
+import CommerceDetailsModal from "./CommerceDetailsModal";
+import CommercesAnalytics from "./CommercesAnalytics";
 
 type CommerceStatus = Database['public']['Enums']['commerce_status'];
 
@@ -51,8 +55,26 @@ interface Commerce {
   document: string;
   status: CommerceStatus;
   created_at: string;
+  plan_id: string | null;
+  address: string | null;
+  address_number: string | null;
+  neighborhood: string | null;
+  cep: string | null;
+  complement: string | null;
+  whatsapp: string | null;
+  is_open: boolean | null;
+  approved_at: string | null;
+  rejection_reason: string | null;
   plans: { name: string; price: number } | null;
 }
+
+interface CommerceStats {
+  totalOrders: number;
+  totalRevenue: number;
+  growth: number;
+}
+
+const ITEMS_PER_PAGE = 10;
 
 const AdminCommerces = () => {
   const [commerces, setCommerces] = useState<Commerce[]>([]);
@@ -62,6 +84,9 @@ const AdminCommerces = () => {
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [selectedCommerce, setSelectedCommerce] = useState<Commerce | null>(null);
   const [rejectReason, setRejectReason] = useState("");
+  const [detailsModalOpen, setDetailsModalOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [commerceStats, setCommerceStats] = useState<Record<string, CommerceStats>>({});
   const { toast } = useToast();
 
   useEffect(() => {
@@ -84,8 +109,41 @@ const AdminCommerces = () => {
       });
     } else {
       setCommerces(data || []);
+      // Fetch stats for each commerce
+      fetchAllCommerceStats(data || []);
     }
     setIsLoading(false);
+  };
+
+  const fetchAllCommerceStats = async (commercesList: Commerce[]) => {
+    const stats: Record<string, CommerceStats> = {};
+    
+    for (const commerce of commercesList) {
+      const { data: orders } = await supabase
+        .from('orders')
+        .select('total, created_at')
+        .eq('commerce_id', commerce.id);
+
+      const totalOrders = orders?.length || 0;
+      const totalRevenue = orders?.reduce((sum, o) => sum + Number(o.total), 0) || 0;
+
+      // Calculate growth
+      const now = new Date();
+      const last30Days = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const prev30Days = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+      
+      const recentRevenue = orders?.filter(o => new Date(o.created_at) >= last30Days)
+        .reduce((sum, o) => sum + Number(o.total), 0) || 0;
+      const prevRevenue = orders?.filter(o => 
+        new Date(o.created_at) >= prev30Days && new Date(o.created_at) < last30Days
+      ).reduce((sum, o) => sum + Number(o.total), 0) || 0;
+      
+      const growth = prevRevenue > 0 ? ((recentRevenue - prevRevenue) / prevRevenue) * 100 : 0;
+
+      stats[commerce.id] = { totalOrders, totalRevenue, growth };
+    }
+
+    setCommerceStats(stats);
   };
 
   const updateStatus = async (commerceId: string, status: CommerceStatus, reason?: string) => {
@@ -119,6 +177,7 @@ const AdminCommerces = () => {
         title: statusMessages[status],
       });
       fetchCommerces();
+      setDetailsModalOpen(false);
     }
   };
 
@@ -131,6 +190,24 @@ const AdminCommerces = () => {
     }
   };
 
+  const handleViewDetails = (commerce: Commerce) => {
+    setSelectedCommerce(commerce);
+    setDetailsModalOpen(true);
+  };
+
+  const handleStatusChangeFromModal = (id: string, status: string) => {
+    if (status === 'rejected') {
+      const commerce = commerces.find(c => c.id === id);
+      if (commerce) {
+        setSelectedCommerce(commerce);
+        setDetailsModalOpen(false);
+        setRejectDialogOpen(true);
+      }
+    } else {
+      updateStatus(id, status as CommerceStatus);
+    }
+  };
+
   const filteredCommerces = commerces.filter(commerce => {
     const matchesSearch = 
       commerce.fantasy_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -138,6 +215,16 @@ const AdminCommerces = () => {
     const matchesStatus = statusFilter === "all" || commerce.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
+
+  // Pagination
+  const totalPages = Math.ceil(filteredCommerces.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const paginatedCommerces = filteredCommerces.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+  // Reset to page 1 when filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter]);
 
   const getStatusBadge = (status: CommerceStatus) => {
     const config = {
@@ -230,115 +317,187 @@ const AdminCommerces = () => {
             </CardContent>
           </Card>
         ) : (
-          filteredCommerces.map((commerce) => (
-            <Card key={commerce.id} className="border-border/50 hover:border-primary/30 transition-colors">
-              <CardContent className="p-6">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div className="flex items-start gap-4">
-                    <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white font-bold text-xl">
-                      {commerce.fantasy_name.charAt(0)}
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-3">
-                        <h3 className="font-semibold text-lg text-foreground">
-                          {commerce.fantasy_name}
-                        </h3>
-                        {getStatusBadge(commerce.status)}
+          <>
+            {paginatedCommerces.map((commerce) => (
+              <Card key={commerce.id} className="border-border/50 hover:border-primary/30 transition-colors">
+                <CardContent className="p-6">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="flex items-start gap-4">
+                      <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white font-bold text-xl">
+                        {commerce.fantasy_name.charAt(0)}
                       </div>
-                      <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <Mail className="w-4 h-4" />
-                          {commerce.email}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Phone className="w-4 h-4" />
-                          {commerce.phone}
-                        </span>
-                        {commerce.city && (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-3">
+                          <h3 className="font-semibold text-lg text-foreground">
+                            {commerce.fantasy_name}
+                          </h3>
+                          {getStatusBadge(commerce.status)}
+                        </div>
+                        <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
                           <span className="flex items-center gap-1">
-                            <MapPin className="w-4 h-4" />
-                            {commerce.city}
+                            <Mail className="w-4 h-4" />
+                            {commerce.email}
                           </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-4 text-sm">
-                        <span className="text-muted-foreground">
-                          {commerce.document_type.toUpperCase()}: {commerce.document}
-                        </span>
-                        {commerce.plans && (
-                          <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">
-                            {commerce.plans.name} - R$ {commerce.plans.price}
-                          </Badge>
-                        )}
+                          <span className="flex items-center gap-1">
+                            <Phone className="w-4 h-4" />
+                            {commerce.phone}
+                          </span>
+                          {commerce.city && (
+                            <span className="flex items-center gap-1">
+                              <MapPin className="w-4 h-4" />
+                              {commerce.city}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-4 text-sm">
+                          <span className="text-muted-foreground">
+                            {commerce.document_type.toUpperCase()}: {commerce.document}
+                          </span>
+                          {commerce.plans && (
+                            <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">
+                              {commerce.plans.name} - R$ {commerce.plans.price}
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="flex items-center gap-2">
-                    {commerce.status === 'pending' && (
-                      <>
-                        <Button
-                          size="sm"
-                          variant="success"
-                          className="gap-1"
-                          onClick={() => updateStatus(commerce.id, 'approved')}
-                        >
-                          <CheckCircle className="w-4 h-4" />
-                          Aprovar
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          className="gap-1"
-                          onClick={() => {
-                            setSelectedCommerce(commerce);
-                            setRejectDialogOpen(true);
-                          }}
-                        >
-                          <XCircle className="w-4 h-4" />
-                          Rejeitar
-                        </Button>
-                      </>
-                    )}
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreVertical className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem className="gap-2">
-                          <Eye className="w-4 h-4" />
-                          Ver detalhes
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        {commerce.status !== 'approved' && (
-                          <DropdownMenuItem 
-                            className="gap-2"
+                    <div className="flex items-center gap-2">
+                      {commerce.status === 'pending' && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="success"
+                            className="gap-1"
                             onClick={() => updateStatus(commerce.id, 'approved')}
                           >
                             <CheckCircle className="w-4 h-4" />
                             Aprovar
-                          </DropdownMenuItem>
-                        )}
-                        {commerce.status !== 'suspended' && (
-                          <DropdownMenuItem 
-                            className="gap-2 text-yellow-500"
-                            onClick={() => updateStatus(commerce.id, 'suspended')}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            className="gap-1"
+                            onClick={() => {
+                              setSelectedCommerce(commerce);
+                              setRejectDialogOpen(true);
+                            }}
                           >
-                            <Ban className="w-4 h-4" />
-                            Suspender
+                            <XCircle className="w-4 h-4" />
+                            Rejeitar
+                          </Button>
+                        </>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1"
+                        onClick={() => handleViewDetails(commerce)}
+                      >
+                        <Eye className="w-4 h-4" />
+                        Ver detalhes
+                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreVertical className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem 
+                            className="gap-2"
+                            onClick={() => handleViewDetails(commerce)}
+                          >
+                            <Eye className="w-4 h-4" />
+                            Ver detalhes
                           </DropdownMenuItem>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                          <DropdownMenuSeparator />
+                          {commerce.status !== 'approved' && (
+                            <DropdownMenuItem 
+                              className="gap-2"
+                              onClick={() => updateStatus(commerce.id, 'approved')}
+                            >
+                              <CheckCircle className="w-4 h-4" />
+                              Aprovar
+                            </DropdownMenuItem>
+                          )}
+                          {commerce.status !== 'suspended' && (
+                            <DropdownMenuItem 
+                              className="gap-2 text-yellow-500"
+                              onClick={() => updateStatus(commerce.id, 'suspended')}
+                            >
+                              <Ban className="w-4 h-4" />
+                              Suspender
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </div>
+                </CardContent>
+              </Card>
+            ))}
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between mt-4">
+                <p className="text-sm text-muted-foreground">
+                  Mostrando {startIndex + 1}-{Math.min(startIndex + ITEMS_PER_PAGE, filteredCommerces.length)} de {filteredCommerces.length} comércios
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    Anterior
+                  </Button>
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                      <Button
+                        key={page}
+                        variant={currentPage === page ? "default" : "ghost"}
+                        size="sm"
+                        className="w-8 h-8 p-0"
+                        onClick={() => setCurrentPage(page)}
+                      >
+                        {page}
+                      </Button>
+                    ))}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                  >
+                    Próximo
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
                 </div>
-              </CardContent>
-            </Card>
-          ))
+              </div>
+            )}
+          </>
         )}
       </div>
+
+      {/* Analytics Section */}
+      {!isLoading && commerces.length > 0 && (
+        <CommercesAnalytics 
+          commerces={commerces} 
+          commerceStats={commerceStats} 
+        />
+      )}
+
+      {/* Commerce Details Modal */}
+      <CommerceDetailsModal
+        commerce={selectedCommerce}
+        isOpen={detailsModalOpen}
+        onClose={() => setDetailsModalOpen(false)}
+        onStatusChange={handleStatusChangeFromModal}
+      />
 
       {/* Reject Dialog */}
       <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
