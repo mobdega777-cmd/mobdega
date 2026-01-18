@@ -34,11 +34,13 @@ import AdminCustomization from "@/components/admin/AdminCustomization";
 import AdminSettings from "@/components/admin/AdminSettings";
 import AdminBillingConfig from "@/components/admin/AdminBillingConfig";
 import AdminPlans from "@/components/admin/AdminPlans";
+import AdminCustomers from "@/components/admin/AdminCustomers";
 
 type AdminSection = 
   | "overview" 
   | "users" 
   | "commerces" 
+  | "customers"
   | "financial" 
   | "invoices" 
   | "billing-config"
@@ -53,6 +55,7 @@ const menuItems = [
   { id: "billing-config" as AdminSection, label: "Configurar Cobrança", icon: CreditCard },
   { id: "users" as AdminSection, label: "Usuários", icon: Users },
   { id: "commerces" as AdminSection, label: "Adegas/Tabacarias", icon: Store },
+  { id: "customers" as AdminSection, label: "Gestão de Clientes", icon: Users },
   { id: "plans" as AdminSection, label: "Planos", icon: Crown },
   { id: "customization" as AdminSection, label: "Personalização", icon: Palette },
   { id: "settings" as AdminSection, label: "Configurações", icon: Settings },
@@ -107,6 +110,8 @@ const AdminDashboard = () => {
         return <AdminUsers />;
       case "commerces":
         return <AdminCommerces />;
+      case "customers":
+        return <AdminCustomers />;
       case "financial":
         return <AdminFinancial />;
       case "invoices":

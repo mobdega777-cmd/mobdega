@@ -503,7 +503,7 @@ const UserDashboard = () => {
                                 {commerce.is_open ? 'Aberto' : 'Fechado'}
                               </Badge>
                               <Button variant="ghost" size="sm" className="text-primary">
-                                Ver cardápio <ChevronRight className="w-4 h-4" />
+                                Acessar <ChevronRight className="w-4 h-4" />
                               </Button>
                             </div>
                           </div>
@@ -603,19 +603,36 @@ const UserDashboard = () => {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {favorites.map((fav) => (
                         <div key={fav.id} className="bg-muted/50 rounded-xl overflow-hidden">
-                          <div className="h-24 bg-gradient-to-br from-primary/20 to-secondary/20">
-                            {fav.commerce?.cover_url && (
+                        <div className="h-24 bg-gradient-to-br from-primary/20 to-secondary/20 relative">
+                            {fav.commerce?.cover_url ? (
                               <img src={fav.commerce.cover_url} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <Store className="w-8 h-8 text-primary/30" />
+                              </div>
                             )}
                           </div>
                           <div className="p-3">
-                            <div className="flex items-center justify-between">
-                              <h3 className="font-semibold text-foreground">{fav.commerce?.fantasy_name}</h3>
-                              <button onClick={() => toggleFavorite(fav.commerce_id)}>
-                                <Heart className="w-5 h-5 fill-red-500 text-red-500" />
-                              </button>
+                            <div className="flex items-center gap-3">
+                              <div className="w-12 h-12 rounded-full bg-card border-2 border-background -mt-9 overflow-hidden flex-shrink-0">
+                                {fav.commerce?.logo_url ? (
+                                  <img src={fav.commerce.logo_url} alt="" className="w-full h-full object-cover" />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center bg-primary/10">
+                                    <Store className="w-5 h-5 text-primary/50" />
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between">
+                                  <h3 className="font-semibold text-foreground truncate">{fav.commerce?.fantasy_name}</h3>
+                                  <button onClick={() => toggleFavorite(fav.commerce_id)}>
+                                    <Heart className="w-5 h-5 fill-red-500 text-red-500" />
+                                  </button>
+                                </div>
+                                <p className="text-sm text-muted-foreground">{fav.commerce?.city}</p>
+                              </div>
                             </div>
-                            <p className="text-sm text-muted-foreground">{fav.commerce?.city}</p>
                           </div>
                         </div>
                       ))}
