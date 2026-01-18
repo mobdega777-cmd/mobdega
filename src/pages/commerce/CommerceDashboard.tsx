@@ -15,10 +15,15 @@ import {
   Menu,
   X,
   ChevronRight,
-  Store
+  Store,
+  Clock,
+  AlertTriangle,
+  Ban,
+  Lock
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -67,30 +72,66 @@ interface Commerce {
   fantasy_name: string;
   logo_url: string | null;
   status: string;
+  plan_id: string | null;
+  rejection_reason: string | null;
+}
+
+interface PlanMenuConfig {
+  allowed_menu_items: string[];
 }
 
 const CommerceDashboard = () => {
   const [activeSection, setActiveSection] = useState<CommerceSection>("overview");
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [commerce, setCommerce] = useState<Commerce | null>(null);
+  const [planConfig, setPlanConfig] = useState<PlanMenuConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [pendingInvoicesCount, setPendingInvoicesCount] = useState(0);
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+
+  const isPending = commerce?.status === 'pending';
+  const isRejected = commerce?.status === 'rejected';
+  const isSuspended = commerce?.status === 'suspended';
+  const isBlocked = isPending || isRejected || isSuspended;
 
   const fetchCommerce = async () => {
     if (!user) return;
     
     const { data, error } = await supabase
       .from('commerces')
-      .select('id, fantasy_name, logo_url, status')
+      .select('id, fantasy_name, logo_url, status, plan_id, rejection_reason')
       .eq('owner_id', user.id)
       .maybeSingle();
     
     if (error) {
       console.error('Error fetching commerce:', error);
-    } else {
-      setCommerce(data);
+    } else if (data) {
+      setCommerce({
+        id: data.id,
+        fantasy_name: data.fantasy_name,
+        logo_url: data.logo_url,
+        status: data.status,
+        plan_id: data.plan_id,
+        rejection_reason: data.rejection_reason
+      });
+      
+      // Fetch plan configuration if commerce has a plan
+      if (data.plan_id) {
+        const { data: planData } = await supabase
+          .from('plans')
+          .select('allowed_menu_items')
+          .eq('id', data.plan_id)
+          .single();
+        
+        if (planData) {
+          setPlanConfig({
+            allowed_menu_items: Array.isArray(planData.allowed_menu_items) 
+              ? (planData.allowed_menu_items as string[])
+              : ["overview", "settings"]
+          });
+        }
+      }
     }
     setLoading(false);
   };
@@ -142,6 +183,46 @@ const CommerceDashboard = () => {
     navigate("/");
   };
 
+  // Filter menu items based on plan configuration
+  const filteredMenuItems = menuItems.filter(item => {
+    if (!planConfig) return true; // Show all if no plan config
+    return planConfig.allowed_menu_items.includes(item.id);
+  });
+
+  const getBlockedStatusInfo = () => {
+    if (isPending) {
+      return {
+        icon: Clock,
+        title: "Aguardando Aprovação",
+        description: "Seu comércio está em análise. Assim que for aprovado, você terá acesso a todas as funcionalidades.",
+        color: "text-amber-500",
+        bgColor: "bg-amber-500/10",
+        borderColor: "border-amber-500/30"
+      };
+    }
+    if (isRejected) {
+      return {
+        icon: Ban,
+        title: "Cadastro Rejeitado",
+        description: commerce?.rejection_reason || "Seu cadastro foi rejeitado. Entre em contato para mais informações.",
+        color: "text-red-500",
+        bgColor: "bg-red-500/10",
+        borderColor: "border-red-500/30"
+      };
+    }
+    if (isSuspended) {
+      return {
+        icon: AlertTriangle,
+        title: "Conta Suspensa",
+        description: "Sua conta foi suspensa temporariamente. Entre em contato para mais informações.",
+        color: "text-red-500",
+        bgColor: "bg-red-500/10",
+        borderColor: "border-red-500/30"
+      };
+    }
+    return null;
+  };
+
   const renderContent = () => {
     if (!commerce) {
       return (
@@ -154,6 +235,37 @@ const CommerceDashboard = () => {
           <Button onClick={() => navigate("/")}>
             Cadastrar Comércio
           </Button>
+        </div>
+      );
+    }
+
+    // Show blocked status screen when commerce is not approved
+    if (isBlocked) {
+      const statusInfo = getBlockedStatusInfo();
+      if (!statusInfo) return null;
+      
+      const StatusIcon = statusInfo.icon;
+      
+      return (
+        <div className="flex flex-col items-center justify-center h-[60vh] text-center">
+          <Card className={`max-w-lg ${statusInfo.bgColor} ${statusInfo.borderColor} border-2`}>
+            <CardContent className="p-8">
+              <StatusIcon className={`w-16 h-16 mx-auto mb-4 ${statusInfo.color}`} />
+              <h2 className={`text-2xl font-bold mb-2 ${statusInfo.color}`}>
+                {statusInfo.title}
+              </h2>
+              <p className="text-muted-foreground">
+                {statusInfo.description}
+              </p>
+              
+              <div className="mt-6 p-4 bg-muted/50 rounded-lg">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Lock className="w-4 h-4" />
+                  <span>Todas as funcionalidades estão temporariamente bloqueadas</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       );
     }
@@ -233,30 +345,35 @@ const CommerceDashboard = () => {
 
         {/* Navigation */}
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-          {menuItems.map((item) => {
+          {filteredMenuItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeSection === item.id;
+            const isDisabled = isBlocked && item.id !== "overview";
 
             return (
               <button
                 key={item.id}
-                onClick={() => setActiveSection(item.id)}
+                onClick={() => !isDisabled && setActiveSection(item.id)}
+                disabled={isDisabled}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all group ${
-                  isActive
-                    ? "gradient-primary text-primary-foreground shadow-glow-primary"
-                    : "text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
+                  isDisabled
+                    ? "opacity-40 cursor-not-allowed text-primary-foreground/40"
+                    : isActive
+                      ? "gradient-primary text-primary-foreground shadow-glow-primary"
+                      : "text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
                 }`}
               >
                 <Icon className={`w-5 h-5 ${!sidebarOpen && 'mx-auto'}`} />
                 {sidebarOpen && (
                   <>
                     <span className="flex-1 text-left font-medium">{item.label}</span>
-                    {item.showBadge && pendingInvoicesCount > 0 && (
+                    {isDisabled && <Lock className="w-4 h-4 text-primary-foreground/40" />}
+                    {!isDisabled && item.showBadge && pendingInvoicesCount > 0 && (
                       <Badge variant="destructive" className="text-xs px-2 py-0.5">
                         {pendingInvoicesCount}
                       </Badge>
                     )}
-                    {isActive && <ChevronRight className="w-4 h-4" />}
+                    {!isDisabled && isActive && <ChevronRight className="w-4 h-4" />}
                   </>
                 )}
               </button>

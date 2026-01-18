@@ -623,6 +623,7 @@ export type Database = {
       }
       plans: {
         Row: {
+          allowed_menu_items: Json | null
           created_at: string
           description: string | null
           features: Json | null
@@ -635,6 +636,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          allowed_menu_items?: Json | null
           created_at?: string
           description?: string | null
           features?: Json | null
@@ -647,6 +649,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          allowed_menu_items?: Json | null
           created_at?: string
           description?: string | null
           features?: Json | null

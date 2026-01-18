@@ -14,7 +14,8 @@ import {
   LogOut,
   Menu,
   X,
-  ChevronRight
+  ChevronRight,
+  Crown
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +33,7 @@ import AdminInvoices from "@/components/admin/AdminInvoices";
 import AdminCustomization from "@/components/admin/AdminCustomization";
 import AdminSettings from "@/components/admin/AdminSettings";
 import AdminBillingConfig from "@/components/admin/AdminBillingConfig";
+import AdminPlans from "@/components/admin/AdminPlans";
 
 type AdminSection = 
   | "overview" 
@@ -40,6 +42,7 @@ type AdminSection =
   | "financial" 
   | "invoices" 
   | "billing-config"
+  | "plans"
   | "customization" 
   | "settings";
 
@@ -50,6 +53,7 @@ const menuItems = [
   { id: "billing-config" as AdminSection, label: "Configurar Cobrança", icon: CreditCard },
   { id: "users" as AdminSection, label: "Usuários", icon: Users },
   { id: "commerces" as AdminSection, label: "Adegas/Tabacarias", icon: Store },
+  { id: "plans" as AdminSection, label: "Planos", icon: Crown },
   { id: "customization" as AdminSection, label: "Personalização", icon: Palette },
   { id: "settings" as AdminSection, label: "Configurações", icon: Settings },
 ];
@@ -109,6 +113,8 @@ const AdminDashboard = () => {
         return <AdminInvoices />;
       case "billing-config":
         return <AdminBillingConfig />;
+      case "plans":
+        return <AdminPlans />;
       case "customization":
         return <AdminCustomization />;
       case "settings":
