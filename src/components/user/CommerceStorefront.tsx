@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   ArrowLeft, Store, MapPin, Phone, Clock, Star, Heart,
   UtensilsCrossed, Truck, MessageCircle, ShoppingCart, ChevronRight,
-  X, Plus, Minus, Send
+  X, Plus, Minus, Send, User, CreditCard, Banknote, Smartphone, DollarSign,
+  Check, Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -57,6 +58,7 @@ interface Review {
   comment: string | null;
   created_at: string;
   user_id: string;
+  user_name?: string;
 }
 
 interface Table {
@@ -98,6 +100,7 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
+  const [favoritesCount, setFavoritesCount] = useState(0);
   const [activeTab, setActiveTab] = useState("menu");
   
   // Order mode and cart
@@ -108,29 +111,38 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
   // Modals
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [showTableModal, setShowTableModal] = useState(false);
-  const [showDeliveryModal, setShowDeliveryModal] = useState(false);
   const [showCartModal, setShowCartModal] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showOrderStatusModal, setShowOrderStatusModal] = useState(false);
   
   // Review form
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState("");
   const [submittingReview, setSubmittingReview] = useState(false);
   
-  // Delivery form
-  const [deliveryAddress, setDeliveryAddress] = useState("");
+  // Delivery/order form
   const [deliveryNotes, setDeliveryNotes] = useState("");
   const [submittingOrder, setSubmittingOrder] = useState(false);
   
-  // User profile for delivery
-  const [userProfile, setUserProfile] = useState<{
-    full_name: string;
-    phone: string | null;
-    cep: string | null;
-    address: string | null;
-    address_number: string | null;
-    city: string | null;
-    neighborhood: string | null;
-  } | null>(null);
+  // User profile for delivery - editable fields
+  const [customerName, setCustomerName] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [customerCep, setCustomerCep] = useState("");
+  const [customerAddress, setCustomerAddress] = useState("");
+  const [customerNumber, setCustomerNumber] = useState("");
+  const [customerComplement, setCustomerComplement] = useState("");
+  const [customerNeighborhood, setCustomerNeighborhood] = useState("");
+  const [customerCity, setCustomerCity] = useState("");
+
+  // Payment
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string | null>(null);
+  const [cashReceived, setCashReceived] = useState("");
+  const [commercePixKey, setCommercePixKey] = useState<string | null>(null);
+  const [commercePixQrCode, setCommercePixQrCode] = useState<string | null>(null);
+
+  // Order status tracking
+  const [createdOrderId, setCreatedOrderId] = useState<string | null>(null);
+  const [orderStatus, setOrderStatus] = useState<string>("pending");
 
   useEffect(() => {
     fetchCommerceData();
@@ -170,7 +182,7 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
     
     setProducts(productsData || []);
 
-    // Fetch reviews
+    // Fetch reviews with user names
     const { data: reviewsData } = await supabase
       .from('reviews')
       .select('id, rating, comment, created_at, user_id')
@@ -178,7 +190,23 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
       .order('created_at', { ascending: false })
       .limit(20);
     
-    setReviews(reviewsData || []);
+    // Fetch user names for reviews
+    if (reviewsData && reviewsData.length > 0) {
+      const userIds = [...new Set(reviewsData.map(r => r.user_id))];
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('user_id, full_name')
+        .in('user_id', userIds);
+      
+      const profileMap = new Map(profiles?.map(p => [p.user_id, p.full_name]) || []);
+      const reviewsWithNames = reviewsData.map(r => ({
+        ...r,
+        user_name: profileMap.get(r.user_id) || 'Usuário'
+      }));
+      setReviews(reviewsWithNames);
+    } else {
+      setReviews([]);
+    }
 
     // Fetch tables
     const { data: tablesData } = await supabase
@@ -198,6 +226,26 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
     
     setDeliveryZones(zonesData || []);
 
+    // Fetch favorites count for this commerce
+    const { count: favsCount } = await supabase
+      .from('favorites')
+      .select('*', { count: 'exact', head: true })
+      .eq('commerce_id', commerceId);
+    
+    setFavoritesCount(favsCount || 0);
+
+    // Fetch billing config for PIX
+    const { data: billingData } = await supabase
+      .from('billing_config')
+      .select('pix_key, qr_code_url')
+      .limit(1)
+      .maybeSingle();
+    
+    if (billingData) {
+      setCommercePixKey(billingData.pix_key);
+      setCommercePixQrCode(billingData.qr_code_url);
+    }
+
     // Check if favorite and fetch user profile
     if (user) {
       const { data: favData } = await supabase
@@ -212,18 +260,19 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
       // Fetch user profile for delivery
       const { data: profileData } = await supabase
         .from('profiles')
-        .select('full_name, phone, cep, address, address_number, city, neighborhood')
+        .select('full_name, phone, cep, address, address_number, city, neighborhood, complement')
         .eq('user_id', user.id)
         .maybeSingle();
       
       if (profileData) {
-        setUserProfile(profileData);
-        // Pre-fill delivery address
-        if (profileData.address) {
-          setDeliveryAddress(
-            `${profileData.address}${profileData.address_number ? ', ' + profileData.address_number : ''} - ${profileData.neighborhood}, ${profileData.city}`
-          );
-        }
+        setCustomerName(profileData.full_name || "");
+        setCustomerPhone(profileData.phone || "");
+        setCustomerCep(profileData.cep || "");
+        setCustomerAddress(profileData.address || "");
+        setCustomerNumber(profileData.address_number || "");
+        setCustomerComplement(profileData.complement || "");
+        setCustomerNeighborhood(profileData.neighborhood || "");
+        setCustomerCity(profileData.city || "");
       }
     }
 
@@ -236,10 +285,12 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
     if (isFavorite) {
       await supabase.from('favorites').delete().eq('user_id', user.id).eq('commerce_id', commerceId);
       setIsFavorite(false);
+      setFavoritesCount(prev => Math.max(0, prev - 1));
       toast({ title: "Removido dos favoritos" });
     } else {
       await supabase.from('favorites').insert({ user_id: user.id, commerce_id: commerceId });
       setIsFavorite(true);
+      setFavoritesCount(prev => prev + 1);
       toast({ title: "Adicionado aos favoritos" });
     }
   };
@@ -307,9 +358,9 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
 
   // Calculate delivery fee based on CEP
   const calculateDeliveryFee = (): number => {
-    if (!userProfile?.cep || deliveryZones.length === 0) return 0;
+    if (!customerCep || deliveryZones.length === 0) return 0;
     
-    const userCep = parseInt(userProfile.cep.replace(/\D/g, ''));
+    const userCep = parseInt(customerCep.replace(/\D/g, ''));
     
     for (const zone of deliveryZones) {
       const start = parseInt(zone.cep_start.replace(/\D/g, ''));
@@ -322,6 +373,10 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
   };
 
   const deliveryFee = calculateDeliveryFee();
+  const orderTotal = orderMode === 'delivery' ? cartTotal + deliveryFee : cartTotal;
+
+  // Calculate change for cash payment
+  const cashChange = cashReceived ? Math.max(0, parseFloat(cashReceived) - orderTotal) : 0;
 
   // Handle table selection
   const handleSelectTable = (table: Table) => {
@@ -331,11 +386,15 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
     toast({ title: `Mesa ${table.number} selecionada!` });
   };
 
-  // Handle order modes
+  // Handle order modes - exclusive selection
   const handlePedirNaMesa = () => {
     if (tables.length === 0) {
       toast({ variant: "destructive", title: "Nenhuma mesa disponível" });
       return;
+    }
+    // Reset delivery mode if selected
+    if (orderMode === 'delivery') {
+      setOrderMode('none');
     }
     setShowTableModal(true);
   };
@@ -344,6 +403,10 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
     if (!commerce?.delivery_enabled) {
       toast({ variant: "destructive", title: "Delivery indisponível", description: "Este estabelecimento não está aceitando pedidos de delivery no momento" });
       return;
+    }
+    // Reset table selection if was in table mode
+    if (orderMode === 'table') {
+      setSelectedTable(null);
     }
     setOrderMode('delivery');
     toast({ title: "Modo Delivery selecionado!", description: "Adicione produtos ao carrinho" });
@@ -384,14 +447,28 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
     setSubmittingReview(false);
   };
 
-  // Submit order
+  // Open cart modal
+  const openCartModal = () => {
+    setShowCartModal(true);
+  };
+
+  // Proceed to payment
+  const proceedToPayment = () => {
+    setShowCartModal(false);
+    setShowPaymentModal(true);
+  };
+
+  // Submit order with payment
   const submitOrder = async () => {
-    if (!user || cart.length === 0) return;
+    if (!user || cart.length === 0 || !selectedPaymentMethod) return;
 
     setSubmittingOrder(true);
 
     const subtotal = cartTotal;
-    const total = orderMode === 'delivery' ? subtotal + deliveryFee : subtotal;
+    const total = orderTotal;
+    const fullAddress = orderMode === 'delivery' 
+      ? `${customerAddress}, ${customerNumber}${customerComplement ? ' - ' + customerComplement : ''} - ${customerNeighborhood}, ${customerCity} - CEP: ${customerCep}`
+      : null;
 
     const { data: orderData, error: orderError } = await supabase
       .from('orders')
@@ -400,11 +477,12 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
         user_id: user.id,
         order_type: orderMode,
         table_id: selectedTable?.id || null,
-        delivery_address: orderMode === 'delivery' ? deliveryAddress : null,
+        delivery_address: fullAddress,
         delivery_fee: orderMode === 'delivery' ? deliveryFee : 0,
         notes: deliveryNotes || null,
-        customer_name: userProfile?.full_name || null,
-        customer_phone: userProfile?.phone || null,
+        customer_name: customerName,
+        customer_phone: customerPhone,
+        payment_method: selectedPaymentMethod,
         subtotal,
         total,
         status: 'pending'
@@ -430,13 +508,52 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
 
     await supabase.from('order_items').insert(orderItems);
 
-    toast({ title: "Pedido enviado com sucesso!", description: "Acompanhe o status na aba Pedidos" });
+    setCreatedOrderId(orderData.id);
+    setOrderStatus('pending');
+    setShowPaymentModal(false);
+    setShowOrderStatusModal(true);
+
+    // Reset cart and form
     setCart([]);
     setOrderMode('none');
     setSelectedTable(null);
-    setShowDeliveryModal(false);
-    setShowCartModal(false);
+    setSelectedPaymentMethod(null);
+    setCashReceived("");
+    setDeliveryNotes("");
     setSubmittingOrder(false);
+
+    toast({ title: "Pedido enviado com sucesso!" });
+  };
+
+  // Subscribe to order status changes
+  useEffect(() => {
+    if (!createdOrderId) return;
+
+    const channel = supabase
+      .channel(`order-${createdOrderId}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${createdOrderId}` },
+        (payload) => {
+          setOrderStatus(payload.new.status);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [createdOrderId]);
+
+  const getOrderStatusStep = () => {
+    switch (orderStatus) {
+      case 'pending': return 0;
+      case 'confirmed':
+      case 'preparing': return 1;
+      case 'delivering':
+      case 'delivered': return 2;
+      default: return 0;
+    }
   };
 
   if (loading) {
@@ -475,27 +592,42 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
           variant="ghost"
           size="icon"
           onClick={onBack}
-          className="absolute top-3 left-3 bg-black/50 text-white hover:bg-black/70"
+          className="absolute top-3 left-3 bg-primary text-white hover:bg-primary/90"
         >
           <ArrowLeft className="w-5 h-5" />
         </Button>
 
-        <button
-          onClick={toggleFavorite}
-          className="absolute top-3 right-3 w-10 h-10 bg-black/50 rounded-full flex items-center justify-center hover:bg-black/70 transition-colors"
-        >
-          <Heart className={`w-5 h-5 ${isFavorite ? 'fill-red-500 text-red-500' : 'text-white'}`} />
-        </button>
+        {/* Favorite button with count */}
+        <div className="absolute top-3 right-3 flex flex-col items-center">
+          <button
+            onClick={toggleFavorite}
+            className="w-10 h-10 bg-black/50 rounded-full flex items-center justify-center hover:bg-black/70 transition-colors"
+          >
+            <Heart className={`w-5 h-5 ${isFavorite ? 'fill-red-500 text-red-500' : 'text-white'}`} />
+          </button>
+          <span className="text-xs text-white bg-black/50 px-2 py-0.5 rounded-full mt-1">
+            {favoritesCount}
+          </span>
+        </div>
 
         {/* Commerce Info Overlay */}
         <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
           <div className="flex items-end gap-3">
-            <div className="w-16 h-16 rounded-xl bg-card border-2 border-background overflow-hidden flex-shrink-0">
-              {commerce.logo_url ? (
-                <img src={commerce.logo_url} alt="" className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-primary/10">
-                  <Store className="w-8 h-8 text-primary" />
+            <div className="relative w-16 h-16 flex-shrink-0">
+              <div className="w-16 h-16 rounded-xl bg-card border-2 border-background overflow-hidden">
+                {commerce.logo_url ? (
+                  <img src={commerce.logo_url} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-primary/10">
+                    <Store className="w-8 h-8 text-primary" />
+                  </div>
+                )}
+              </div>
+              {/* Rating badge on logo */}
+              {averageRating && (
+                <div className="absolute -bottom-1 -right-1 bg-yellow-500 text-black text-xs font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                  <Star className="w-3 h-3 fill-current" />
+                  {averageRating}
                 </div>
               )}
             </div>
@@ -530,10 +662,10 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
         </Button>
       </div>
 
-      {/* Action Buttons */}
+      {/* Action Buttons - Exclusive selection */}
       <div className="grid grid-cols-2 gap-3">
         <Button 
-          className={`gap-2 h-14 text-base ${orderMode === 'table' ? 'ring-2 ring-primary' : ''}`} 
+          className={`gap-2 h-14 text-base`} 
           variant={orderMode === 'table' ? 'default' : 'outline'}
           onClick={handlePedirNaMesa}
         >
@@ -542,7 +674,7 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
           {selectedTable && <Badge variant="secondary" className="ml-1">Mesa {selectedTable.number}</Badge>}
         </Button>
         <Button 
-          className={`gap-2 h-14 text-base ${orderMode === 'delivery' ? 'ring-2 ring-primary' : ''}`} 
+          className={`gap-2 h-14 text-base`} 
           variant={orderMode === 'delivery' ? 'default' : 'outline'}
           onClick={handlePedirDelivery}
           disabled={!commerce.delivery_enabled}
@@ -666,6 +798,11 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
 
         {/* Reviews Tab */}
         <TabsContent value="reviews" className="space-y-4 mt-4">
+          {/* Add Review Button - At top */}
+          <Button className="w-full" variant="default" onClick={() => setShowReviewModal(true)}>
+            Adicionar Avaliação
+          </Button>
+
           {/* Rating Summary */}
           {averageRating && (
             <Card className="bg-gradient-to-br from-primary/10 to-secondary/10">
@@ -693,7 +830,18 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
             {reviews.map((review) => (
               <Card key={review.id}>
                 <CardContent className="pt-4">
-                  <div className="flex items-center gap-2 mb-2">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                        <User className="w-4 h-4 text-primary" />
+                      </div>
+                      <span className="font-medium text-foreground">{review.user_name}</span>
+                    </div>
+                    <span className="text-sm text-muted-foreground">
+                      {format(new Date(review.created_at), "dd/MM/yyyy", { locale: ptBR })}
+                    </span>
+                  </div>
+                  <div className="flex gap-1 mb-2">
                     {[1, 2, 3, 4, 5].map((star) => (
                       <Star
                         key={star}
@@ -704,9 +852,6 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
                         }`}
                       />
                     ))}
-                    <span className="text-sm text-muted-foreground ml-auto">
-                      {format(new Date(review.created_at), "dd/MM/yyyy", { locale: ptBR })}
-                    </span>
                   </div>
                   {review.comment && (
                     <p className="text-foreground">{review.comment}</p>
@@ -719,16 +864,8 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
               <div className="text-center py-8 text-muted-foreground">
                 <MessageCircle className="w-12 h-12 mx-auto mb-4 opacity-50" />
                 <p>Nenhuma avaliação ainda</p>
-                <Button className="mt-4" variant="default" onClick={() => setShowReviewModal(true)}>
-                  Seja o primeiro a avaliar
-                </Button>
+                <p className="text-sm">Seja o primeiro a avaliar!</p>
               </div>
-            )}
-
-            {reviews.length > 0 && (
-              <Button className="w-full" variant="outline" onClick={() => setShowReviewModal(true)}>
-                Adicionar Avaliação
-              </Button>
             )}
           </div>
         </TabsContent>
@@ -743,7 +880,7 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
         >
           <Button
             className="w-full h-14 text-lg gap-3"
-            onClick={() => orderMode === 'delivery' ? setShowDeliveryModal(true) : setShowCartModal(true)}
+            onClick={openCartModal}
           >
             <ShoppingCart className="w-5 h-5" />
             Ver Carrinho ({cartItemsCount})
@@ -807,159 +944,389 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
           <DialogHeader>
             <DialogTitle>Selecione uma Mesa</DialogTitle>
           </DialogHeader>
-          <div className="grid grid-cols-3 gap-3 py-4">
-            {tables.map((table) => (
-              <Button
-                key={table.id}
-                variant={table.status === 'available' ? 'outline' : 'ghost'}
-                disabled={table.status !== 'available'}
-                className="h-20 flex flex-col"
-                onClick={() => handleSelectTable(table)}
-              >
-                <span className="text-lg font-bold">Mesa {table.number}</span>
-                {table.name && <span className="text-xs text-muted-foreground">{table.name}</span>}
-                <span className="text-xs text-muted-foreground">{table.capacity} lugares</span>
-              </Button>
-            ))}
-          </div>
+          {tables.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <UtensilsCrossed className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p>Nenhuma mesa cadastrada</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 gap-3 py-4">
+              {tables.map((table) => (
+                <Button
+                  key={table.id}
+                  variant={table.status === 'available' ? 'outline' : 'ghost'}
+                  disabled={table.status !== 'available'}
+                  className="h-20 flex flex-col"
+                  onClick={() => handleSelectTable(table)}
+                >
+                  <span className="text-lg font-bold">Mesa {table.number}</span>
+                  {table.name && <span className="text-xs text-muted-foreground">{table.name}</span>}
+                  <span className="text-xs text-muted-foreground">{table.capacity} lugares</span>
+                </Button>
+              ))}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
-      {/* Cart Modal (Table Order) */}
+      {/* Cart Modal with full customer info */}
       <Dialog open={showCartModal} onOpenChange={setShowCartModal}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Seu Pedido - Mesa {selectedTable?.number}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            {cart.map((item) => (
-              <div key={item.product.id} className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                {item.product.image_url && (
-                  <img src={item.product.image_url} alt="" className="w-16 h-16 rounded object-cover" />
-                )}
-                <div className="flex-1">
-                  <p className="font-medium">{item.product.name}</p>
-                  <p className="text-primary font-bold">
-                    {formatCurrency(item.product.promotional_price || item.product.price)}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => updateCartQuantity(item.product.id, -1)}>
-                    <Minus className="w-4 h-4" />
-                  </Button>
-                  <span className="w-8 text-center font-medium">{item.quantity}</span>
-                  <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => updateCartQuantity(item.product.id, 1)}>
-                    <Plus className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-
-            <div className="border-t pt-4">
-              <div className="flex justify-between text-lg font-bold">
-                <span>Total</span>
-                <span className="text-primary">{formatCurrency(cartTotal)}</span>
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="notes">Observações</Label>
-              <Textarea
-                id="notes"
-                placeholder="Alguma observação para o pedido?"
-                value={deliveryNotes}
-                onChange={(e) => setDeliveryNotes(e.target.value)}
-                className="mt-2"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCartModal(false)}>
-              Continuar Comprando
-            </Button>
-            <Button onClick={submitOrder} disabled={submittingOrder}>
-              {submittingOrder ? 'Enviando...' : 'Enviar Pedido'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delivery Modal */}
-      <Dialog open={showDeliveryModal} onOpenChange={setShowDeliveryModal}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Finalizar Delivery</DialogTitle>
+            <DialogTitle>
+              {orderMode === 'table' ? `Seu Pedido - Mesa ${selectedTable?.number}` : 'Seu Pedido - Delivery'}
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             {/* Cart Items */}
             {cart.map((item) => (
               <div key={item.product.id} className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
                 {item.product.image_url && (
-                  <img src={item.product.image_url} alt="" className="w-12 h-12 rounded object-cover" />
+                  <img src={item.product.image_url} alt="" className="w-14 h-14 rounded object-cover" />
                 )}
                 <div className="flex-1">
                   <p className="font-medium text-sm">{item.product.name}</p>
-                  <p className="text-primary text-sm">
+                  <p className="text-primary text-sm font-bold">
                     {item.quantity}x {formatCurrency(item.product.promotional_price || item.product.price)}
                   </p>
                 </div>
                 <div className="flex items-center gap-1">
-                  <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => updateCartQuantity(item.product.id, -1)}>
+                  <Button size="icon" variant="outline" className="h-7 w-7" onClick={() => updateCartQuantity(item.product.id, -1)}>
                     <Minus className="w-3 h-3" />
                   </Button>
-                  <span className="w-6 text-center text-sm">{item.quantity}</span>
-                  <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => updateCartQuantity(item.product.id, 1)}>
+                  <span className="w-6 text-center text-sm font-medium">{item.quantity}</span>
+                  <Button size="icon" variant="outline" className="h-7 w-7" onClick={() => updateCartQuantity(item.product.id, 1)}>
                     <Plus className="w-3 h-3" />
                   </Button>
                 </div>
               </div>
             ))}
 
-            {/* Delivery Address */}
-            <div>
-              <Label htmlFor="address">Endereço de Entrega</Label>
-              <Input
-                id="address"
-                value={deliveryAddress}
-                onChange={(e) => setDeliveryAddress(e.target.value)}
-                placeholder="Seu endereço completo"
-                className="mt-2"
-              />
+            {/* Customer Info - Editable */}
+            <div className="border-t pt-4 space-y-3">
+              <h4 className="font-semibold text-foreground">Seus Dados</h4>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="customerName">Nome</Label>
+                  <Input
+                    id="customerName"
+                    value={customerName}
+                    onChange={(e) => setCustomerName(e.target.value)}
+                    placeholder="Seu nome"
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="customerPhone">Telefone</Label>
+                  <Input
+                    id="customerPhone"
+                    value={customerPhone}
+                    onChange={(e) => setCustomerPhone(e.target.value)}
+                    placeholder="(00) 00000-0000"
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+
+              {orderMode === 'delivery' && (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label htmlFor="customerCep">CEP</Label>
+                      <Input
+                        id="customerCep"
+                        value={customerCep}
+                        onChange={(e) => setCustomerCep(e.target.value)}
+                        placeholder="00000-000"
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="customerCity">Cidade</Label>
+                      <Input
+                        id="customerCity"
+                        value={customerCity}
+                        onChange={(e) => setCustomerCity(e.target.value)}
+                        placeholder="Cidade"
+                        className="mt-1"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="customerNeighborhood">Bairro</Label>
+                    <Input
+                      id="customerNeighborhood"
+                      value={customerNeighborhood}
+                      onChange={(e) => setCustomerNeighborhood(e.target.value)}
+                      placeholder="Bairro"
+                      className="mt-1"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="col-span-2">
+                      <Label htmlFor="customerAddress">Endereço</Label>
+                      <Input
+                        id="customerAddress"
+                        value={customerAddress}
+                        onChange={(e) => setCustomerAddress(e.target.value)}
+                        placeholder="Rua, Avenida..."
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="customerNumber">Número</Label>
+                      <Input
+                        id="customerNumber"
+                        value={customerNumber}
+                        onChange={(e) => setCustomerNumber(e.target.value)}
+                        placeholder="Nº"
+                        className="mt-1"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="customerComplement">Complemento</Label>
+                    <Input
+                      id="customerComplement"
+                      value={customerComplement}
+                      onChange={(e) => setCustomerComplement(e.target.value)}
+                      placeholder="Apto, Bloco, Referência..."
+                      className="mt-1"
+                    />
+                  </div>
+                </>
+              )}
+
+              <div>
+                <Label htmlFor="notes">Observações</Label>
+                <Textarea
+                  id="notes"
+                  placeholder="Alguma observação para o pedido?"
+                  value={deliveryNotes}
+                  onChange={(e) => setDeliveryNotes(e.target.value)}
+                  className="mt-1"
+                />
+              </div>
             </div>
 
-            <div>
-              <Label htmlFor="delivery-notes">Observações</Label>
-              <Textarea
-                id="delivery-notes"
-                placeholder="Ponto de referência, instruções de entrega..."
-                value={deliveryNotes}
-                onChange={(e) => setDeliveryNotes(e.target.value)}
-                className="mt-2"
-              />
-            </div>
-
-            {/* Totals */}
+            {/* Order Summary */}
             <div className="border-t pt-4 space-y-2">
               <div className="flex justify-between text-sm">
-                <span>Subtotal</span>
+                <span className="text-muted-foreground">Subtotal</span>
                 <span>{formatCurrency(cartTotal)}</span>
               </div>
-              <div className="flex justify-between text-sm">
-                <span>Taxa de entrega</span>
-                <span>{formatCurrency(deliveryFee)}</span>
-              </div>
-              <div className="flex justify-between text-lg font-bold">
+              {orderMode === 'delivery' && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Taxa de entrega</span>
+                  <span>{formatCurrency(deliveryFee)}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-lg font-bold pt-2 border-t">
                 <span>Total</span>
-                <span className="text-primary">{formatCurrency(cartTotal + deliveryFee)}</span>
+                <span className="text-primary">{formatCurrency(orderTotal)}</span>
               </div>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDeliveryModal(false)}>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowCartModal(false)}>
               Continuar Comprando
             </Button>
-            <Button onClick={submitOrder} disabled={submittingOrder || !deliveryAddress}>
-              {submittingOrder ? 'Enviando...' : 'Confirmar Pedido'}
+            <Button onClick={proceedToPayment}>
+              Confirmar Pedido
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Payment Modal */}
+      <Dialog open={showPaymentModal} onOpenChange={setShowPaymentModal}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Forma de Pagamento</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {/* Payment Methods */}
+            <div className="grid grid-cols-2 gap-3">
+              <Button
+                variant={selectedPaymentMethod === 'credit' ? 'default' : 'outline'}
+                className="h-20 flex flex-col gap-2"
+                onClick={() => setSelectedPaymentMethod('credit')}
+              >
+                <CreditCard className="w-6 h-6" />
+                <span>Crédito</span>
+              </Button>
+              <Button
+                variant={selectedPaymentMethod === 'debit' ? 'default' : 'outline'}
+                className="h-20 flex flex-col gap-2"
+                onClick={() => setSelectedPaymentMethod('debit')}
+              >
+                <CreditCard className="w-6 h-6" />
+                <span>Débito</span>
+              </Button>
+              <Button
+                variant={selectedPaymentMethod === 'cash' ? 'default' : 'outline'}
+                className="h-20 flex flex-col gap-2"
+                onClick={() => setSelectedPaymentMethod('cash')}
+              >
+                <Banknote className="w-6 h-6" />
+                <span>Dinheiro</span>
+              </Button>
+              <Button
+                variant={selectedPaymentMethod === 'pix' ? 'default' : 'outline'}
+                className="h-20 flex flex-col gap-2"
+                onClick={() => setSelectedPaymentMethod('pix')}
+              >
+                <Smartphone className="w-6 h-6" />
+                <span>PIX</span>
+              </Button>
+            </div>
+
+            {/* Cash - Change Calculator */}
+            {selectedPaymentMethod === 'cash' && (
+              <div className="p-4 bg-muted/50 rounded-lg space-y-3">
+                <div>
+                  <Label htmlFor="cashReceived">Valor recebido</Label>
+                  <Input
+                    id="cashReceived"
+                    type="number"
+                    value={cashReceived}
+                    onChange={(e) => setCashReceived(e.target.value)}
+                    placeholder="0,00"
+                    className="mt-1"
+                  />
+                </div>
+                <div className="flex justify-between font-bold text-lg">
+                  <span>Total do pedido:</span>
+                  <span>{formatCurrency(orderTotal)}</span>
+                </div>
+                {cashReceived && parseFloat(cashReceived) >= orderTotal && (
+                  <div className="flex justify-between font-bold text-lg text-green-600">
+                    <span>Troco:</span>
+                    <span>{formatCurrency(cashChange)}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* PIX - Show QR Code */}
+            {selectedPaymentMethod === 'pix' && (
+              <div className="p-4 bg-muted/50 rounded-lg space-y-3 text-center">
+                <p className="font-medium">Pague via PIX</p>
+                {commercePixQrCode && (
+                  <div className="flex justify-center">
+                    <img src={commercePixQrCode} alt="QR Code PIX" className="w-48 h-48 rounded-lg" />
+                  </div>
+                )}
+                {commercePixKey && (
+                  <div className="space-y-1">
+                    <p className="text-sm text-muted-foreground">Chave PIX:</p>
+                    <p className="font-mono text-sm bg-card p-2 rounded break-all">{commercePixKey}</p>
+                  </div>
+                )}
+                <p className="text-sm text-muted-foreground">
+                  Total: <span className="font-bold text-foreground">{formatCurrency(orderTotal)}</span>
+                </p>
+              </div>
+            )}
+
+            {/* Order Summary */}
+            <div className="pt-4 border-t">
+              <div className="flex justify-between font-bold text-lg">
+                <span>Total a pagar:</span>
+                <span className="text-primary">{formatCurrency(orderTotal)}</span>
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => {
+              setShowPaymentModal(false);
+              setShowCartModal(true);
+            }}>
+              Voltar
+            </Button>
+            <Button 
+              onClick={submitOrder} 
+              disabled={!selectedPaymentMethod || submittingOrder}
+            >
+              {submittingOrder ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Enviando...
+                </>
+              ) : (
+                'Confirmar Pagamento'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Order Status Modal */}
+      <Dialog open={showOrderStatusModal} onOpenChange={setShowOrderStatusModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-center">Acompanhe seu Pedido</DialogTitle>
+          </DialogHeader>
+          <div className="py-8">
+            {/* Status Steps */}
+            <div className="flex items-center justify-between relative">
+              {/* Progress Line */}
+              <div className="absolute top-5 left-0 right-0 h-1 bg-muted">
+                <div 
+                  className="h-full bg-primary transition-all duration-500"
+                  style={{ width: `${getOrderStatusStep() * 50}%` }}
+                />
+              </div>
+
+              {/* Step 1: Waiting */}
+              <div className="flex flex-col items-center relative z-10">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                  getOrderStatusStep() >= 0 ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'
+                }`}>
+                  {getOrderStatusStep() > 0 ? <Check className="w-5 h-5" /> : <Clock className="w-5 h-5" />}
+                </div>
+                <span className="text-xs mt-2 text-center">Aguardando<br />Aprovação</span>
+              </div>
+
+              {/* Step 2: Preparing */}
+              <div className="flex flex-col items-center relative z-10">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                  getOrderStatusStep() >= 1 ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'
+                }`}>
+                  {getOrderStatusStep() > 1 ? <Check className="w-5 h-5" /> : <UtensilsCrossed className="w-5 h-5" />}
+                </div>
+                <span className="text-xs mt-2 text-center">Preparando</span>
+              </div>
+
+              {/* Step 3: Ready/Delivering */}
+              <div className="flex flex-col items-center relative z-10">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                  getOrderStatusStep() >= 2 ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'
+                }`}>
+                  {orderMode === 'delivery' ? <Truck className="w-5 h-5" /> : <Check className="w-5 h-5" />}
+                </div>
+                <span className="text-xs mt-2 text-center">
+                  {orderMode === 'delivery' ? 'Saiu p/' : 'Pedido'}<br />
+                  {orderMode === 'delivery' ? 'Entrega' : 'Pronto'}
+                </span>
+              </div>
+            </div>
+
+            <p className="text-center text-muted-foreground mt-8">
+              {orderStatus === 'pending' && 'Aguardando confirmação do estabelecimento...'}
+              {orderStatus === 'confirmed' && 'Pedido confirmado! Preparando...'}
+              {orderStatus === 'preparing' && 'Seu pedido está sendo preparado!'}
+              {orderStatus === 'delivering' && 'Pedido saiu para entrega!'}
+              {orderStatus === 'delivered' && 'Pedido entregue! Bom apetite!'}
+            </p>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setShowOrderStatusModal(false)} className="w-full">
+              Fechar
             </Button>
           </DialogFooter>
         </DialogContent>

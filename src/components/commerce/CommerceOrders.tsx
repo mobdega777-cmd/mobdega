@@ -398,7 +398,7 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
                                     size="sm"
                                     onClick={() => updateOrderStatus(order.id, nextStatus)}
                                   >
-                                    {statusConfig[nextStatus]?.label}
+                                    {order.status === 'pending' ? 'Iniciar' : statusConfig[nextStatus]?.label}
                                   </Button>
                                 )}
                                 {order.status !== 'cancelled' && order.status !== 'delivered' && (
@@ -458,7 +458,7 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
 
       {/* Order Details Dialog */}
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Receipt className="w-5 h-5" />

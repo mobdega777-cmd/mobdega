@@ -512,7 +512,7 @@ const UserDashboard = () => {
                         className="bg-card rounded-xl overflow-hidden shadow-sm border border-border"
                       >
                         <div className="flex">
-                          <div className="w-24 h-24 flex-shrink-0 bg-muted">
+                          <div className="relative w-24 h-24 flex-shrink-0 bg-muted">
                             {commerce.cover_url || commerce.logo_url ? (
                               <img
                                 src={commerce.cover_url || commerce.logo_url || ''}
@@ -522,6 +522,13 @@ const UserDashboard = () => {
                             ) : (
                               <div className="w-full h-full flex items-center justify-center bg-primary/10">
                                 <Store className="w-8 h-8 text-primary/50" />
+                              </div>
+                            )}
+                            {/* Rating badge on logo */}
+                            {commerce.averageRating && commerce.averageRating > 0 && (
+                              <div className="absolute bottom-1 right-1 bg-yellow-500 text-black text-xs font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                                <Star className="w-3 h-3 fill-current" />
+                                {commerce.averageRating.toFixed(1)}
                               </div>
                             )}
                           </div>
@@ -537,12 +544,6 @@ const UserDashboard = () => {
                                 <MapPin className="w-3 h-3" />
                                 {commerce.neighborhood}, {commerce.city}
                               </p>
-                              {commerce.averageRating && commerce.averageRating > 0 && (
-                                <div className="flex items-center gap-1 text-sm mt-0.5">
-                                  <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
-                                  <span className="font-medium text-foreground">{commerce.averageRating.toFixed(1)}</span>
-                                </div>
-                              )}
                             </div>
                             <div className="flex items-center justify-between">
                               <Badge className={`${commerce.is_open ? 'bg-green-500' : 'bg-red-500'} text-white border-0 text-xs`}>
