@@ -57,7 +57,7 @@ type CommerceSection =
 const menuItems = [
   { id: "overview" as CommerceSection, label: "Visão Geral", icon: LayoutDashboard },
   { id: "cashregister" as CommerceSection, label: "Caixa/PDV", icon: Calculator },
-  { id: "orders" as CommerceSection, label: "Pedidos", icon: ShoppingCart },
+  { id: "orders" as CommerceSection, label: "Pedidos", icon: ShoppingCart, showPendingBadge: true },
   { id: "delivery" as CommerceSection, label: "Delivery", icon: Truck },
   { id: "deliveryzones" as CommerceSection, label: "Áreas de Entrega", icon: MapPin },
   { id: "tables" as CommerceSection, label: "Mesas/Comandas", icon: Utensils },
