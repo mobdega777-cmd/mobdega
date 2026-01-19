@@ -297,11 +297,11 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
         // Check if input looks like a document (numbers only)
         const cleanInput = formData.email.replace(/\D/g, '');
         if (cleanInput.length >= 11) {
-          // Lookup email by document
+          // Lookup email by document - use cleaned input to match stored format
           const { data: commerce } = await supabase
             .from('commerces')
             .select('email')
-            .eq('document', formData.email)
+            .eq('document', cleanInput)
             .maybeSingle();
           
           if (commerce?.email) {
