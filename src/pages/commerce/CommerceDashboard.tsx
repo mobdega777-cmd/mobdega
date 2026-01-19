@@ -19,7 +19,8 @@ import {
   Clock,
   AlertTriangle,
   Ban,
-  Lock
+  Lock,
+  Wallet
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -40,6 +41,7 @@ import CommerceCashRegister from "@/components/commerce/CommerceCashRegister";
 import CommerceDelivery from "@/components/commerce/CommerceDelivery";
 import CommerceSettings from "@/components/commerce/CommerceSettings";
 import DeliveryZonesConfig from "@/components/commerce/DeliveryZonesConfig";
+import CommercePaymentConfig from "@/components/commerce/CommercePaymentConfig";
 
 type CommerceSection = 
   | "overview" 
@@ -51,12 +53,14 @@ type CommerceSection =
   | "cashregister"
   | "delivery"
   | "deliveryzones"
+  | "paymentconfig"
   | "settings";
 
 // Ordem atualizada: Caixa/PDV agora é a segunda opção (logo após Visão Geral)
 const menuItems = [
   { id: "overview" as CommerceSection, label: "Visão Geral", icon: LayoutDashboard },
   { id: "cashregister" as CommerceSection, label: "Caixa/PDV", icon: Calculator },
+  { id: "paymentconfig" as CommerceSection, label: "Configurar Pagamentos", icon: Wallet },
   { id: "orders" as CommerceSection, label: "Pedidos", icon: ShoppingCart, showPendingBadge: true },
   { id: "delivery" as CommerceSection, label: "Delivery", icon: Truck },
   { id: "deliveryzones" as CommerceSection, label: "Áreas de Entrega", icon: MapPin },
@@ -87,6 +91,7 @@ const CommerceDashboard = () => {
   const [planConfig, setPlanConfig] = useState<PlanMenuConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [pendingInvoicesCount, setPendingInvoicesCount] = useState(0);
+  const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
 
@@ -147,6 +152,16 @@ const CommerceDashboard = () => {
     setPendingInvoicesCount(count || 0);
   };
 
+  const fetchPendingOrders = async (commerceId: string) => {
+    const { count } = await supabase
+      .from('orders')
+      .select('*', { count: 'exact', head: true })
+      .eq('commerce_id', commerceId)
+      .eq('status', 'pending');
+    
+    setPendingOrdersCount(count || 0);
+  };
+
   useEffect(() => {
     fetchCommerce();
   }, [user]);
@@ -154,9 +169,10 @@ const CommerceDashboard = () => {
   useEffect(() => {
     if (commerce?.id) {
       fetchPendingInvoices(commerce.id);
+      fetchPendingOrders(commerce.id);
 
       // Subscribe to invoice changes for this commerce
-      const channel = supabase
+      const invoicesChannel = supabase
         .channel('commerce-invoices-changes')
         .on(
           'postgres_changes',
@@ -165,8 +181,19 @@ const CommerceDashboard = () => {
         )
         .subscribe();
 
+      // Subscribe to order changes for this commerce
+      const ordersChannel = supabase
+        .channel('commerce-orders-changes')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'orders', filter: `commerce_id=eq.${commerce.id}` },
+          () => fetchPendingOrders(commerce.id)
+        )
+        .subscribe();
+
       return () => {
-        supabase.removeChannel(channel);
+        supabase.removeChannel(invoicesChannel);
+        supabase.removeChannel(ordersChannel);
       };
     }
   }, [commerce?.id]);
@@ -289,6 +316,8 @@ const CommerceDashboard = () => {
         return <CommerceDelivery commerceId={commerce.id} />;
       case "deliveryzones":
         return <DeliveryZonesConfig commerceId={commerce.id} />;
+      case "paymentconfig":
+        return <CommercePaymentConfig commerceId={commerce.id} />;
       case "settings":
         return <CommerceSettings commerce={commerce} />;
       default:
@@ -368,6 +397,11 @@ const CommerceDashboard = () => {
                   <>
                     <span className="flex-1 text-left font-medium">{item.label}</span>
                     {isDisabled && <Lock className="w-4 h-4 text-primary-foreground/40" />}
+                    {!isDisabled && item.showPendingBadge && pendingOrdersCount > 0 && (
+                      <Badge variant="destructive" className="text-xs px-2 py-0.5">
+                        {pendingOrdersCount}
+                      </Badge>
+                    )}
                     {!isDisabled && item.showBadge && pendingInvoicesCount > 0 && (
                       <Badge variant="destructive" className="text-xs px-2 py-0.5">
                         {pendingInvoicesCount}
