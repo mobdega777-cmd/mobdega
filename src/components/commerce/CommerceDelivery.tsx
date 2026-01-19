@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -16,7 +18,8 @@ import {
   Clock, 
   CheckCircle,
   Package,
-  Navigation
+  Navigation,
+  Power
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -50,7 +53,40 @@ const CommerceDelivery = ({ commerceId }: CommerceDeliveryProps) => {
   const [orders, setOrders] = useState<DeliveryOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<DeliveryOrder | null>(null);
+  const [deliveryEnabled, setDeliveryEnabled] = useState(true);
+  const [togglingDelivery, setTogglingDelivery] = useState(false);
   const { toast } = useToast();
+
+  // Fetch commerce delivery status
+  const fetchDeliveryStatus = async () => {
+    const { data } = await supabase
+      .from('commerces')
+      .select('delivery_enabled')
+      .eq('id', commerceId)
+      .single();
+    
+    if (data) {
+      setDeliveryEnabled(data.delivery_enabled ?? true);
+    }
+  };
+
+  const toggleDeliveryEnabled = async () => {
+    setTogglingDelivery(true);
+    const newValue = !deliveryEnabled;
+    
+    const { error } = await supabase
+      .from('commerces')
+      .update({ delivery_enabled: newValue })
+      .eq('id', commerceId);
+    
+    if (error) {
+      toast({ variant: "destructive", title: "Erro ao atualizar", description: error.message });
+    } else {
+      setDeliveryEnabled(newValue);
+      toast({ title: newValue ? "Delivery ativado!" : "Delivery desativado!" });
+    }
+    setTogglingDelivery(false);
+  };
 
   const fetchOrders = async () => {
     const { data, error } = await supabase
@@ -71,6 +107,7 @@ const CommerceDelivery = ({ commerceId }: CommerceDeliveryProps) => {
 
   useEffect(() => {
     fetchOrders();
+    fetchDeliveryStatus();
 
     // Set up realtime subscription
     const channel = supabase
@@ -152,9 +189,28 @@ const CommerceDelivery = ({ commerceId }: CommerceDeliveryProps) => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Delivery</h1>
-        <p className="text-muted-foreground">Gerencie entregas em tempo real</p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Delivery</h1>
+          <p className="text-muted-foreground">Gerencie entregas em tempo real</p>
+        </div>
+        <div className="flex items-center gap-3 p-4 rounded-xl bg-card border">
+          <Power className={`w-5 h-5 ${deliveryEnabled ? 'text-green-500' : 'text-muted-foreground'}`} />
+          <div className="flex flex-col">
+            <Label htmlFor="delivery-toggle" className="text-sm font-medium">
+              {deliveryEnabled ? 'Delivery Ativo' : 'Delivery Inativo'}
+            </Label>
+            <span className="text-xs text-muted-foreground">
+              {deliveryEnabled ? 'Clientes podem pedir' : 'Entregas pausadas'}
+            </span>
+          </div>
+          <Switch
+            id="delivery-toggle"
+            checked={deliveryEnabled}
+            onCheckedChange={toggleDeliveryEnabled}
+            disabled={togglingDelivery}
+          />
+        </div>
       </div>
 
       {/* Stats */}

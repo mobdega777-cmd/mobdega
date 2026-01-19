@@ -221,6 +221,7 @@ export type Database = {
           complement: string | null
           cover_url: string | null
           created_at: string
+          delivery_enabled: boolean | null
           document: string
           document_type: string
           email: string
@@ -248,6 +249,7 @@ export type Database = {
           complement?: string | null
           cover_url?: string | null
           created_at?: string
+          delivery_enabled?: boolean | null
           document: string
           document_type: string
           email: string
@@ -275,6 +277,7 @@ export type Database = {
           complement?: string | null
           cover_url?: string | null
           created_at?: string
+          delivery_enabled?: boolean | null
           document?: string
           document_type?: string
           email?: string

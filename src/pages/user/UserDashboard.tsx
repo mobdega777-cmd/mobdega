@@ -72,6 +72,8 @@ interface Commerce {
   neighborhood: string | null;
   is_open: boolean | null;
   whatsapp: string | null;
+  averageRating?: number;
+  reviewCount?: number;
 }
 
 const UserDashboard = () => {
@@ -211,8 +213,29 @@ const UserDashboard = () => {
       console.error('Error fetching commerces:', error);
       return;
     }
+
+    // Fetch ratings for each commerce
+    const commercesWithRatings = await Promise.all(
+      (data || []).map(async (commerce) => {
+        const { data: reviews } = await supabase
+          .from('reviews')
+          .select('rating')
+          .eq('commerce_id', commerce.id);
+        
+        const reviewCount = reviews?.length || 0;
+        const averageRating = reviewCount > 0 
+          ? reviews!.reduce((sum, r) => sum + r.rating, 0) / reviewCount 
+          : 0;
+        
+        return {
+          ...commerce,
+          averageRating,
+          reviewCount
+        };
+      })
+    );
     
-    setCommerces((data || []) as Commerce[]);
+    setCommerces(commercesWithRatings as Commerce[]);
   };
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -514,6 +537,12 @@ const UserDashboard = () => {
                                 <MapPin className="w-3 h-3" />
                                 {commerce.neighborhood}, {commerce.city}
                               </p>
+                              {commerce.averageRating && commerce.averageRating > 0 && (
+                                <div className="flex items-center gap-1 text-sm mt-0.5">
+                                  <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+                                  <span className="font-medium text-foreground">{commerce.averageRating.toFixed(1)}</span>
+                                </div>
+                              )}
                             </div>
                             <div className="flex items-center justify-between">
                               <Badge className={`${commerce.is_open ? 'bg-green-500' : 'bg-red-500'} text-white border-0 text-xs`}>
