@@ -624,6 +624,59 @@ export type Database = {
           },
         ]
       }
+      payment_methods: {
+        Row: {
+          commerce_id: string
+          created_at: string
+          fee_fixed: number | null
+          fee_percentage: number | null
+          id: string
+          is_active: boolean | null
+          name: string
+          pix_key: string | null
+          pix_key_type: string | null
+          pix_qr_code_url: string | null
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          commerce_id: string
+          created_at?: string
+          fee_fixed?: number | null
+          fee_percentage?: number | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          pix_key?: string | null
+          pix_key_type?: string | null
+          pix_qr_code_url?: string | null
+          type?: string
+          updated_at?: string
+        }
+        Update: {
+          commerce_id?: string
+          created_at?: string
+          fee_fixed?: number | null
+          fee_percentage?: number | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          pix_key?: string | null
+          pix_key_type?: string | null
+          pix_qr_code_url?: string | null
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_methods_commerce_id_fkey"
+            columns: ["commerce_id"]
+            isOneToOne: false
+            referencedRelation: "commerces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       plans: {
         Row: {
           allowed_menu_items: Json | null
