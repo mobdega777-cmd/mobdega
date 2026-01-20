@@ -6,6 +6,7 @@ import FeaturedStores from "@/components/landing/FeaturedStores";
 import Footer from "@/components/landing/Footer";
 import AuthModal from "@/components/auth/AuthModal";
 import MasterAdminModal from "@/components/auth/MasterAdminModal";
+import PWAInstallPrompt from "@/components/PWAInstallPrompt";
 
 const Index = () => {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -74,6 +75,9 @@ const Index = () => {
         isOpen={isMasterAdminModalOpen}
         onClose={() => setIsMasterAdminModalOpen(false)}
       />
+
+      {/* PWA Install Prompt */}
+      <PWAInstallPrompt />
     </div>
   );
 };
