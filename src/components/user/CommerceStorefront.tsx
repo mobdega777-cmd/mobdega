@@ -305,27 +305,35 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
   const checkActiveTableOrder = async () => {
     if (!user) return;
 
-    // Find active order (pending/confirmed/preparing) for this user at this commerce with a table
+    // Find active order (pending/confirmed/preparing/delivered with pending payment) for this user at this commerce with a table
     const { data: activeOrder } = await supabase
       .from('orders')
-      .select('id, table_id, status')
+      .select('id, table_id, status, payment_method')
       .eq('user_id', user.id)
       .eq('commerce_id', commerceId)
       .not('table_id', 'is', null)
-      .in('status', ['pending', 'confirmed', 'preparing'])
+      .in('status', ['pending', 'confirmed', 'preparing', 'delivered'])
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
 
-    if (activeOrder) {
+    // Only show as active if order is not yet paid (delivered with payment_method = pending OR not delivered yet)
+    if (activeOrder && (activeOrder.status !== 'delivered' || activeOrder.payment_method === 'pending')) {
       setHasActiveTableOrder(true);
       setActiveOrderId(activeOrder.id);
       setOrderMode('table');
 
-      // Find the table
-      const table = tables.find(t => t.id === activeOrder.table_id);
-      if (table) {
-        setSelectedTable(table);
+      // Fetch table info directly from database (don't rely on tables state which may not be loaded yet)
+      if (activeOrder.table_id) {
+        const { data: tableData } = await supabase
+          .from('tables')
+          .select('id, number, name, capacity, status')
+          .eq('id', activeOrder.table_id)
+          .single();
+        
+        if (tableData) {
+          setSelectedTable(tableData as Table);
+        }
       }
 
       // Fetch order items
@@ -373,12 +381,12 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
     };
   }, [activeOrderId]);
 
-  // Re-check active order when user or tables change
+  // Re-check active order when user changes or loading completes
   useEffect(() => {
-    if (user && tables.length > 0 && !loading) {
+    if (user && !loading) {
       checkActiveTableOrder();
     }
-  }, [user, tables.length]);
+  }, [user, loading]);
 
   const toggleFavorite = async () => {
     

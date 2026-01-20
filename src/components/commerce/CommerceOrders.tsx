@@ -40,6 +40,7 @@ import {
   CreditCard
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import DateFilter from "./DateFilter";
 import { startOfDay, endOfDay, subDays } from "date-fns";
@@ -134,6 +135,7 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
     start: startOfDay(subDays(new Date(), 29)), 
     end: endOfDay(new Date()) 
   });
+  const { user } = useAuth();
   const { toast } = useToast();
 
   const handleDateChange = (start: Date, end: Date) => {
@@ -248,18 +250,47 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
     if (error) {
       toast({ variant: "destructive", title: "Erro ao atualizar pedido", description: error.message });
     } else {
-      // Se o pedido for finalizado e for de mesa, liberar a mesa automaticamente
+      // Se o pedido for finalizado, deduzir estoque e registrar movimentação de caixa
       if (newStatus === 'delivered') {
         const order = orders.find(o => o.id === orderId);
-        if (order && !isCashMovement(order) && order.order_type === 'table' && order.table_id) {
-          await supabase
-            .from('tables')
-            .update({ 
-              status: 'available', 
-              current_order_id: null,
-              closed_at: new Date().toISOString()
-            })
-            .eq('id', order.table_id);
+        if (order && !isCashMovement(order)) {
+          // Buscar itens do pedido para deduzir estoque
+          const { data: orderItems } = await supabase
+            .from('order_items')
+            .select('product_id, quantity')
+            .eq('order_id', orderId);
+
+          if (orderItems) {
+            for (const item of orderItems) {
+              if (item.product_id) {
+                const { data: product } = await supabase
+                  .from('products')
+                  .select('stock')
+                  .eq('id', item.product_id)
+                  .single();
+
+                if (product && product.stock !== null) {
+                  const newStock = Math.max(0, product.stock - item.quantity);
+                  await supabase
+                    .from('products')
+                    .update({ stock: newStock })
+                    .eq('id', item.product_id);
+                }
+              }
+            }
+          }
+
+          // Liberar a mesa se for pedido de mesa
+          if (order.order_type === 'table' && order.table_id) {
+            await supabase
+              .from('tables')
+              .update({ 
+                status: 'available', 
+                current_order_id: null,
+                closed_at: new Date().toISOString()
+              })
+              .eq('id', order.table_id);
+          }
         }
       }
       
@@ -426,15 +457,26 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
+                            {/* Eye icon for viewing details - show for all orders with order_items */}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                if (isMovement) {
+                                  // For cash movements, show a toast with the info
+                                  toast({ 
+                                    title: "Venda PDV", 
+                                    description: order.description || "Venda realizada no caixa" 
+                                  });
+                                } else {
+                                  fetchOrderDetails(order.id);
+                                }
+                              }}
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
                             {!isMovement && (
                               <>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => fetchOrderDetails(order.id)}
-                                >
-                                  <Eye className="w-4 h-4" />
-                                </Button>
                                 {nextStatus && (
                                   <Button
                                     size="sm"
