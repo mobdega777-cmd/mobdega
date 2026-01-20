@@ -368,7 +368,7 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
                           </div>
                         </TableCell>
                         <TableCell className="font-medium">
-                          R$ {Number(isMovement ? order.amount : order.total).toFixed(2)}
+                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(isMovement ? order.amount : order.total))}
                         </TableCell>
                         <TableCell>
                           <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${status.color}`}>
@@ -503,7 +503,7 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
                           <p className="text-sm text-muted-foreground">{item.notes}</p>
                         )}
                       </div>
-                      <p className="font-medium">R$ {Number(item.total_price).toFixed(2)}</p>
+                      <p className="font-medium">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(item.total_price))}</p>
                     </div>
                   ))}
                 </div>
@@ -512,24 +512,48 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
               <div className="border-t pt-4 space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Subtotal</span>
-                  <span>R$ {Number(selectedOrder.subtotal).toFixed(2)}</span>
+                  <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(selectedOrder.subtotal))}</span>
                 </div>
                 {selectedOrder.delivery_fee && Number(selectedOrder.delivery_fee) > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Taxa de entrega</span>
-                    <span>R$ {Number(selectedOrder.delivery_fee).toFixed(2)}</span>
+                    <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(selectedOrder.delivery_fee))}</span>
                   </div>
                 )}
                 {selectedOrder.discount && Number(selectedOrder.discount) > 0 && (
                   <div className="flex justify-between text-sm text-green-500">
                     <span>Desconto</span>
-                    <span>-R$ {Number(selectedOrder.discount).toFixed(2)}</span>
+                    <span>-{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(selectedOrder.discount))}</span>
+                  </div>
+                )}
+                {/* Payment Fee Calculation */}
+                {selectedOrder.payment_method && (
+                  <div className="flex justify-between text-sm text-orange-500">
+                    <span>Taxa de {paymentMethodLabels[selectedOrder.payment_method] || selectedOrder.payment_method} (estimada)</span>
+                    <span>-{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                      selectedOrder.payment_method === 'credit' ? Number(selectedOrder.total) * 0.035 :
+                      selectedOrder.payment_method === 'debit' ? Number(selectedOrder.total) * 0.02 :
+                      selectedOrder.payment_method === 'pix' ? Number(selectedOrder.total) * 0.01 : 0
+                    )}</span>
                   </div>
                 )}
                 <div className="flex justify-between font-bold text-lg pt-2 border-t">
-                  <span>Total</span>
-                  <span>R$ {Number(selectedOrder.total).toFixed(2)}</span>
+                  <span>Total Recebido</span>
+                  <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(selectedOrder.total))}</span>
                 </div>
+                {/* Lucro Líquido */}
+                {selectedOrder.payment_method && (
+                  <div className="flex justify-between font-bold text-lg text-green-600">
+                    <span>Lucro Líquido (após taxas)</span>
+                    <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                      Number(selectedOrder.total) - (
+                        selectedOrder.payment_method === 'credit' ? Number(selectedOrder.total) * 0.035 :
+                        selectedOrder.payment_method === 'debit' ? Number(selectedOrder.total) * 0.02 :
+                        selectedOrder.payment_method === 'pix' ? Number(selectedOrder.total) * 0.01 : 0
+                      )
+                    )}</span>
+                  </div>
+                )}
               </div>
 
               {selectedOrder.notes && (
