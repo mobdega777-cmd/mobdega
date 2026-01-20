@@ -600,6 +600,35 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
   const closeTableOrder = async () => {
     if (!selectedTableOrder || !currentRegister || !user) return;
 
+    // Deduct stock for all items in the order
+    for (const item of selectedTableOrder.items) {
+      // Get product info to find the product_id
+      const { data: orderItem } = await supabase
+        .from('order_items')
+        .select('product_id')
+        .eq('order_id', selectedTableOrder.id)
+        .eq('product_name', item.product_name)
+        .limit(1)
+        .maybeSingle();
+
+      if (orderItem?.product_id) {
+        // Get current stock
+        const { data: product } = await supabase
+          .from('products')
+          .select('stock')
+          .eq('id', orderItem.product_id)
+          .single();
+
+        if (product && product.stock !== null) {
+          const newStock = Math.max(0, product.stock - item.quantity);
+          await supabase
+            .from('products')
+            .update({ stock: newStock })
+            .eq('id', orderItem.product_id);
+        }
+      }
+    }
+
     // Update order with payment method and status
     await supabase
       .from('orders')
