@@ -113,9 +113,18 @@ const CommerceOverview = ({ commerce }: CommerceOverviewProps) => {
     fetchStats();
   }, [commerce.id, dateFilter]);
 
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(value);
+  };
+
   const statCards = [
     { title: "Pedidos Pendentes", value: stats.pendingOrders, icon: Clock, color: "text-yellow-500", bgColor: "bg-yellow-500/10" },
-    { title: "Faturamento do Período", value: `R$ ${stats.todayRevenue.toFixed(2)}`, icon: DollarSign, color: "text-green-500", bgColor: "bg-green-500/10" },
+    { title: "Faturamento do Período", value: formatCurrency(stats.todayRevenue), icon: DollarSign, color: "text-green-500", bgColor: "bg-green-500/10" },
     { title: "Entregas Ativas", value: stats.activeDeliveries, icon: Truck, color: "text-blue-500", bgColor: "bg-blue-500/10" },
     { title: "Finalizados no Período", value: stats.completedToday, icon: CheckCircle, color: "text-emerald-500", bgColor: "bg-emerald-500/10" },
     { title: "Total de Produtos", value: stats.totalProducts, icon: Package, color: "text-purple-500", bgColor: "bg-purple-500/10" },
@@ -196,7 +205,7 @@ const CommerceOverview = ({ commerce }: CommerceOverviewProps) => {
               {recentOrders.map((order) => { const status = getStatusBadge(order.status); return (
                 <div key={order.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 md:p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors gap-2 sm:gap-4">
                   <div className="flex items-center gap-3 md:gap-4"><div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0"><ShoppingCart className="w-4 h-4 md:w-5 md:h-5 text-primary" /></div><div className="min-w-0"><p className="font-medium text-sm md:text-base truncate">Pedido #{order.id.slice(0, 8)}</p><p className="text-xs md:text-sm text-muted-foreground">{new Date(order.created_at).toLocaleString('pt-BR')}</p></div></div>
-                  <div className="flex items-center gap-2 md:gap-4 ml-11 sm:ml-0"><span className={`px-2 md:px-3 py-1 rounded-full text-xs font-medium ${status.color}`}>{status.label}</span><span className="font-bold text-sm md:text-base">R$ {Number(order.total).toFixed(2)}</span></div>
+                  <div className="flex items-center gap-2 md:gap-4 ml-11 sm:ml-0"><span className={`px-2 md:px-3 py-1 rounded-full text-xs font-medium ${status.color}`}>{status.label}</span><span className="font-bold text-sm md:text-base">{formatCurrency(Number(order.total))}</span></div>
                 </div>
               ); })}
             </div>

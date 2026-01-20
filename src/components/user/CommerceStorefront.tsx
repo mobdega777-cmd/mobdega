@@ -972,20 +972,44 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
               <p>Nenhuma mesa cadastrada</p>
             </div>
           ) : (
-            <div className="grid grid-cols-3 gap-3 py-4">
-              {tables.map((table) => (
-                <Button
-                  key={table.id}
-                  variant={table.status === 'available' ? 'outline' : 'ghost'}
-                  disabled={table.status !== 'available'}
-                  className="h-20 flex flex-col"
-                  onClick={() => handleSelectTable(table)}
-                >
-                  <span className="text-lg font-bold">Mesa {table.number}</span>
-                  {table.name && <span className="text-xs text-muted-foreground">{table.name}</span>}
-                  <span className="text-xs text-muted-foreground">{table.capacity} lugares</span>
-                </Button>
-              ))}
+            <div className="space-y-4 py-4">
+              <div className="flex items-center gap-4 text-xs">
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded bg-green-500/20 border border-green-500" />
+                  <span>Disponível</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded bg-red-500/20 border border-red-500" />
+                  <span>Ocupada</span>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                {tables.map((table) => {
+                  const isOccupied = table.status === 'occupied' || table.status === 'reserved';
+                  const isAvailable = table.status === 'available';
+                  return (
+                    <Button
+                      key={table.id}
+                      variant="outline"
+                      disabled={!isAvailable}
+                      className={`h-20 flex flex-col border-2 ${
+                        isOccupied 
+                          ? 'bg-red-500/10 border-red-500 text-red-600 hover:bg-red-500/20' 
+                          : isAvailable 
+                            ? 'bg-green-500/10 border-green-500 text-green-700 hover:bg-green-500/20' 
+                            : 'bg-muted border-muted-foreground/30'
+                      }`}
+                      onClick={() => handleSelectTable(table)}
+                    >
+                      <span className="text-lg font-bold">Mesa {table.number}</span>
+                      {table.name && <span className="text-xs opacity-70">{table.name}</span>}
+                      <span className="text-xs opacity-70">
+                        {isOccupied ? 'Ocupada' : isAvailable ? `${table.capacity} lugares` : 'Fechada'}
+                      </span>
+                    </Button>
+                  );
+                })}
+              </div>
             </div>
           )}
         </DialogContent>
