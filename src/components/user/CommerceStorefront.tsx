@@ -33,6 +33,7 @@ interface Commerce {
   is_open: boolean | null;
   delivery_enabled: boolean | null;
   opening_hours: Record<string, { open: string; close: string; enabled: boolean }> | null;
+  table_payment_required: boolean;
 }
 
 interface Category {
@@ -151,15 +152,18 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
   const fetchCommerceData = async () => {
     setLoading(true);
     
-    // Fetch commerce details
+    // Fetch commerce details including table_payment_required
     const { data: commerceData } = await supabase
       .from('commerces')
-      .select('*')
+      .select('*, table_payment_required')
       .eq('id', commerceId)
       .single();
     
     if (commerceData) {
-      setCommerce(commerceData as unknown as Commerce);
+      setCommerce({
+        ...commerceData,
+        table_payment_required: commerceData.table_payment_required ?? true
+      } as unknown as Commerce);
     }
 
     // Fetch categories
@@ -465,7 +469,7 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
     setShowCartModal(true);
   };
 
-  // Proceed to payment
+  // Proceed to payment or directly submit order for table orders without payment
   const proceedToPayment = () => {
     // Validate CEP for delivery orders
     if (orderMode === 'delivery' && !isCepCovered()) {
@@ -476,8 +480,78 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
       });
       return;
     }
+    
     setShowCartModal(false);
-    setShowPaymentModal(true);
+    
+    // For table orders: check if payment is required
+    if (orderMode === 'table' && commerce && !commerce.table_payment_required) {
+      // Skip payment modal - submit order directly with payment_method as "pending"
+      submitOrderWithoutPayment();
+    } else {
+      // Show payment modal
+      setShowPaymentModal(true);
+    }
+  };
+
+  // Submit order without payment (for table orders when payment is disabled)
+  const submitOrderWithoutPayment = async () => {
+    if (!user || cart.length === 0) return;
+
+    setSubmittingOrder(true);
+
+    const subtotal = cartTotal;
+    const total = orderTotal;
+
+    const { data: orderData, error: orderError } = await supabase
+      .from('orders')
+      .insert({
+        commerce_id: commerceId,
+        user_id: user.id,
+        order_type: orderMode,
+        table_id: selectedTable?.id || null,
+        delivery_address: null,
+        delivery_fee: 0,
+        notes: deliveryNotes || null,
+        customer_name: customerName,
+        customer_phone: customerPhone,
+        payment_method: 'pending', // Will be set by commerce when processing
+        subtotal,
+        total,
+        status: 'pending'
+      })
+      .select()
+      .single();
+
+    if (orderError) {
+      toast({ variant: "destructive", title: "Erro ao criar pedido", description: orderError.message });
+      setSubmittingOrder(false);
+      return;
+    }
+
+    // Insert order items
+    const orderItems = cart.map(item => ({
+      order_id: orderData.id,
+      product_id: item.product.id,
+      product_name: item.product.name,
+      quantity: item.quantity,
+      unit_price: item.product.promotional_price || item.product.price,
+      total_price: (item.product.promotional_price || item.product.price) * item.quantity
+    }));
+
+    await supabase.from('order_items').insert(orderItems);
+
+    setCreatedOrderId(orderData.id);
+    setOrderStatus('pending');
+    setShowOrderStatusModal(true);
+
+    // Reset cart and form
+    setCart([]);
+    setOrderMode('none');
+    setSelectedTable(null);
+    setDeliveryNotes("");
+    setSubmittingOrder(false);
+
+    toast({ title: "Pedido enviado com sucesso!" });
   };
 
   // Submit order with payment

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -18,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Pencil, Trash2, Utensils, Users, Clock, DollarSign } from "lucide-react";
+import { Plus, Pencil, Trash2, Utensils, Users, Clock, DollarSign, CreditCard } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -48,6 +49,7 @@ const CommerceTables = ({ commerceId }: CommerceTablesProps) => {
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingTable, setEditingTable] = useState<Table | null>(null);
+  const [tablePaymentRequired, setTablePaymentRequired] = useState(true);
   const { toast } = useToast();
 
   const [formData, setFormData] = useState({
@@ -71,8 +73,35 @@ const CommerceTables = ({ commerceId }: CommerceTablesProps) => {
     setLoading(false);
   };
 
+  const fetchPaymentSetting = async () => {
+    const { data, error } = await supabase
+      .from('commerces')
+      .select('table_payment_required')
+      .eq('id', commerceId)
+      .single();
+
+    if (!error && data) {
+      setTablePaymentRequired(data.table_payment_required ?? true);
+    }
+  };
+
+  const togglePaymentSetting = async (value: boolean) => {
+    const { error } = await supabase
+      .from('commerces')
+      .update({ table_payment_required: value })
+      .eq('id', commerceId);
+
+    if (error) {
+      toast({ variant: "destructive", title: "Erro ao atualizar configuração", description: error.message });
+    } else {
+      setTablePaymentRequired(value);
+      toast({ title: value ? "Pagamento na mesa ativado" : "Pagamento na mesa desativado" });
+    }
+  };
+
   useEffect(() => {
     fetchTables();
+    fetchPaymentSetting();
   }, [commerceId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -193,21 +222,38 @@ const CommerceTables = ({ commerceId }: CommerceTablesProps) => {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold">Mesas/Comandas</h1>
           <p className="text-muted-foreground">Gerencie as mesas do seu estabelecimento</p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={(open) => {
-          setIsDialogOpen(open);
-          if (!open) resetForm();
-        }}>
-          <DialogTrigger asChild>
-            <Button className="gap-2">
-              <Plus className="w-4 h-4" />
-              Nova Mesa
-            </Button>
-          </DialogTrigger>
+        
+        <div className="flex items-center gap-4">
+          {/* Toggle de pagamento na mesa */}
+          <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg border">
+            <CreditCard className="w-4 h-4 text-muted-foreground" />
+            <div className="flex flex-col">
+              <span className="text-sm font-medium">Pagamento na mesa</span>
+              <span className="text-xs text-muted-foreground">
+                {tablePaymentRequired ? "Cliente escolhe forma de pagamento" : "Pedido direto para a cozinha"}
+              </span>
+            </div>
+            <Switch
+              checked={tablePaymentRequired}
+              onCheckedChange={togglePaymentSetting}
+            />
+          </div>
+          
+          <Dialog open={isDialogOpen} onOpenChange={(open) => {
+            setIsDialogOpen(open);
+            if (!open) resetForm();
+          }}>
+            <DialogTrigger asChild>
+              <Button className="gap-2">
+                <Plus className="w-4 h-4" />
+                Nova Mesa
+              </Button>
+            </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>
@@ -253,9 +299,9 @@ const CommerceTables = ({ commerceId }: CommerceTablesProps) => {
               </div>
             </form>
           </DialogContent>
-        </Dialog>
+          </Dialog>
+        </div>
       </div>
-
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {Object.entries(statusConfig).map(([status, config]) => {
