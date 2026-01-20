@@ -109,6 +109,9 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
   
+  // Track if user has an active table order (to keep Comanda tab visible)
+  const [hasActiveTableOrder, setHasActiveTableOrder] = useState(false);
+  
   // Modals
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [showTableModal, setShowTableModal] = useState(false);
@@ -544,10 +547,14 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
     setOrderStatus('pending');
     setShowOrderStatusModal(true);
 
-    // Reset cart and form
+    // Keep track that we have an active table order (don't hide Comanda tab yet)
+    setHasActiveTableOrder(true);
+
+    // Reset cart but keep table mode active for Comanda visibility
     setCart([]);
-    setOrderMode('none');
-    setSelectedTable(null);
+    // Don't reset orderMode for table orders without payment - keep Comanda tab visible
+    // setOrderMode('none');
+    // setSelectedTable(null);
     setDeliveryNotes("");
     setSubmittingOrder(false);
 
@@ -781,12 +788,12 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className={`grid w-full ${orderMode === 'table' ? 'grid-cols-3' : 'grid-cols-2'}`}>
+        <TabsList className={`grid w-full ${(orderMode === 'table' || hasActiveTableOrder) ? 'grid-cols-3' : 'grid-cols-2'}`}>
           <TabsTrigger value="menu" className="gap-2">
             <ShoppingCart className="w-4 h-4" />
             Cardápio
           </TabsTrigger>
-          {orderMode === 'table' && (
+          {(orderMode === 'table' || hasActiveTableOrder) && (
             <TabsTrigger value="comanda" className="gap-2">
               <UtensilsCrossed className="w-4 h-4" />
               Comanda
