@@ -308,8 +308,26 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'BRL',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
     }).format(value);
+  };
+
+  // Check if CEP is covered by delivery zones
+  const isCepCovered = (): boolean => {
+    if (!customerCep || deliveryZones.length === 0) return false;
+    const userCep = parseInt(customerCep.replace(/\D/g, ''));
+    if (isNaN(userCep)) return false;
+    
+    for (const zone of deliveryZones) {
+      const start = parseInt(zone.cep_start.replace(/\D/g, ''));
+      const end = parseInt(zone.cep_end.replace(/\D/g, ''));
+      if (userCep >= start && userCep <= end) {
+        return true;
+      }
+    }
+    return false;
   };
 
   // Cart functions
@@ -386,16 +404,13 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
     toast({ title: `Mesa ${table.number} selecionada!` });
   };
 
-  // Handle order modes - exclusive selection
+  // Handle order modes - exclusive selection (toggle behavior)
   const handlePedirNaMesa = () => {
     if (tables.length === 0) {
       toast({ variant: "destructive", title: "Nenhuma mesa disponível" });
       return;
     }
-    // Reset delivery mode if selected
-    if (orderMode === 'delivery') {
-      setOrderMode('none');
-    }
+    // Always open the table modal to select a table
     setShowTableModal(true);
   };
 
@@ -404,10 +419,8 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
       toast({ variant: "destructive", title: "Delivery indisponível", description: "Este estabelecimento não está aceitando pedidos de delivery no momento" });
       return;
     }
-    // Reset table selection if was in table mode
-    if (orderMode === 'table') {
-      setSelectedTable(null);
-    }
+    // Toggle delivery mode - reset table selection
+    setSelectedTable(null);
     setOrderMode('delivery');
     toast({ title: "Modo Delivery selecionado!", description: "Adicione produtos ao carrinho" });
   };
@@ -454,6 +467,15 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
 
   // Proceed to payment
   const proceedToPayment = () => {
+    // Validate CEP for delivery orders
+    if (orderMode === 'delivery' && !isCepCovered()) {
+      toast({ 
+        variant: "destructive", 
+        title: "CEP não atendido", 
+        description: "Infelizmente este CEP não está na área de entrega do estabelecimento." 
+      });
+      return;
+    }
     setShowCartModal(false);
     setShowPaymentModal(true);
   };
@@ -1265,8 +1287,13 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
         </DialogContent>
       </Dialog>
 
-      {/* Order Status Modal */}
-      <Dialog open={showOrderStatusModal} onOpenChange={setShowOrderStatusModal}>
+      {/* Order Status Modal - No auto-refresh, only manual close */}
+      <Dialog open={showOrderStatusModal} onOpenChange={(open) => {
+        // Only allow closing through the X button or Fechar button
+        if (!open) {
+          setShowOrderStatusModal(false);
+        }
+      }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="text-center">Acompanhe seu Pedido</DialogTitle>

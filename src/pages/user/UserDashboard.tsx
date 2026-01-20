@@ -146,6 +146,12 @@ const UserDashboard = () => {
     
     if (data) {
       setProfile(data);
+      // Fix timezone issue for birthday - ensure we use the date as-is without timezone conversion
+      let formattedBirthday = "";
+      if (data.birthday) {
+        // If it's already in YYYY-MM-DD format, use it directly
+        formattedBirthday = data.birthday.split('T')[0];
+      }
       setFormData({
         full_name: data.full_name || "",
         phone: data.phone || "",
@@ -156,7 +162,7 @@ const UserDashboard = () => {
         address_number: data.address_number || "",
         complement: data.complement || "",
         bio: data.bio || "",
-        birthday: data.birthday || "",
+        birthday: formattedBirthday,
       });
     }
   };
@@ -440,14 +446,20 @@ const UserDashboard = () => {
             </div>
           </div>
 
-          {/* Quick Stats */}
+          {/* Quick Stats - Clickable Cards */}
           <div className="grid grid-cols-3 gap-4 mb-6">
-            <Card className="text-center p-4">
+            <Card 
+              className="text-center p-4 cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => setActiveTab('orders')}
+            >
               <Package className="w-6 h-6 mx-auto text-primary mb-2" />
               <p className="text-2xl font-bold text-foreground">{orders.length}</p>
               <p className="text-xs text-muted-foreground">Pedidos</p>
             </Card>
-            <Card className="text-center p-4">
+            <Card 
+              className="text-center p-4 cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => setActiveTab('favorites')}
+            >
               <Heart className="w-6 h-6 mx-auto text-red-500 mb-2" />
               <p className="text-2xl font-bold text-foreground">{favorites.length}</p>
               <p className="text-xs text-muted-foreground">Favoritos</p>
