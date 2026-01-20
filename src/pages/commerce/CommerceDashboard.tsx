@@ -20,7 +20,8 @@ import {
   AlertTriangle,
   Ban,
   Lock,
-  Wallet
+  Wallet,
+  Bell
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -29,6 +30,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import logoMobdega from "@/assets/logo-mobdega.png";
+import { useStockAlerts } from "@/hooks/useStockAlerts";
 
 // Commerce sections
 import CommerceOverview from "@/components/commerce/CommerceOverview";
@@ -304,6 +306,11 @@ const CommerceDashboard = () => {
       );
     }
 
+    // Use stock alerts hook when commerce is active
+    if (commerce && !isBlocked) {
+      // Note: hook is called at component level, this just documents usage
+    }
+
     switch (activeSection) {
       case "overview":
         return <CommerceOverview commerce={commerce} />;
@@ -331,6 +338,9 @@ const CommerceDashboard = () => {
         return <CommerceOverview commerce={commerce} />;
     }
   };
+
+  // Use stock alerts for the commerce
+  useStockAlerts(commerce?.id || "");
 
   if (loading) {
     return (

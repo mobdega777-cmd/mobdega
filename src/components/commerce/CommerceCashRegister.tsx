@@ -47,7 +47,8 @@ import {
   UtensilsCrossed,
   XCircle,
   User,
-  Phone
+  Phone,
+  Eye
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -1196,6 +1197,25 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-1">
+                              {movement.order_id && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    // Find the table order with this order_id
+                                    const tableOrder = tableOrders.find(o => o.id === movement.order_id);
+                                    if (tableOrder) {
+                                      openTableOrderDetails(tableOrder);
+                                    } else {
+                                      // Fetch order details if not in tableOrders
+                                      toast({ title: "Detalhes do pedido", description: `ID: ${movement.order_id?.slice(0, 8)}...` });
+                                    }
+                                  }}
+                                  title="Ver detalhes"
+                                >
+                                  <Eye className="w-4 h-4" />
+                                </Button>
+                              )}
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -1207,7 +1227,7 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => deleteMovement(movement.id)}
-                                className="text-red-500 hover:text-red-600"
+                                className="text-destructive hover:text-destructive"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </Button>

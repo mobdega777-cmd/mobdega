@@ -49,6 +49,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
     ownerName: "",
     document: "",
     plan: "basic",
+    couponCode: "", // New coupon field
   });
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -104,6 +105,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
       ownerName: "",
       document: "",
       plan: "basic",
+      couponCode: "",
     });
   };
 
@@ -179,6 +181,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
           complement: formData.complement,
           status: 'pending',
           plan_id: planData?.id || null,
+          coupon_code: formData.couponCode || null,
         });
 
       if (commerceError) {
@@ -961,6 +964,22 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
                           </button>
                         ))}
                       </div>
+                    </div>
+
+                    {/* Coupon Code Field */}
+                    <div className="space-y-2">
+                      <Label htmlFor="couponCode">Cupom de desconto (opcional)</Label>
+                      <Input
+                        id="couponCode"
+                        name="couponCode"
+                        value={formData.couponCode}
+                        onChange={handleInputChange}
+                        placeholder="CUPOM10"
+                        className="h-11 uppercase"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Se você possui um cupom de desconto, insira aqui
+                      </p>
                     </div>
                   </div>
 
