@@ -276,10 +276,10 @@ const FeaturedStores = () => {
                 viewport={{ once: true }}
                 transition={{ duration: 0.5, delay: index * 0.1 }}
                 whileHover={{ y: -8 }}
-                className="bg-card rounded-2xl overflow-hidden shadow-card hover:shadow-elevated transition-all duration-300 cursor-pointer group"
+                className="bg-card rounded-xl overflow-hidden shadow-card hover:shadow-elevated transition-all duration-300 cursor-pointer group"
               >
                 {/* Store Cover Image */}
-                <div className="relative h-40 overflow-hidden bg-gradient-to-br from-primary/20 to-secondary/20">
+                <div className="relative h-28 overflow-hidden bg-gradient-to-br from-primary/20 to-secondary/20">
                   {store.cover_url ? (
                     <img
                       src={store.cover_url}
@@ -303,7 +303,7 @@ const FeaturedStores = () => {
                   
                   {/* Logo overlay */}
                   {store.logo_url && (
-                    <div className="absolute bottom-3 left-3 w-14 h-14 rounded-xl overflow-hidden border-2 border-card shadow-lg bg-card">
+                    <div className="absolute bottom-2 left-2 w-10 h-10 rounded-lg overflow-hidden border-2 border-card shadow-lg bg-card">
                       <img
                         src={store.logo_url}
                         alt={`Logo ${store.fantasy_name}`}
@@ -329,7 +329,7 @@ const FeaturedStores = () => {
                 </div>
 
                 {/* Store Info */}
-                <div className="p-4">
+                <div className="p-3">
                   <h3 className="font-display text-lg font-semibold text-foreground mb-1 truncate">
                     {store.fantasy_name}
                   </h3>

@@ -219,6 +219,7 @@ export type Database = {
           cep: string | null
           city: string | null
           complement: string | null
+          coupon_code: string | null
           cover_url: string | null
           created_at: string
           delivery_enabled: boolean | null
@@ -248,6 +249,7 @@ export type Database = {
           cep?: string | null
           city?: string | null
           complement?: string | null
+          coupon_code?: string | null
           cover_url?: string | null
           created_at?: string
           delivery_enabled?: boolean | null
@@ -277,6 +279,7 @@ export type Database = {
           cep?: string | null
           city?: string | null
           complement?: string | null
+          coupon_code?: string | null
           cover_url?: string | null
           created_at?: string
           delivery_enabled?: boolean | null
@@ -355,6 +358,54 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      discount_coupons: {
+        Row: {
+          code: string
+          created_at: string
+          description: string | null
+          discount_type: string
+          discount_value: number
+          id: string
+          is_active: boolean | null
+          max_uses: number | null
+          plan_ids: string[] | null
+          updated_at: string
+          used_count: number | null
+          valid_from: string | null
+          valid_until: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          description?: string | null
+          discount_type?: string
+          discount_value?: number
+          id?: string
+          is_active?: boolean | null
+          max_uses?: number | null
+          plan_ids?: string[] | null
+          updated_at?: string
+          used_count?: number | null
+          valid_from?: string | null
+          valid_until?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          description?: string | null
+          discount_type?: string
+          discount_value?: number
+          id?: string
+          is_active?: boolean | null
+          max_uses?: number | null
+          plan_ids?: string[] | null
+          updated_at?: string
+          used_count?: number | null
+          valid_from?: string | null
+          valid_until?: string | null
+        }
+        Relationships: []
       }
       favorites: {
         Row: {
