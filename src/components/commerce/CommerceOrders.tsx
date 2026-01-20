@@ -254,6 +254,9 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
               })
               .eq('id', order.table_id);
           }
+
+          // Criar movimentação de caixa automaticamente para consolidar vendas
+          await createCashMovementForOrder(order);
         }
       }
       
@@ -262,6 +265,69 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
       if (selectedOrder?.id === orderId) {
         setSelectedOrder({ ...selectedOrder, status: newStatus });
       }
+    }
+  };
+
+  // Função para criar cash_movement ao finalizar pedido
+  const createCashMovementForOrder = async (order: Order) => {
+    if (!user) return;
+
+    // Buscar caixa aberto do comércio
+    const { data: openRegister } = await supabase
+      .from('cash_registers')
+      .select('id')
+      .eq('commerce_id', commerceId)
+      .eq('status', 'open')
+      .order('opened_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!openRegister) {
+      // Se não houver caixa aberto, não registrar movimentação
+      // Isso é um cenário válido - o comércio pode não usar o PDV
+      console.log('Nenhum caixa aberto para registrar movimentação');
+      return;
+    }
+
+    // Verificar se já existe movimentação para este pedido (evitar duplicação)
+    const { data: existingMovement } = await supabase
+      .from('cash_movements')
+      .select('id')
+      .eq('order_id', order.id)
+      .maybeSingle();
+
+    if (existingMovement) {
+      console.log('Movimentação já existe para este pedido');
+      return;
+    }
+
+    // Mapear método de pagamento
+    const paymentMethod = order.payment_method || 'cash';
+
+    // Criar descrição baseada no tipo de pedido
+    const orderTypeLabel = order.order_type === 'delivery' ? 'Delivery' : 
+                           order.order_type === 'table' ? 'Mesa' : 
+                           order.order_type === 'pickup' ? 'Retirada' : 'Pedido';
+    const description = `${orderTypeLabel} #${order.id.slice(0, 8)} - ${order.customer_name || 'Cliente'}`;
+
+    // Inserir movimentação de caixa
+    const { error } = await supabase
+      .from('cash_movements')
+      .insert({
+        cash_register_id: openRegister.id,
+        commerce_id: commerceId,
+        type: 'sale',
+        amount: Number(order.total),
+        payment_method: paymentMethod,
+        order_id: order.id,
+        description: description,
+        created_by: user.id
+      });
+
+    if (error) {
+      console.error('Erro ao criar movimentação de caixa:', error);
+    } else {
+      console.log('Movimentação de caixa criada com sucesso para pedido:', order.id);
     }
   };
 
