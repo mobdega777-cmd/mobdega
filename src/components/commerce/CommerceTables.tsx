@@ -235,7 +235,7 @@ const CommerceTables = ({ commerceId }: CommerceTablesProps) => {
             <div className="flex flex-col">
               <span className="text-sm font-medium">Pagamento na mesa</span>
               <span className="text-xs text-muted-foreground">
-                {tablePaymentRequired ? "Cliente escolhe forma de pagamento" : "Pedido direto para a cozinha"}
+                {tablePaymentRequired ? "Cliente escolhe forma de pagamento" : "Pagamento no caixa"}
               </span>
             </div>
             <Switch
