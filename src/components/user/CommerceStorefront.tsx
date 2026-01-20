@@ -111,6 +111,16 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
   
   // Track if user has an active table order (to keep Comanda tab visible)
   const [hasActiveTableOrder, setHasActiveTableOrder] = useState(false);
+  const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
+  const [activeOrderItems, setActiveOrderItems] = useState<Array<{
+    id: string;
+    product_name: string;
+    quantity: number;
+    unit_price: number;
+    total_price: number;
+    product_id: string | null;
+    notes: string | null;
+  }>>([]);
   
   // Modals
   const [showReviewModal, setShowReviewModal] = useState(false);
@@ -167,6 +177,11 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
         ...commerceData,
         table_payment_required: commerceData.table_payment_required ?? true
       } as unknown as Commerce);
+    }
+
+    // Check for active table order for this user at this commerce
+    if (user) {
+      await checkActiveTableOrder();
     }
 
     // Fetch categories
@@ -286,8 +301,86 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
     setLoading(false);
   };
 
-  const toggleFavorite = async () => {
+  // Check and fetch active table order for this user
+  const checkActiveTableOrder = async () => {
     if (!user) return;
+
+    // Find active order (pending/confirmed/preparing) for this user at this commerce with a table
+    const { data: activeOrder } = await supabase
+      .from('orders')
+      .select('id, table_id, status')
+      .eq('user_id', user.id)
+      .eq('commerce_id', commerceId)
+      .not('table_id', 'is', null)
+      .in('status', ['pending', 'confirmed', 'preparing'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (activeOrder) {
+      setHasActiveTableOrder(true);
+      setActiveOrderId(activeOrder.id);
+      setOrderMode('table');
+
+      // Find the table
+      const table = tables.find(t => t.id === activeOrder.table_id);
+      if (table) {
+        setSelectedTable(table);
+      }
+
+      // Fetch order items
+      await fetchActiveOrderItems(activeOrder.id);
+    } else {
+      setHasActiveTableOrder(false);
+      setActiveOrderId(null);
+      setActiveOrderItems([]);
+    }
+  };
+
+  // Fetch order items for an active order
+  const fetchActiveOrderItems = async (orderId: string) => {
+    const { data: items } = await supabase
+      .from('order_items')
+      .select('id, product_name, quantity, unit_price, total_price, product_id, notes')
+      .eq('order_id', orderId)
+      .order('created_at');
+
+    setActiveOrderItems(items || []);
+  };
+
+  // Real-time subscription for active order items
+  useEffect(() => {
+    if (!activeOrderId) return;
+
+    const channel = supabase
+      .channel(`order-items-${activeOrderId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'order_items',
+          filter: `order_id=eq.${activeOrderId}`
+        },
+        () => {
+          fetchActiveOrderItems(activeOrderId);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [activeOrderId]);
+
+  // Re-check active order when user or tables change
+  useEffect(() => {
+    if (user && tables.length > 0 && !loading) {
+      checkActiveTableOrder();
+    }
+  }, [user, tables.length]);
+
+  const toggleFavorite = async () => {
     
     if (isFavorite) {
       await supabase.from('favorites').delete().eq('user_id', user.id).eq('commerce_id', commerceId);
@@ -905,9 +998,10 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
         </TabsContent>
 
         {/* Comanda Tab - Only for table orders */}
-        {orderMode === 'table' && (
+        {(orderMode === 'table' || hasActiveTableOrder) && (
           <TabsContent value="comanda" className="space-y-4 mt-4">
-            {cart.length === 0 ? (
+            {/* Show empty state only if no cart items AND no active order items */}
+            {cart.length === 0 && activeOrderItems.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <UtensilsCrossed className="w-16 h-16 mx-auto mb-4 opacity-50" />
                 <p className="text-lg font-medium">Sua comanda está vazia</p>
@@ -923,52 +1017,99 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {/* Cart Items */}
-                  <div className="space-y-3">
-                    {cart.map((item) => (
-                      <div key={item.product.id} className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg border">
-                        {item.product.image_url && (
-                          <img src={item.product.image_url} alt="" className="w-12 h-12 rounded object-cover" />
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm truncate">{item.product.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {item.quantity}x {formatCurrency(item.product.promotional_price || item.product.price)}
+                  {/* Active Order Items from Database (already sent) */}
+                  {activeOrderItems.length > 0 && (
+                    <div className="space-y-3">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Itens do pedido</p>
+                      {activeOrderItems.map((item) => {
+                        const productImage = products.find(p => p.id === item.product_id)?.image_url;
+                        return (
+                          <div key={item.id} className="flex items-center gap-3 p-3 bg-primary/5 rounded-lg border border-primary/20">
+                            {productImage && (
+                              <img src={productImage} alt="" className="w-12 h-12 rounded object-cover" />
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm truncate">{item.product_name}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {item.quantity}x {formatCurrency(item.unit_price)}
+                              </p>
+                              {item.notes && <p className="text-xs text-muted-foreground italic">{item.notes}</p>}
+                            </div>
+                            <Check className="w-4 h-4 text-primary" />
+                            <p className="font-bold text-primary text-sm">
+                              {formatCurrency(item.total_price)}
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Cart Items (pending - not yet sent) */}
+                  {cart.length > 0 && (
+                    <div className="space-y-3">
+                      {activeOrderItems.length > 0 && (
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Novos itens (não enviados)</p>
+                      )}
+                      {cart.map((item) => (
+                        <div key={item.product.id} className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg border">
+                          {item.product.image_url && (
+                            <img src={item.product.image_url} alt="" className="w-12 h-12 rounded object-cover" />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm truncate">{item.product.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {item.quantity}x {formatCurrency(item.product.promotional_price || item.product.price)}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Button size="icon" variant="outline" className="h-7 w-7" onClick={() => updateCartQuantity(item.product.id, -1)}>
+                              <Minus className="w-3 h-3" />
+                            </Button>
+                            <span className="w-6 text-center text-sm font-medium">{item.quantity}</span>
+                            <Button size="icon" variant="outline" className="h-7 w-7" onClick={() => updateCartQuantity(item.product.id, 1)}>
+                              <Plus className="w-3 h-3" />
+                            </Button>
+                          </div>
+                          <p className="font-bold text-primary text-sm">
+                            {formatCurrency((item.product.promotional_price || item.product.price) * item.quantity)}
                           </p>
                         </div>
-                        <div className="flex items-center gap-1">
-                          <Button size="icon" variant="outline" className="h-7 w-7" onClick={() => updateCartQuantity(item.product.id, -1)}>
-                            <Minus className="w-3 h-3" />
-                          </Button>
-                          <span className="w-6 text-center text-sm font-medium">{item.quantity}</span>
-                          <Button size="icon" variant="outline" className="h-7 w-7" onClick={() => updateCartQuantity(item.product.id, 1)}>
-                            <Plus className="w-3 h-3" />
-                          </Button>
-                        </div>
-                        <p className="font-bold text-primary text-sm">
-                          {formatCurrency((item.product.promotional_price || item.product.price) * item.quantity)}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
 
                   {/* Total */}
                   <div className="border-t pt-4 space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Itens no pedido</span>
-                      <span>{cartItemsCount}</span>
-                    </div>
+                    {activeOrderItems.length > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Itens já enviados</span>
+                        <span>{activeOrderItems.reduce((sum, item) => sum + item.quantity, 0)}</span>
+                      </div>
+                    )}
+                    {cart.length > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Novos itens</span>
+                        <span>{cartItemsCount}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between font-bold text-lg">
-                      <span>Total</span>
-                      <span className="text-primary">{formatCurrency(cartTotal)}</span>
+                      <span>Total da Comanda</span>
+                      <span className="text-primary">
+                        {formatCurrency(
+                          cartTotal + activeOrderItems.reduce((sum, item) => sum + item.total_price, 0)
+                        )}
+                      </span>
                     </div>
                   </div>
 
                   {/* Actions */}
-                  <Button className="w-full h-12" onClick={openCartModal}>
-                    <Send className="w-4 h-4 mr-2" />
-                    Enviar Pedido
-                  </Button>
+                  {cart.length > 0 && (
+                    <Button className="w-full h-12" onClick={openCartModal}>
+                      <Send className="w-4 h-4 mr-2" />
+                      Enviar Novos Itens
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             )}

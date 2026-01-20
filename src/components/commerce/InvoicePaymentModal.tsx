@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { formatCurrency } from "@/lib/formatCurrency";
 
 interface InvoicePaymentModalProps {
   isOpen: boolean;
@@ -144,7 +145,7 @@ const InvoicePaymentModal = ({ isOpen, onClose, invoice, commerceStats }: Invoic
                     <TrendingUp className="w-4 h-4" />
                     <span className="text-xs">Faturamento</span>
                   </div>
-                  <p className="font-bold">R$ {stats.totalRevenue.toFixed(2)}</p>
+                  <p className="font-bold">{formatCurrency(stats.totalRevenue)}</p>
                 </div>
                 <div className="p-3 rounded-lg bg-background/50">
                   <div className="flex items-center gap-2 text-blue-500 mb-1">
@@ -158,7 +159,7 @@ const InvoicePaymentModal = ({ isOpen, onClose, invoice, commerceStats }: Invoic
                     <Wallet className="w-4 h-4" />
                     <span className="text-xs">Ticket Médio</span>
                   </div>
-                  <p className="font-bold">R$ {stats.avgTicket.toFixed(2)}</p>
+                  <p className="font-bold">{formatCurrency(stats.avgTicket)}</p>
                 </div>
                 <div className="p-3 rounded-lg bg-background/50">
                   <div className="flex items-center gap-2 text-orange-500 mb-1">
@@ -178,7 +179,7 @@ const InvoicePaymentModal = ({ isOpen, onClose, invoice, commerceStats }: Invoic
           <div className="text-center py-4 border-y">
             <p className="text-sm text-muted-foreground mb-1">Valor a pagar</p>
             <p className="text-4xl font-bold text-primary">
-              R$ {Number(invoice.amount).toFixed(2)}
+              {formatCurrency(Number(invoice.amount))}
             </p>
             <p className="text-xs text-muted-foreground mt-1">
               Vencimento: {new Date(invoice.due_date).toLocaleDateString('pt-BR')}
