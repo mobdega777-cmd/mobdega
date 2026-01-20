@@ -73,6 +73,8 @@ interface Order {
   created_at: string;
   table_id: string | null;
   order_items?: OrderItem[];
+  table_number?: number;
+  table_name?: string | null;
 }
 
 interface CashMovement {
@@ -213,7 +215,19 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
 
     const order = orders.find(o => o.id === orderId);
     if (order && !isCashMovement(order)) {
-      setSelectedOrder({ ...order, order_items: items || [] });
+      // Fetch table info if it's a table order
+      let tableInfo = { table_number: undefined as number | undefined, table_name: undefined as string | null | undefined };
+      if (order.order_type === 'table' && order.table_id) {
+        const { data: tableData } = await supabase
+          .from('tables')
+          .select('number, name')
+          .eq('id', order.table_id)
+          .single();
+        if (tableData) {
+          tableInfo = { table_number: tableData.number, table_name: tableData.name };
+        }
+      }
+      setSelectedOrder({ ...order, order_items: items || [], ...tableInfo });
       setIsDetailsOpen(true);
     }
   };
@@ -256,7 +270,7 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
     }
   };
 
-  const getNextStatus = (currentStatus: string): OrderStatus | null => {
+  const getNextStatus = (currentStatus: string, orderType?: string | null): OrderStatus | null => {
     const flow: Record<string, OrderStatus> = {
       pending: 'confirmed',
       confirmed: 'preparing',
@@ -264,6 +278,17 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
       delivering: 'delivered',
     };
     return flow[currentStatus] || null;
+  };
+
+  const getNextStatusLabel = (currentStatus: string, orderType?: string | null): string => {
+    if (orderType === 'table' && currentStatus === 'preparing') {
+      return 'Finalizado!';
+    }
+    const nextStatus = getNextStatus(currentStatus, orderType);
+    if (nextStatus) {
+      return statusConfig[nextStatus]?.label || nextStatus;
+    }
+    return '';
   };
 
   const filteredOrders = orders.filter(order => {
@@ -414,7 +439,7 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
                                     size="sm"
                                     onClick={() => updateOrderStatus(order.id, nextStatus)}
                                   >
-                                    {order.status === 'pending' ? 'Iniciar' : statusConfig[nextStatus]?.label}
+                                    {order.status === 'pending' ? 'Iniciar' : getNextStatusLabel(order.status, order.order_type)}
                                   </Button>
                                 )}
                                 {order.status !== 'cancelled' && order.status !== 'delivered' && (
@@ -494,7 +519,14 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Tipo</p>
-                  <p className="font-medium">{orderTypeLabels[selectedOrder.order_type || 'delivery']}</p>
+                  <p className="font-medium">
+                    {orderTypeLabels[selectedOrder.order_type || 'delivery']}
+                    {selectedOrder.order_type === 'table' && selectedOrder.table_number && (
+                      <span className="ml-2 text-primary font-bold">
+                        (Mesa {selectedOrder.table_number}{selectedOrder.table_name ? ` - ${selectedOrder.table_name}` : ''})
+                      </span>
+                    )}
+                  </p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Pagamento</p>

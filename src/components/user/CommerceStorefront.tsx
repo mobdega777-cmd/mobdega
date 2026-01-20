@@ -761,32 +761,37 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
       {/* Action Buttons - Exclusive selection */}
       <div className="grid grid-cols-2 gap-3">
         <Button 
-          className={`gap-2 h-14 text-base`} 
+          className={`gap-1 h-14 text-sm sm:text-base px-2 sm:px-4`} 
           variant={orderMode === 'table' ? 'default' : 'outline'}
           onClick={handlePedirNaMesa}
         >
-          <UtensilsCrossed className="w-5 h-5" />
-          Pedir na Mesa
-          {selectedTable && <Badge variant="secondary" className="ml-1">Mesa {selectedTable.number}</Badge>}
+          <UtensilsCrossed className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+          <span className="truncate">{selectedTable ? `Mesa ${selectedTable.number}` : 'Mesa'}</span>
         </Button>
         <Button 
-          className={`gap-2 h-14 text-base`} 
+          className={`gap-1 h-14 text-sm sm:text-base px-2 sm:px-4`} 
           variant={orderMode === 'delivery' ? 'default' : 'outline'}
           onClick={handlePedirDelivery}
           disabled={!commerce.delivery_enabled}
         >
-          <Truck className="w-5 h-5" />
-          Pedir Delivery
+          <Truck className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+          <span className="truncate">Delivery</span>
         </Button>
       </div>
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className={`grid w-full ${orderMode === 'table' ? 'grid-cols-3' : 'grid-cols-2'}`}>
           <TabsTrigger value="menu" className="gap-2">
             <ShoppingCart className="w-4 h-4" />
             Cardápio
           </TabsTrigger>
+          {orderMode === 'table' && (
+            <TabsTrigger value="comanda" className="gap-2">
+              <UtensilsCrossed className="w-4 h-4" />
+              Comanda
+            </TabsTrigger>
+          )}
           <TabsTrigger value="reviews" className="gap-2">
             <MessageCircle className="w-4 h-4" />
             Avaliações ({reviews.length})
@@ -891,6 +896,77 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
             )}
           </div>
         </TabsContent>
+
+        {/* Comanda Tab - Only for table orders */}
+        {orderMode === 'table' && (
+          <TabsContent value="comanda" className="space-y-4 mt-4">
+            {cart.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <UtensilsCrossed className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                <p className="text-lg font-medium">Sua comanda está vazia</p>
+                <p className="text-sm mt-1">Adicione itens do cardápio para ver aqui</p>
+              </div>
+            ) : (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <UtensilsCrossed className="w-5 h-5 text-primary" />
+                    Comanda - Mesa {selectedTable?.number}
+                    {selectedTable?.name && <span className="text-sm font-normal text-muted-foreground">({selectedTable.name})</span>}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Cart Items */}
+                  <div className="space-y-3">
+                    {cart.map((item) => (
+                      <div key={item.product.id} className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg border">
+                        {item.product.image_url && (
+                          <img src={item.product.image_url} alt="" className="w-12 h-12 rounded object-cover" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">{item.product.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {item.quantity}x {formatCurrency(item.product.promotional_price || item.product.price)}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button size="icon" variant="outline" className="h-7 w-7" onClick={() => updateCartQuantity(item.product.id, -1)}>
+                            <Minus className="w-3 h-3" />
+                          </Button>
+                          <span className="w-6 text-center text-sm font-medium">{item.quantity}</span>
+                          <Button size="icon" variant="outline" className="h-7 w-7" onClick={() => updateCartQuantity(item.product.id, 1)}>
+                            <Plus className="w-3 h-3" />
+                          </Button>
+                        </div>
+                        <p className="font-bold text-primary text-sm">
+                          {formatCurrency((item.product.promotional_price || item.product.price) * item.quantity)}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Total */}
+                  <div className="border-t pt-4 space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Itens no pedido</span>
+                      <span>{cartItemsCount}</span>
+                    </div>
+                    <div className="flex justify-between font-bold text-lg">
+                      <span>Total</span>
+                      <span className="text-primary">{formatCurrency(cartTotal)}</span>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <Button className="w-full h-12" onClick={openCartModal}>
+                    <Send className="w-4 h-4 mr-2" />
+                    Enviar Pedido
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+        )}
 
         {/* Reviews Tab */}
         <TabsContent value="reviews" className="space-y-4 mt-4">
@@ -1445,8 +1521,8 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
               {orderStatus === 'pending' && 'Aguardando confirmação do estabelecimento...'}
               {orderStatus === 'confirmed' && 'Pedido confirmado! Preparando...'}
               {orderStatus === 'preparing' && 'Seu pedido está sendo preparado!'}
-              {orderStatus === 'delivering' && 'Pedido saiu para entrega!'}
-              {orderStatus === 'delivered' && 'Pedido entregue! Bom apetite!'}
+              {orderStatus === 'delivering' && (orderMode === 'table' ? 'O atendente está levando o pedido até você.' : 'Pedido saiu para entrega!')}
+              {orderStatus === 'delivered' && 'Pedido entregue! Obrigado pela preferência!'}
             </p>
           </div>
           <DialogFooter>
