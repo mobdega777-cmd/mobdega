@@ -21,6 +21,7 @@ import { format, formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import logoMobdega from "@/assets/logo-mobdega.png";
 import CommerceStorefront from "@/components/user/CommerceStorefront";
+import { formatCurrency } from "@/lib/formatCurrency";
 
 interface Profile {
   id: string;
@@ -639,7 +640,7 @@ const UserDashboard = () => {
                                 {status.label}
                               </Badge>
                               <p className="font-semibold text-foreground mt-1">
-                                R$ {order.total.toFixed(2)}
+                                {formatCurrency(order.total)}
                               </p>
                             </div>
                           </div>

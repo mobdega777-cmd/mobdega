@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, User, Store, Eye, EyeOff, Loader2 } from "lucide-react";
+import { X, User, Store, Eye, EyeOff, Loader2, Check, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,6 +10,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { fetchAddressByCep, formatCep } from "@/lib/viaCepService";
+import { formatCurrency, formatPercentage } from "@/lib/formatCurrency";
 type AuthMode = "login" | "register";
 type UserType = "user" | "commerce";
 type DocumentType = "cpf" | "cnpj";
@@ -31,6 +32,9 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingCep, setLoadingCep] = useState(false);
+  const [validatingCoupon, setValidatingCoupon] = useState(false);
+  const [couponValid, setCouponValid] = useState<boolean | null>(null);
+  const [couponDiscount, setCouponDiscount] = useState<{ type: string; value: number } | null>(null);
   // Form states
   const [formData, setFormData] = useState({
     name: "",
@@ -66,8 +70,88 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
       }
       return;
     }
+
+    // Handle coupon code - validate when user types
+    if (name === 'couponCode') {
+      const upperValue = value.toUpperCase();
+      setFormData(prev => ({ ...prev, couponCode: upperValue }));
+      if (upperValue.length >= 3) {
+        validateCoupon(upperValue);
+      } else {
+        setCouponValid(null);
+        setCouponDiscount(null);
+      }
+      return;
+    }
     
     setFormData({ ...formData, [name]: value });
+  };
+
+  const validateCoupon = async (code: string) => {
+    setValidatingCoupon(true);
+    setCouponValid(null);
+    
+    const { data: coupon, error } = await supabase
+      .from('discount_coupons')
+      .select('*')
+      .eq('code', code)
+      .eq('is_active', true)
+      .maybeSingle();
+    
+    if (error || !coupon) {
+      setCouponValid(false);
+      setCouponDiscount(null);
+      setValidatingCoupon(false);
+      return;
+    }
+
+    // Check if coupon is within valid dates
+    const now = new Date();
+    if (coupon.valid_from && new Date(coupon.valid_from) > now) {
+      setCouponValid(false);
+      setCouponDiscount(null);
+      setValidatingCoupon(false);
+      return;
+    }
+    if (coupon.valid_until && new Date(coupon.valid_until) < now) {
+      setCouponValid(false);
+      setCouponDiscount(null);
+      setValidatingCoupon(false);
+      return;
+    }
+
+    // Check max uses
+    if (coupon.max_uses && coupon.used_count >= coupon.max_uses) {
+      setCouponValid(false);
+      setCouponDiscount(null);
+      setValidatingCoupon(false);
+      return;
+    }
+
+    // Check if coupon applies to selected plan
+    if (coupon.plan_ids && coupon.plan_ids.length > 0) {
+      // Get the plan ID for the selected plan type
+      const { data: planData } = await supabase
+        .from('plans')
+        .select('id')
+        .eq('type', formData.plan as 'basic' | 'startup' | 'business')
+        .eq('is_active', true)
+        .single();
+      
+      if (planData && !coupon.plan_ids.includes(planData.id)) {
+        setCouponValid(false);
+        setCouponDiscount(null);
+        setValidatingCoupon(false);
+        return;
+      }
+    }
+
+    setCouponValid(true);
+    setCouponDiscount({
+      type: coupon.discount_type,
+      value: coupon.discount_value
+    });
+    setValidatingCoupon(false);
   };
 
   const handleCepLookup = async (cep: string) => {
@@ -969,17 +1053,41 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
                     {/* Coupon Code Field */}
                     <div className="space-y-2">
                       <Label htmlFor="couponCode">Cupom de desconto (opcional)</Label>
-                      <Input
-                        id="couponCode"
-                        name="couponCode"
-                        value={formData.couponCode}
-                        onChange={handleInputChange}
-                        placeholder="CUPOM10"
-                        className="h-11 uppercase"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Se você possui um cupom de desconto, insira aqui
-                      </p>
+                      <div className="relative">
+                        <Input
+                          id="couponCode"
+                          name="couponCode"
+                          value={formData.couponCode}
+                          onChange={handleInputChange}
+                          placeholder="CUPOM10"
+                          className={`h-11 uppercase pr-12 ${
+                            couponValid === true ? 'border-green-500 focus-visible:ring-green-500' : 
+                            couponValid === false ? 'border-red-500 focus-visible:ring-red-500' : ''
+                          }`}
+                        />
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                          {validatingCoupon && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
+                          {!validatingCoupon && couponValid === true && <Check className="w-5 h-5 text-green-500" />}
+                          {!validatingCoupon && couponValid === false && <AlertCircle className="w-5 h-5 text-red-500" />}
+                        </div>
+                      </div>
+                      {couponValid === true && couponDiscount && (
+                        <p className="text-xs text-green-600 font-medium">
+                          ✓ Cupom válido! Desconto de {couponDiscount.type === 'percentage' 
+                            ? `${couponDiscount.value}%` 
+                            : formatCurrency(couponDiscount.value)} na primeira fatura
+                        </p>
+                      )}
+                      {couponValid === false && formData.couponCode.length >= 3 && (
+                        <p className="text-xs text-red-500">
+                          Cupom inválido ou expirado
+                        </p>
+                      )}
+                      {couponValid === null && (
+                        <p className="text-xs text-muted-foreground">
+                          Se você possui um cupom de desconto, insira aqui
+                        </p>
+                      )}
                     </div>
                   </div>
 

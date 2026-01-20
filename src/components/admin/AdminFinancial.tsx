@@ -32,6 +32,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import DateFilter from "@/components/commerce/DateFilter";
+import { formatCurrency } from "@/lib/formatCurrency";
 
 interface FinancialStats {
   totalIncome: number;
@@ -310,7 +311,7 @@ const AdminFinancial = () => {
                 </div>
                 <div className="mt-4">
                   <h3 className={`text-2xl font-bold ${stat.color}`}>
-                    R$ {stat.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    {formatCurrency(stat.value)}
                   </h3>
                   <p className="text-sm text-muted-foreground mt-1">
                     {stat.title}
@@ -333,7 +334,7 @@ const AdminFinancial = () => {
               <div>
                 <p className="text-sm text-muted-foreground">Faturas Pagas</p>
                 <h3 className="text-xl font-bold text-green-500">
-                  R$ {stats.paidInvoices.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  {formatCurrency(stats.paidInvoices)}
                 </h3>
               </div>
             </div>
@@ -349,7 +350,7 @@ const AdminFinancial = () => {
               <div>
                 <p className="text-sm text-muted-foreground">Pendentes</p>
                 <h3 className="text-xl font-bold text-yellow-500">
-                  R$ {stats.pendingReceivables.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  {formatCurrency(stats.pendingReceivables)}
                 </h3>
               </div>
             </div>
@@ -365,7 +366,7 @@ const AdminFinancial = () => {
               <div>
                 <p className="text-sm text-muted-foreground">Em Atraso</p>
                 <h3 className="text-xl font-bold text-red-500">
-                  R$ {stats.overdueInvoices.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  {formatCurrency(stats.overdueInvoices)}
                 </h3>
               </div>
             </div>
@@ -420,7 +421,7 @@ const AdminFinancial = () => {
                     <p className={`font-semibold ${
                       transaction.type === 'income' ? 'text-green-500' : 'text-red-500'
                     }`}>
-                      {transaction.type === 'income' ? '+' : '-'} R$ {Number(transaction.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      {transaction.type === 'income' ? '+' : '-'} {formatCurrency(Number(transaction.amount))}
                     </p>
                     <p className="text-sm text-muted-foreground">
                       {new Date(transaction.transaction_date).toLocaleDateString('pt-BR')}
