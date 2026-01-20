@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
+import { formatCurrency } from "@/lib/formatCurrency";
 
 interface Stats {
   totalUsers: number;
@@ -112,7 +113,7 @@ const AdminOverview = () => {
     },
     {
       title: "Faturamento Mensal",
-      value: `R$ ${stats.monthlyRevenue.toLocaleString('pt-BR')}`,
+      value: formatCurrency(stats.monthlyRevenue),
       icon: DollarSign,
       color: "success",
       trend: "+23%",

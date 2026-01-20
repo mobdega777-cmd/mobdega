@@ -19,6 +19,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import DateFilter from "./DateFilter";
 import { startOfDay, endOfDay } from "date-fns";
+import { formatCurrency } from "@/lib/formatCurrency";
 
 interface OpeningHours {
   [key: string]: { open: string; close: string; enabled: boolean };
@@ -113,14 +114,7 @@ const CommerceOverview = ({ commerce }: CommerceOverviewProps) => {
     fetchStats();
   }, [commerce.id, dateFilter]);
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    }).format(value);
-  };
+  // Using centralized formatCurrency from @/lib/formatCurrency
 
   const statCards = [
     { title: "Pedidos Pendentes", value: stats.pendingOrders, icon: Clock, color: "text-yellow-500", bgColor: "bg-yellow-500/10" },

@@ -35,6 +35,7 @@ import { useToast } from "@/hooks/use-toast";
 import DateFilter from "./DateFilter";
 import InvoicePaymentModal from "./InvoicePaymentModal";
 import { startOfDay, endOfDay, subDays, startOfMonth } from "date-fns";
+import { formatCurrency, formatPercentage } from "@/lib/formatCurrency";
 
 interface CommerceFinancialProps {
   commerceId: string;
@@ -98,14 +99,7 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
   });
   const { toast } = useToast();
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    }).format(value);
-  };
+  // Using centralized formatCurrency from @/lib/formatCurrency
 
   const handleDateChange = (start: Date, end: Date) => {
     setDateFilter({ start, end });
