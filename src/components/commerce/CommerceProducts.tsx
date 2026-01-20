@@ -178,8 +178,8 @@ const CommerceProducts = ({ commerceId }: CommerceProductsProps) => {
       ? { name: sortedByStock[0].name, stock: sortedByStock[0].stock || 0 }
       : null;
     
-    const lowStockProducts = products.filter(p => (p.stock || 0) > 0);
-    const sortedLowStock = lowStockProducts.sort((a, b) => (a.stock || 0) - (b.stock || 0));
+    // Ordenar por menor estoque (incluindo 0)
+    const sortedLowStock = [...products].sort((a, b) => (a.stock || 0) - (b.stock || 0));
     const lowStock = sortedLowStock.length > 0
       ? { name: sortedLowStock[0].name, stock: sortedLowStock[0].stock || 0 }
       : null;
