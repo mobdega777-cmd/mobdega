@@ -4,12 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -41,13 +43,18 @@ import {
   ShoppingCart,
   Search,
   Pencil,
-  Trash2
+  Trash2,
+  UtensilsCrossed,
+  XCircle,
+  User,
+  Phone
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import DateFilter, { getDateRange } from "./DateFilter";
-import { startOfDay, endOfDay } from "date-fns";
+import { startOfDay, endOfDay, format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 interface CommerceCashRegisterProps {
   commerceId: string;
@@ -83,6 +90,25 @@ interface Product {
   stock: number | null;
 }
 
+interface TableOrder {
+  id: string;
+  table_id: string;
+  table_number: number;
+  table_name: string | null;
+  customer_name: string | null;
+  customer_phone: string | null;
+  created_at: string;
+  total: number;
+  status: string;
+  payment_method: string | null;
+  items: {
+    product_name: string;
+    quantity: number;
+    unit_price: number;
+    total_price: number;
+  }[];
+}
+
 const paymentMethods = [
   { value: 'cash', label: 'Dinheiro', icon: Banknote },
   { value: 'credit', label: 'Crédito', icon: CreditCard },
@@ -95,6 +121,7 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
   const [movements, setMovements] = useState<CashMovement[]>([]);
   const [filteredMovements, setFilteredMovements] = useState<CashMovement[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [tableOrders, setTableOrders] = useState<TableOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [isOpenDialogOpen, setIsOpenDialogOpen] = useState(false);
   const [isCloseDialogOpen, setIsCloseDialogOpen] = useState(false);
@@ -103,6 +130,13 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
   const [editingMovement, setEditingMovement] = useState<CashMovement | null>(null);
   const { user } = useAuth();
   const { toast } = useToast();
+
+  // Table order modals
+  const [selectedTableOrder, setSelectedTableOrder] = useState<TableOrder | null>(null);
+  const [showTableOrderModal, setShowTableOrderModal] = useState(false);
+  const [showCloseTableModal, setShowCloseTableModal] = useState(false);
+  const [tablePaymentMethod, setTablePaymentMethod] = useState<string>("cash");
+  const [tableCashReceived, setTableCashReceived] = useState("");
 
   // Date filter state
   const [dateFilter, setDateFilter] = useState({ 
@@ -173,6 +207,63 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
       .order('name');
 
     setProducts(productsData || []);
+
+    // Fetch table orders with pending payment (status = delivered, payment_method = pending, order_type = table)
+    const { data: tableOrdersData } = await supabase
+      .from('orders')
+      .select(`
+        id,
+        table_id,
+        customer_name,
+        customer_phone,
+        created_at,
+        total,
+        status,
+        payment_method,
+        order_items (
+          product_name,
+          quantity,
+          unit_price,
+          total_price
+        )
+      `)
+      .eq('commerce_id', commerceId)
+      .eq('order_type', 'table')
+      .eq('payment_method', 'pending')
+      .in('status', ['pending', 'confirmed', 'preparing', 'delivered'])
+      .order('created_at', { ascending: false });
+
+    // Fetch table details for the orders
+    if (tableOrdersData && tableOrdersData.length > 0) {
+      const tableIds = [...new Set(tableOrdersData.map(o => o.table_id).filter(Boolean))];
+      const { data: tablesData } = await supabase
+        .from('tables')
+        .select('id, number, name')
+        .in('id', tableIds);
+
+      const tableMap = new Map(tablesData?.map(t => [t.id, t]) || []);
+
+      const formattedOrders: TableOrder[] = tableOrdersData.map(order => {
+        const table = tableMap.get(order.table_id);
+        return {
+          id: order.id,
+          table_id: order.table_id || '',
+          table_number: table?.number || 0,
+          table_name: table?.name || null,
+          customer_name: order.customer_name,
+          customer_phone: order.customer_phone,
+          created_at: order.created_at,
+          total: order.total,
+          status: order.status,
+          payment_method: order.payment_method,
+          items: order.order_items || []
+        };
+      });
+
+      setTableOrders(formattedOrders);
+    } else {
+      setTableOrders([]);
+    }
 
     setLoading(false);
   };
@@ -449,6 +540,126 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
   const filteredProducts = products.filter(p => 
     p.name.toLowerCase().includes(productSearch.toLowerCase())
   );
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(value);
+  };
+
+  // Table order functions
+  const openTableOrderDetails = (order: TableOrder) => {
+    setSelectedTableOrder(order);
+    setShowTableOrderModal(true);
+  };
+
+  const openCloseTableModal = (order: TableOrder) => {
+    setSelectedTableOrder(order);
+    setTablePaymentMethod("cash");
+    setTableCashReceived("");
+    setShowCloseTableModal(true);
+  };
+
+  const calculateTableChange = (): number => {
+    if (!selectedTableOrder) return 0;
+    const paid = parseFloat(tableCashReceived) || 0;
+    return paid - selectedTableOrder.total;
+  };
+
+  const tableChange = calculateTableChange();
+
+  const cancelTableOrder = async (order: TableOrder) => {
+    if (!confirm(`Tem certeza que deseja cancelar o pedido da Mesa ${order.table_number}? Esta ação não pode ser desfeita.`)) return;
+
+    // Cancel the order
+    await supabase
+      .from('orders')
+      .update({ status: 'cancelled' })
+      .eq('id', order.id);
+
+    // Free up the table
+    if (order.table_id) {
+      await supabase
+        .from('tables')
+        .update({
+          status: 'available',
+          current_order_id: null,
+          closed_at: new Date().toISOString()
+        })
+        .eq('id', order.table_id);
+    }
+
+    toast({ title: "Pedido cancelado", description: `Mesa ${order.table_number} liberada` });
+    fetchData();
+  };
+
+  const closeTableOrder = async () => {
+    if (!selectedTableOrder || !currentRegister || !user) return;
+
+    // Update order with payment method and status
+    await supabase
+      .from('orders')
+      .update({
+        payment_method: tablePaymentMethod,
+        status: 'delivered',
+        delivered_at: new Date().toISOString()
+      })
+      .eq('id', selectedTableOrder.id);
+
+    // Create cash movement for this sale
+    await supabase
+      .from('cash_movements')
+      .insert({
+        cash_register_id: currentRegister.id,
+        commerce_id: commerceId,
+        type: 'sale',
+        amount: selectedTableOrder.total,
+        payment_method: tablePaymentMethod,
+        description: `Mesa ${selectedTableOrder.table_number} - ${selectedTableOrder.customer_name || 'Cliente'}`,
+        created_by: user.id,
+        order_id: selectedTableOrder.id,
+      });
+
+    // Free up the table
+    if (selectedTableOrder.table_id) {
+      await supabase
+        .from('tables')
+        .update({
+          status: 'available',
+          current_order_id: null,
+          closed_at: new Date().toISOString()
+        })
+        .eq('id', selectedTableOrder.table_id);
+    }
+
+    toast({ title: "Mesa fechada com sucesso!", description: `Pagamento registrado: ${formatCurrency(selectedTableOrder.total)}` });
+    setShowCloseTableModal(false);
+    setSelectedTableOrder(null);
+    fetchData();
+  };
+
+  const getStatusLabel = (status: string) => {
+    const labels: Record<string, string> = {
+      pending: 'Aguardando',
+      confirmed: 'Confirmado',
+      preparing: 'Preparando',
+      delivered: 'Pronto',
+    };
+    return labels[status] || status;
+  };
+
+  const getStatusColor = (status: string) => {
+    const colors: Record<string, string> = {
+      pending: 'bg-yellow-500/20 text-yellow-700 border-yellow-500/30',
+      confirmed: 'bg-blue-500/20 text-blue-700 border-blue-500/30',
+      preparing: 'bg-orange-500/20 text-orange-700 border-orange-500/30',
+      delivered: 'bg-green-500/20 text-green-700 border-green-500/30',
+    };
+    return colors[status] || 'bg-muted text-muted-foreground';
+  };
 
   if (loading) {
     return (
@@ -769,6 +980,115 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
             </CardContent>
           </Card>
 
+          {/* Open Tables Section */}
+          {tableOrders.length > 0 && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <UtensilsCrossed className="w-5 h-5 text-primary" />
+                <h2 className="text-xl font-bold">Mesas Abertas</h2>
+                <Badge variant="secondary" className="ml-2">{tableOrders.length}</Badge>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {tableOrders.map((order) => (
+                  <Card key={order.id} className="border-primary/20">
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                            <UtensilsCrossed className="w-5 h-5 text-primary" />
+                          </div>
+                          <div>
+                            <CardTitle className="text-lg">Mesa {order.table_number}</CardTitle>
+                            {order.table_name && (
+                              <p className="text-xs text-muted-foreground">{order.table_name}</p>
+                            )}
+                          </div>
+                        </div>
+                        <Badge className={getStatusColor(order.status)}>
+                          {getStatusLabel(order.status)}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {/* Customer Info */}
+                      {(order.customer_name || order.customer_phone) && (
+                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                          {order.customer_name && (
+                            <div className="flex items-center gap-1">
+                              <User className="w-3 h-3" />
+                              <span>{order.customer_name}</span>
+                            </div>
+                          )}
+                          {order.customer_phone && (
+                            <div className="flex items-center gap-1">
+                              <Phone className="w-3 h-3" />
+                              <span>{order.customer_phone}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Time */}
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <Clock className="w-3 h-3" />
+                        <span>Aberta em {format(new Date(order.created_at), "HH:mm", { locale: ptBR })}</span>
+                      </div>
+
+                      {/* Items Preview */}
+                      <div className="text-sm space-y-1 max-h-20 overflow-y-auto">
+                        {order.items.slice(0, 3).map((item, idx) => (
+                          <div key={idx} className="flex justify-between text-muted-foreground">
+                            <span className="truncate">{item.quantity}x {item.product_name}</span>
+                            <span className="flex-shrink-0">{formatCurrency(item.total_price)}</span>
+                          </div>
+                        ))}
+                        {order.items.length > 3 && (
+                          <p className="text-xs text-muted-foreground italic">
+                            +{order.items.length - 3} itens...
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Total */}
+                      <div className="border-t pt-2 flex justify-between items-center">
+                        <span className="text-sm font-medium">Total</span>
+                        <span className="text-lg font-bold text-primary">{formatCurrency(order.total)}</span>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => openTableOrderDetails(order)}
+                        >
+                          Ver Detalhes
+                        </Button>
+                        <Button 
+                          size="sm"
+                          onClick={() => openCloseTableModal(order)}
+                          disabled={order.status !== 'delivered'}
+                        >
+                          Fechar Mesa
+                        </Button>
+                      </div>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => cancelTableOrder(order)}
+                      >
+                        <XCircle className="w-4 h-4 mr-2" />
+                        Cancelar Mesa
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Summary Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Card>
@@ -919,6 +1239,173 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
           </CardContent>
         </Card>
       )}
+
+      {/* Table Order Details Modal */}
+      <Dialog open={showTableOrderModal} onOpenChange={setShowTableOrderModal}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UtensilsCrossed className="w-5 h-5 text-primary" />
+              Comanda - Mesa {selectedTableOrder?.table_number}
+            </DialogTitle>
+          </DialogHeader>
+          {selectedTableOrder && (
+            <div className="space-y-4">
+              {/* Customer Info */}
+              {(selectedTableOrder.customer_name || selectedTableOrder.customer_phone) && (
+                <div className="p-3 bg-muted/50 rounded-lg space-y-1">
+                  {selectedTableOrder.customer_name && (
+                    <div className="flex items-center gap-2">
+                      <User className="w-4 h-4 text-muted-foreground" />
+                      <span className="font-medium">{selectedTableOrder.customer_name}</span>
+                    </div>
+                  )}
+                  {selectedTableOrder.customer_phone && (
+                    <div className="flex items-center gap-2">
+                      <Phone className="w-4 h-4 text-muted-foreground" />
+                      <span>{selectedTableOrder.customer_phone}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Status */}
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Status</span>
+                <Badge className={getStatusColor(selectedTableOrder.status)}>
+                  {getStatusLabel(selectedTableOrder.status)}
+                </Badge>
+              </div>
+
+              {/* Items */}
+              <div className="space-y-2">
+                <h4 className="font-medium">Itens do Pedido</h4>
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {selectedTableOrder.items.map((item, idx) => (
+                    <div key={idx} className="flex justify-between items-center p-2 bg-muted/30 rounded">
+                      <div>
+                        <p className="font-medium">{item.product_name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {item.quantity}x {formatCurrency(item.unit_price)}
+                        </p>
+                      </div>
+                      <span className="font-bold">{formatCurrency(item.total_price)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Total */}
+              <div className="border-t pt-3 flex justify-between items-center">
+                <span className="font-bold text-lg">Total</span>
+                <span className="text-xl font-bold text-primary">{formatCurrency(selectedTableOrder.total)}</span>
+              </div>
+
+              {/* Time */}
+              <div className="text-sm text-muted-foreground text-center">
+                Pedido aberto em {format(new Date(selectedTableOrder.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowTableOrderModal(false)}>
+              Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Close Table Modal */}
+      <Dialog open={showCloseTableModal} onOpenChange={setShowCloseTableModal}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Fechar Mesa {selectedTableOrder?.table_number}</DialogTitle>
+          </DialogHeader>
+          {selectedTableOrder && (
+            <div className="space-y-4">
+              {/* Order Summary */}
+              <div className="p-4 bg-muted/50 rounded-lg space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Cliente</span>
+                  <span className="font-medium">{selectedTableOrder.customer_name || 'Não informado'}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Itens</span>
+                  <span>{selectedTableOrder.items.reduce((acc, item) => acc + item.quantity, 0)}</span>
+                </div>
+                <div className="border-t pt-2 flex justify-between">
+                  <span className="font-bold">Total</span>
+                  <span className="text-xl font-bold text-primary">{formatCurrency(selectedTableOrder.total)}</span>
+                </div>
+              </div>
+
+              {/* Payment Method */}
+              <div>
+                <Label className="mb-2 block">Forma de Pagamento</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {paymentMethods.map((method) => {
+                    const IconComponent = method.icon;
+                    return (
+                      <Button
+                        key={method.value}
+                        variant={tablePaymentMethod === method.value ? "default" : "outline"}
+                        className="h-16 flex flex-col gap-1"
+                        onClick={() => setTablePaymentMethod(method.value)}
+                      >
+                        <IconComponent className="w-5 h-5" />
+                        <span className="text-xs">{method.label}</span>
+                      </Button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Cash Change Calculator */}
+              {tablePaymentMethod === 'cash' && (
+                <div className="space-y-3 p-4 rounded-lg border bg-muted/30">
+                  <div>
+                    <Label>Valor Recebido (R$)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={tableCashReceived}
+                      onChange={(e) => setTableCashReceived(e.target.value)}
+                      placeholder="Valor recebido do cliente"
+                    />
+                  </div>
+                  <div className="flex justify-between font-bold text-lg">
+                    <span>Total:</span>
+                    <span>{formatCurrency(selectedTableOrder.total)}</span>
+                  </div>
+                  {tableCashReceived && (
+                    <div className={`p-3 rounded-lg ${tableChange >= 0 ? 'bg-green-500/10 border border-green-500/30' : 'bg-destructive/10 border border-destructive/30'}`}>
+                      <p className="text-sm text-muted-foreground">Troco a devolver</p>
+                      <p className={`text-2xl font-bold ${tableChange >= 0 ? 'text-green-600' : 'text-destructive'}`}>
+                        {formatCurrency(tableChange)}
+                      </p>
+                      {tableChange < 0 && (
+                        <p className="text-xs text-destructive mt-1">Valor insuficiente!</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowCloseTableModal(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={closeTableOrder}
+              disabled={tablePaymentMethod === 'cash' && tableCashReceived && tableChange < 0}
+            >
+              <CheckCircle className="w-4 h-4 mr-2" />
+              Confirmar Pagamento
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
