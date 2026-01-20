@@ -71,6 +71,7 @@ interface Order {
   customer_phone: string | null;
   payment_method: string | null;
   created_at: string;
+  table_id: string | null;
   order_items?: OrderItem[];
 }
 
@@ -232,6 +233,21 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
     if (error) {
       toast({ variant: "destructive", title: "Erro ao atualizar pedido", description: error.message });
     } else {
+      // Se o pedido for finalizado e for de mesa, liberar a mesa automaticamente
+      if (newStatus === 'delivered') {
+        const order = orders.find(o => o.id === orderId);
+        if (order && !isCashMovement(order) && order.order_type === 'table' && order.table_id) {
+          await supabase
+            .from('tables')
+            .update({ 
+              status: 'available', 
+              current_order_id: null,
+              closed_at: new Date().toISOString()
+            })
+            .eq('id', order.table_id);
+        }
+      }
+      
       toast({ title: "Status atualizado com sucesso!" });
       fetchOrders();
       if (selectedOrder?.id === orderId) {
