@@ -536,6 +536,30 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
     return { sales, deposits, withdrawals, expenses, cashInRegister };
   };
 
+  // Calcular totais por forma de pagamento para o fechamento
+  const calculatePaymentMethodTotals = () => {
+    const movementsToCalculate = currentRegister ? movements : filteredMovements;
+    const salesMovements = movementsToCalculate.filter(m => m.type === 'sale');
+    
+    const byPaymentMethod = {
+      cash: salesMovements.filter(m => m.payment_method === 'cash').reduce((sum, m) => sum + Number(m.amount), 0),
+      credit: salesMovements.filter(m => m.payment_method === 'credit').reduce((sum, m) => sum + Number(m.amount), 0),
+      debit: salesMovements.filter(m => m.payment_method === 'debit').reduce((sum, m) => sum + Number(m.amount), 0),
+      pix: salesMovements.filter(m => m.payment_method === 'pix').reduce((sum, m) => sum + Number(m.amount), 0),
+    };
+
+    const countByPaymentMethod = {
+      cash: salesMovements.filter(m => m.payment_method === 'cash').length,
+      credit: salesMovements.filter(m => m.payment_method === 'credit').length,
+      debit: salesMovements.filter(m => m.payment_method === 'debit').length,
+      pix: salesMovements.filter(m => m.payment_method === 'pix').length,
+    };
+
+    return { byPaymentMethod, countByPaymentMethod, totalSales: salesMovements.length };
+  };
+
+  const paymentTotals = calculatePaymentMethodTotals();
+
   const totals = calculateTotals();
 
   const filteredProducts = products.filter(p => 
@@ -899,17 +923,82 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
                     Fechar Caixa
                   </Button>
                 </DialogTrigger>
-                <DialogContent>
+                <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle>Fechar Caixa</DialogTitle>
                   </DialogHeader>
                   <form onSubmit={closeCashRegister} className="space-y-4">
-                    <div className="p-4 rounded-lg bg-muted/30">
-                      <p className="text-sm text-muted-foreground">Valor esperado em caixa</p>
-                      <p className="text-2xl font-bold">R$ {totals.cashInRegister.toFixed(2)}</p>
+                    {/* Resumo por Forma de Pagamento */}
+                    <div className="p-4 rounded-lg bg-muted/30 space-y-3">
+                      <h4 className="font-semibold text-sm flex items-center gap-2">
+                        <CreditCard className="w-4 h-4" />
+                        Resumo de Vendas por Forma de Pagamento
+                      </h4>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div className="flex items-center justify-between p-2 rounded bg-background">
+                          <div className="flex items-center gap-2">
+                            <Banknote className="w-4 h-4 text-green-600" />
+                            <span>Dinheiro</span>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-bold">{formatCurrency(paymentTotals.byPaymentMethod.cash)}</p>
+                            <p className="text-xs text-muted-foreground">{paymentTotals.countByPaymentMethod.cash} vendas</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between p-2 rounded bg-background">
+                          <div className="flex items-center gap-2">
+                            <CreditCard className="w-4 h-4 text-blue-600" />
+                            <span>Crédito</span>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-bold">{formatCurrency(paymentTotals.byPaymentMethod.credit)}</p>
+                            <p className="text-xs text-muted-foreground">{paymentTotals.countByPaymentMethod.credit} vendas</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between p-2 rounded bg-background">
+                          <div className="flex items-center gap-2">
+                            <CreditCard className="w-4 h-4 text-purple-600" />
+                            <span>Débito</span>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-bold">{formatCurrency(paymentTotals.byPaymentMethod.debit)}</p>
+                            <p className="text-xs text-muted-foreground">{paymentTotals.countByPaymentMethod.debit} vendas</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between p-2 rounded bg-background">
+                          <div className="flex items-center gap-2">
+                            <Smartphone className="w-4 h-4 text-teal-600" />
+                            <span>PIX</span>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-bold">{formatCurrency(paymentTotals.byPaymentMethod.pix)}</p>
+                            <p className="text-xs text-muted-foreground">{paymentTotals.countByPaymentMethod.pix} vendas</p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="pt-2 border-t flex justify-between items-center">
+                        <span className="font-semibold">Total de Vendas</span>
+                        <div className="text-right">
+                          <p className="font-bold text-lg text-primary">{formatCurrency(totals.sales)}</p>
+                          <p className="text-xs text-muted-foreground">{paymentTotals.totalSales} vendas</p>
+                        </div>
+                      </div>
                     </div>
+
+                    {/* Valor esperado em caixa (apenas dinheiro) */}
+                    <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Banknote className="w-4 h-4 text-green-600" />
+                        <p className="text-sm text-muted-foreground">Valor esperado em Dinheiro (para conferência)</p>
+                      </div>
+                      <p className="text-2xl font-bold text-green-600">{formatCurrency(totals.cashInRegister)}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Abertura ({formatCurrency(currentRegister?.opening_amount || 0)}) + Vendas em dinheiro - Sangrias
+                      </p>
+                    </div>
+
                     <div>
-                      <Label htmlFor="closing_amount">Valor Contado (R$)</Label>
+                      <Label htmlFor="closing_amount">Valor Contado em Dinheiro (R$)</Label>
                       <Input
                         id="closing_amount"
                         type="number"
