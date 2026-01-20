@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,7 +19,10 @@ import {
   Percent,
   DollarSign,
   Loader2,
-  Wallet
+  Wallet,
+  Upload,
+  X,
+  Image as ImageIcon
 } from "lucide-react";
 
 interface PaymentMethod {
@@ -52,6 +55,8 @@ const CommercePaymentConfig = ({ commerceId }: CommercePaymentConfigProps) => {
   const [saving, setSaving] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editingMethod, setEditingMethod] = useState<PaymentMethod | null>(null);
+  const [uploadingQrCode, setUploadingQrCode] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -450,12 +455,80 @@ const CommercePaymentConfig = ({ commerceId }: CommercePaymentConfigProps) => {
                   />
                 </div>
                 <div>
-                  <Label>URL do QR Code (opcional)</Label>
-                  <Input
-                    value={formData.pix_qr_code_url}
-                    onChange={(e) => setFormData({ ...formData, pix_qr_code_url: e.target.value })}
-                    placeholder="https://..."
+                  <Label>QR Code PIX (opcional)</Label>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    accept="image/*"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+
+                      if (file.size > 5 * 1024 * 1024) {
+                        toast.error('Imagem deve ter no máximo 5MB');
+                        return;
+                      }
+
+                      setUploadingQrCode(true);
+                      try {
+                        const fileExt = file.name.split('.').pop();
+                        const fileName = `${commerceId}/pix-qrcode-${Date.now()}.${fileExt}`;
+
+                        const { error: uploadError } = await supabase.storage
+                          .from('commerce-assets')
+                          .upload(fileName, file, { upsert: true });
+
+                        if (uploadError) throw uploadError;
+
+                        const { data: { publicUrl } } = supabase.storage
+                          .from('commerce-assets')
+                          .getPublicUrl(fileName);
+
+                        setFormData({ ...formData, pix_qr_code_url: publicUrl });
+                        toast.success('QR Code enviado com sucesso');
+                      } catch (error) {
+                        console.error('Error uploading QR code:', error);
+                        toast.error('Erro ao enviar QR Code');
+                      } finally {
+                        setUploadingQrCode(false);
+                      }
+                    }}
                   />
+                  
+                  {formData.pix_qr_code_url ? (
+                    <div className="mt-2 relative inline-block">
+                      <img 
+                        src={formData.pix_qr_code_url} 
+                        alt="QR Code PIX" 
+                        className="w-32 h-32 object-contain border rounded-lg"
+                      />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="icon"
+                        className="absolute -top-2 -right-2 w-6 h-6"
+                        onClick={() => setFormData({ ...formData, pix_qr_code_url: '' })}
+                      >
+                        <X className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full mt-2 gap-2"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploadingQrCode}
+                    >
+                      {uploadingQrCode ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Upload className="w-4 h-4" />
+                      )}
+                      {uploadingQrCode ? 'Enviando...' : 'Enviar imagem do QR Code'}
+                    </Button>
+                  )}
                 </div>
               </>
             )}
