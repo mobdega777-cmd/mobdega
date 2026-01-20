@@ -10,6 +10,7 @@ import NotFound from "./pages/NotFound";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import CommerceDashboard from "./pages/commerce/CommerceDashboard";
 import UserDashboard from "./pages/user/UserDashboard";
+import Ranking from "./pages/Ranking";
 import ProtectedAdminRoute from "./components/auth/ProtectedAdminRoute";
 import ProtectedCommerceRoute from "./components/auth/ProtectedCommerceRoute";
 import ProtectedUserRoute from "./components/auth/ProtectedUserRoute";
@@ -35,6 +36,7 @@ function App() {
             <BrowserRouter>
               <Routes>
                 <Route path="/" element={<Index />} />
+                <Route path="/ranking" element={<Ranking />} />
                 <Route 
                   path="/admin" 
                   element={

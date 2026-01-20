@@ -46,6 +46,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { formatCurrency, formatPercentage } from "@/lib/formatCurrency";
 
 interface CommerceProductsProps {
   commerceId: string;
@@ -467,7 +468,7 @@ const CommerceProducts = ({ commerceId }: CommerceProductsProps) => {
                         <p className={`font-medium ${
                           margin > 0 ? 'text-green-500' : margin < 0 ? 'text-red-500' : 'text-muted-foreground'
                         }`}>
-                          R$ {((parseFloat(formData.sale_price) || 0) - (parseFloat(formData.cost) || 0)).toFixed(2)}
+                          {formatCurrency((parseFloat(formData.sale_price) || 0) - (parseFloat(formData.cost) || 0))}
                         </p>
                       </div>
                     </div>
@@ -624,7 +625,7 @@ const CommerceProducts = ({ commerceId }: CommerceProductsProps) => {
               <div>
                 <p className="text-xs text-muted-foreground">Total em Estoque (Custo)</p>
                 <p className="text-xl font-bold text-blue-500">
-                  R$ {stats.totalCostValue.toFixed(2)}
+                  {formatCurrency(stats.totalCostValue)}
                 </p>
               </div>
               <div className="p-2 rounded-lg bg-blue-500/10">
@@ -640,7 +641,7 @@ const CommerceProducts = ({ commerceId }: CommerceProductsProps) => {
               <div>
                 <p className="text-xs text-muted-foreground">Total em Estoque (Venda)</p>
                 <p className="text-xl font-bold text-green-500">
-                  R$ {stats.totalSaleValue.toFixed(2)}
+                  {formatCurrency(stats.totalSaleValue)}
                 </p>
               </div>
               <div className="p-2 rounded-lg bg-green-500/10">
@@ -656,7 +657,7 @@ const CommerceProducts = ({ commerceId }: CommerceProductsProps) => {
               <div>
                 <p className="text-xs text-muted-foreground">Lucro Potencial</p>
                 <p className="text-xl font-bold text-purple-500">
-                  R$ {stats.potentialProfit.toFixed(2)}
+                  {formatCurrency(stats.potentialProfit)}
                 </p>
               </div>
               <div className="p-2 rounded-lg bg-purple-500/10">
@@ -810,11 +811,11 @@ const CommerceProducts = ({ commerceId }: CommerceProductsProps) => {
                       </TableCell>
                       <TableCell>{product.category?.name || "-"}</TableCell>
                       <TableCell className="text-muted-foreground">
-                        R$ {product.price.toFixed(2)}
+                        {formatCurrency(product.price)}
                       </TableCell>
                       <TableCell className="font-medium">
                         {product.promotional_price 
-                          ? `R$ ${product.promotional_price.toFixed(2)}`
+                          ? formatCurrency(product.promotional_price)
                           : "-"
                         }
                       </TableCell>
@@ -831,7 +832,7 @@ const CommerceProducts = ({ commerceId }: CommerceProductsProps) => {
                       </TableCell>
                       <TableCell>{product.stock ?? 0}</TableCell>
                       <TableCell className="font-medium">
-                        R$ {stockValue.toFixed(2)}
+                        {formatCurrency(stockValue)}
                       </TableCell>
                       <TableCell>
                         <span className={`px-2 py-1 rounded-full text-xs ${

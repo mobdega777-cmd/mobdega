@@ -43,6 +43,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import DateFilter from "./DateFilter";
 import { startOfDay, endOfDay, subDays } from "date-fns";
+import { formatCurrency } from "@/lib/formatCurrency";
 
 interface CommerceOrdersProps {
   commerceId: string;
@@ -409,7 +410,7 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
                           </div>
                         </TableCell>
                         <TableCell className="font-medium">
-                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(isMovement ? order.amount : order.total))}
+                          {formatCurrency(Number(isMovement ? order.amount : order.total))}
                         </TableCell>
                         <TableCell>
                           <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${status.color}`}>
