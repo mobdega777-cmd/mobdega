@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { 
   LayoutDashboard, 
   Package, 
@@ -86,7 +86,7 @@ interface PlanMenuConfig {
 
 const CommerceDashboard = () => {
   const [activeSection, setActiveSection] = useState<CommerceSection>("overview");
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [commerce, setCommerce] = useState<Commerce | null>(null);
   const [planConfig, setPlanConfig] = useState<PlanMenuConfig | null>(null);
   const [loading, setLoading] = useState(true);
@@ -210,6 +210,13 @@ const CommerceDashboard = () => {
     navigate("/");
   };
 
+  const handleMenuClick = (sectionId: CommerceSection, isDisabled: boolean) => {
+    if (!isDisabled) {
+      setActiveSection(sectionId);
+      setSidebarOpen(false); // Close sidebar on mobile after selection
+    }
+  };
+
   // Filter menu items based on plan configuration
   const filteredMenuItems = menuItems.filter(item => {
     if (!planConfig) return true; // Show all if no plan config
@@ -253,10 +260,10 @@ const CommerceDashboard = () => {
   const renderContent = () => {
     if (!commerce) {
       return (
-        <div className="flex flex-col items-center justify-center h-[60vh] text-center">
+        <div className="flex flex-col items-center justify-center h-[60vh] text-center px-4">
           <Store className="w-16 h-16 text-muted-foreground mb-4" />
-          <h2 className="text-2xl font-bold mb-2">Nenhum comércio encontrado</h2>
-          <p className="text-muted-foreground mb-4">
+          <h2 className="text-xl md:text-2xl font-bold mb-2">Nenhum comércio encontrado</h2>
+          <p className="text-muted-foreground mb-4 text-sm md:text-base">
             Você ainda não possui um comércio cadastrado.
           </p>
           <Button onClick={() => navigate("/")}>
@@ -274,20 +281,20 @@ const CommerceDashboard = () => {
       const StatusIcon = statusInfo.icon;
       
       return (
-        <div className="flex flex-col items-center justify-center h-[60vh] text-center">
-          <Card className={`max-w-lg ${statusInfo.bgColor} ${statusInfo.borderColor} border-2`}>
-            <CardContent className="p-8">
-              <StatusIcon className={`w-16 h-16 mx-auto mb-4 ${statusInfo.color}`} />
-              <h2 className={`text-2xl font-bold mb-2 ${statusInfo.color}`}>
+        <div className="flex flex-col items-center justify-center h-[60vh] text-center px-4">
+          <Card className={`max-w-lg w-full ${statusInfo.bgColor} ${statusInfo.borderColor} border-2`}>
+            <CardContent className="p-6 md:p-8">
+              <StatusIcon className={`w-12 h-12 md:w-16 md:h-16 mx-auto mb-4 ${statusInfo.color}`} />
+              <h2 className={`text-xl md:text-2xl font-bold mb-2 ${statusInfo.color}`}>
                 {statusInfo.title}
               </h2>
-              <p className="text-muted-foreground">
+              <p className="text-muted-foreground text-sm md:text-base">
                 {statusInfo.description}
               </p>
               
               <div className="mt-6 p-4 bg-muted/50 rounded-lg">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Lock className="w-4 h-4" />
+                  <Lock className="w-4 h-4 flex-shrink-0" />
                   <span>Todas as funcionalidades estão temporariamente bloqueadas</span>
                 </div>
               </div>
@@ -334,16 +341,65 @@ const CommerceDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background flex">
-      {/* Sidebar */}
-      <motion.aside
-        initial={false}
-        animate={{ width: sidebarOpen ? 280 : 80 }}
-        className="gradient-dark border-r border-border flex flex-col h-screen sticky top-0"
-      >
-        {/* Logo */}
-        <div className="p-4 border-b border-border/50 flex items-center justify-between">
-          {sidebarOpen && (
+    <div className="min-h-screen bg-background flex flex-col md:flex-row">
+      {/* Mobile Header */}
+      <header className="md:hidden gradient-dark border-b border-border p-4 flex items-center justify-between sticky top-0 z-50">
+        <div className="flex items-center gap-3">
+          <img 
+            src={commerce?.logo_url || logoMobdega} 
+            alt={commerce?.fantasy_name || "Mobdega"} 
+            className="h-10 w-10 rounded-lg object-cover border border-border/50" 
+          />
+          <div className="min-w-0">
+            <h1 className="font-display text-sm font-bold text-primary-foreground truncate max-w-[150px]">
+              {commerce?.fantasy_name || "Meu Comércio"}
+            </h1>
+            <p className="text-[10px] text-primary-foreground/60">Painel</p>
+          </div>
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
+        >
+          <Menu className="w-6 h-6" />
+        </Button>
+      </header>
+
+      {/* Mobile Overlay */}
+      <AnimatePresence>
+        {sidebarOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-40 md:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Sidebar - Drawer on mobile, fixed on desktop */}
+      <AnimatePresence mode="wait">
+        <motion.aside
+          initial={{ x: -280 }}
+          animate={{ x: sidebarOpen ? 0 : (typeof window !== 'undefined' && window.innerWidth >= 768 ? 0 : -280) }}
+          transition={{ type: "spring", damping: 25, stiffness: 200 }}
+          className={`
+            fixed md:sticky top-0 left-0 z-50 md:z-auto
+            w-[280px] h-screen
+            gradient-dark border-r border-border flex flex-col
+            ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+          `}
+          style={{ 
+            transform: typeof window !== 'undefined' && window.innerWidth >= 768 
+              ? 'translateX(0)' 
+              : sidebarOpen ? 'translateX(0)' : 'translateX(-100%)'
+          }}
+        >
+          {/* Logo - Desktop only */}
+          <div className="p-4 border-b border-border/50 hidden md:flex items-center justify-between">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -361,78 +417,89 @@ const CommerceDashboard = () => {
                 <p className="text-[10px] text-primary-foreground/60">Painel</p>
               </div>
             </motion.div>
-          )}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10 flex-shrink-0"
-          >
-            {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          </Button>
-        </div>
+          </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-          {filteredMenuItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = activeSection === item.id;
-            const isDisabled = isBlocked && item.id !== "overview";
+          {/* Mobile close button */}
+          <div className="p-4 border-b border-border/50 flex md:hidden items-center justify-between">
+            <div className="flex items-center gap-3">
+              <img 
+                src={commerce?.logo_url || logoMobdega} 
+                alt={commerce?.fantasy_name || "Mobdega"} 
+                className="h-10 w-10 rounded-lg object-cover border border-border/50" 
+              />
+              <div className="min-w-0">
+                <h1 className="font-display text-sm font-bold text-primary-foreground truncate">
+                  {commerce?.fantasy_name || "Meu Comércio"}
+                </h1>
+                <p className="text-[10px] text-primary-foreground/60">Painel</p>
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSidebarOpen(false)}
+              className="text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
+            >
+              <X className="w-5 h-5" />
+            </Button>
+          </div>
 
-            return (
-              <button
-                key={item.id}
-                onClick={() => !isDisabled && setActiveSection(item.id)}
-                disabled={isDisabled}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all group ${
-                  isDisabled
-                    ? "opacity-40 cursor-not-allowed text-primary-foreground/40"
-                    : isActive
-                      ? "gradient-primary text-primary-foreground shadow-glow-primary"
-                      : "text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
-                }`}
-              >
-                <Icon className={`w-5 h-5 ${!sidebarOpen && 'mx-auto'}`} />
-                {sidebarOpen && (
-                  <>
-                    <span className="flex-1 text-left font-medium">{item.label}</span>
-                    {isDisabled && <Lock className="w-4 h-4 text-primary-foreground/40" />}
-                    {!isDisabled && item.showPendingBadge && pendingOrdersCount > 0 && (
-                      <Badge variant="destructive" className="text-xs px-2 py-0.5">
-                        {pendingOrdersCount}
-                      </Badge>
-                    )}
-                    {!isDisabled && item.showBadge && pendingInvoicesCount > 0 && (
-                      <Badge variant="destructive" className="text-xs px-2 py-0.5">
-                        {pendingInvoicesCount}
-                      </Badge>
-                    )}
-                    {!isDisabled && isActive && <ChevronRight className="w-4 h-4" />}
-                  </>
-                )}
-              </button>
-            );
-          })}
-        </nav>
+          {/* Navigation */}
+          <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+            {filteredMenuItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeSection === item.id;
+              const isDisabled = isBlocked && item.id !== "overview";
 
-        {/* Logout */}
-        <div className="p-4 border-t border-border/50">
-          <Button
-            variant="ghost"
-            onClick={handleLogout}
-            className={`w-full text-red-400 hover:text-red-300 hover:bg-red-500/10 ${
-              sidebarOpen ? "justify-start" : "justify-center"
-            }`}
-          >
-            <LogOut className="w-5 h-5" />
-            {sidebarOpen && <span className="ml-3">Sair</span>}
-          </Button>
-        </div>
-      </motion.aside>
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => handleMenuClick(item.id, isDisabled)}
+                  disabled={isDisabled}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all group ${
+                    isDisabled
+                      ? "opacity-40 cursor-not-allowed text-primary-foreground/40"
+                      : isActive
+                        ? "gradient-primary text-primary-foreground shadow-glow-primary"
+                        : "text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
+                  }`}
+                >
+                  <Icon className="w-5 h-5 flex-shrink-0" />
+                  <span className="flex-1 text-left font-medium text-sm">{item.label}</span>
+                  {isDisabled && <Lock className="w-4 h-4 text-primary-foreground/40" />}
+                  {!isDisabled && item.showPendingBadge && pendingOrdersCount > 0 && (
+                    <Badge variant="destructive" className="text-xs px-2 py-0.5">
+                      {pendingOrdersCount}
+                    </Badge>
+                  )}
+                  {!isDisabled && item.showBadge && pendingInvoicesCount > 0 && (
+                    <Badge variant="destructive" className="text-xs px-2 py-0.5">
+                      {pendingInvoicesCount}
+                    </Badge>
+                  )}
+                  {!isDisabled && isActive && <ChevronRight className="w-4 h-4" />}
+                </button>
+              );
+            })}
+          </nav>
+
+          {/* Logout */}
+          <div className="p-4 border-t border-border/50">
+            <Button
+              variant="ghost"
+              onClick={handleLogout}
+              className="w-full justify-start text-red-400 hover:text-red-300 hover:bg-red-500/10"
+            >
+              <LogOut className="w-5 h-5" />
+              <span className="ml-3">Sair</span>
+            </Button>
+          </div>
+        </motion.aside>
+      </AnimatePresence>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-auto">
-        <div className="p-6 lg:p-8">
+      <main className="flex-1 overflow-auto min-w-0">
+        <div className="p-4 md:p-6 lg:p-8">
           <motion.div
             key={activeSection}
             initial={{ opacity: 0, y: 10 }}
