@@ -137,32 +137,32 @@ const CommerceOverview = ({ commerce }: CommerceOverviewProps) => {
   if (loading) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div></div>;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap justify-between items-start gap-4">
+    <div className="space-y-4 md:space-y-6">
+      <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Bem-vindo, {commerce.fantasy_name}!</h1>
-          <p className="text-muted-foreground">Aqui está o resumo do seu comércio</p>
+          <h1 className="text-xl md:text-2xl lg:text-3xl font-bold">Bem-vindo, {commerce.fantasy_name}!</h1>
+          <p className="text-muted-foreground text-sm md:text-base">Aqui está o resumo do seu comércio</p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-4 py-2 rounded-lg border bg-card">
-            <Store className={`w-5 h-5 ${isOpen ? 'text-green-500' : 'text-red-500'}`} />
-            <span className="text-sm font-medium">{isOpen ? 'Aberto' : 'Fechado'}</span>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg border bg-card">
+            <Store className={`w-4 h-4 md:w-5 md:h-5 ${isOpen ? 'text-green-500' : 'text-red-500'}`} />
+            <span className="text-xs md:text-sm font-medium">{isOpen ? 'Aberto' : 'Fechado'}</span>
             <Switch checked={isOpen} onCheckedChange={handleStoreStatusChange} disabled={savingStatus} />
           </div>
           <Dialog open={hoursDialogOpen} onOpenChange={setHoursDialogOpen}>
             <DialogTrigger asChild>
-              <Button variant="outline" size="sm"><Settings className="w-4 h-4 mr-2" />Horários</Button>
+              <Button variant="outline" size="sm" className="text-xs md:text-sm"><Settings className="w-4 h-4 mr-1 md:mr-2" />Horários</Button>
             </DialogTrigger>
-            <DialogContent className="max-w-md">
+            <DialogContent className="max-w-[95vw] md:max-w-md max-h-[90vh] overflow-y-auto">
               <DialogHeader><DialogTitle>Horário de Funcionamento</DialogTitle></DialogHeader>
-              <div className="space-y-3 max-h-80 overflow-y-auto">
+              <div className="space-y-3 max-h-60 md:max-h-80 overflow-y-auto">
                 {Object.entries(DAY_NAMES).map(([key, name]) => (
-                  <div key={key} className="flex items-center gap-3 p-2 rounded-lg bg-muted/30">
+                  <div key={key} className="flex items-center gap-2 md:gap-3 p-2 rounded-lg bg-muted/30">
                     <Switch checked={openingHours[key]?.enabled} onCheckedChange={(v) => handleHoursChange(key, 'enabled', v)} />
-                    <span className="w-20 text-sm font-medium">{name}</span>
-                    <Input type="time" value={openingHours[key]?.open || '08:00'} onChange={(e) => handleHoursChange(key, 'open', e.target.value)} className="w-24 h-8" disabled={!openingHours[key]?.enabled} />
-                    <span className="text-muted-foreground">-</span>
-                    <Input type="time" value={openingHours[key]?.close || '22:00'} onChange={(e) => handleHoursChange(key, 'close', e.target.value)} className="w-24 h-8" disabled={!openingHours[key]?.enabled} />
+                    <span className="w-16 md:w-20 text-xs md:text-sm font-medium">{name}</span>
+                    <Input type="time" value={openingHours[key]?.open || '08:00'} onChange={(e) => handleHoursChange(key, 'open', e.target.value)} className="w-20 md:w-24 h-8 text-xs md:text-sm" disabled={!openingHours[key]?.enabled} />
+                    <span className="text-muted-foreground text-xs">-</span>
+                    <Input type="time" value={openingHours[key]?.close || '22:00'} onChange={(e) => handleHoursChange(key, 'close', e.target.value)} className="w-20 md:w-24 h-8 text-xs md:text-sm" disabled={!openingHours[key]?.enabled} />
                   </div>
                 ))}
               </div>
@@ -182,21 +182,21 @@ const CommerceOverview = ({ commerce }: CommerceOverviewProps) => {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
         {statCards.map((stat) => { const Icon = stat.icon; return (
-          <Card key={stat.title} className="border-border/50"><CardContent className="p-6"><div className="flex items-center justify-between"><div><p className="text-sm text-muted-foreground">{stat.title}</p><p className="text-2xl font-bold mt-1">{stat.value}</p></div><div className={`p-3 rounded-xl ${stat.bgColor}`}><Icon className={`w-6 h-6 ${stat.color}`} /></div></div></CardContent></Card>
+          <Card key={stat.title} className="border-border/50"><CardContent className="p-3 md:p-6"><div className="flex items-center justify-between"><div className="min-w-0"><p className="text-xs md:text-sm text-muted-foreground truncate">{stat.title}</p><p className="text-lg md:text-2xl font-bold mt-1">{stat.value}</p></div><div className={`p-2 md:p-3 rounded-xl ${stat.bgColor}`}><Icon className={`w-4 h-4 md:w-6 md:h-6 ${stat.color}`} /></div></div></CardContent></Card>
         ); })}
       </div>
 
       <Card>
-        <CardHeader><CardTitle className="flex items-center gap-2"><ShoppingCart className="w-5 h-5" />Pedidos Recentes</CardTitle></CardHeader>
-        <CardContent>
-          {recentOrders.length === 0 ? <p className="text-center text-muted-foreground py-8">Nenhum pedido recebido ainda</p> : (
-            <div className="space-y-3">
+        <CardHeader className="p-4 md:p-6"><CardTitle className="flex items-center gap-2 text-base md:text-lg"><ShoppingCart className="w-4 h-4 md:w-5 md:h-5" />Pedidos Recentes</CardTitle></CardHeader>
+        <CardContent className="p-3 md:p-6 pt-0 md:pt-0">
+          {recentOrders.length === 0 ? <p className="text-center text-muted-foreground py-8 text-sm">Nenhum pedido recebido ainda</p> : (
+            <div className="space-y-2 md:space-y-3">
               {recentOrders.map((order) => { const status = getStatusBadge(order.status); return (
-                <div key={order.id} className="flex items-center justify-between p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
-                  <div className="flex items-center gap-4"><div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center"><ShoppingCart className="w-5 h-5 text-primary" /></div><div><p className="font-medium">Pedido #{order.id.slice(0, 8)}</p><p className="text-sm text-muted-foreground">{new Date(order.created_at).toLocaleString('pt-BR')}</p></div></div>
-                  <div className="flex items-center gap-4"><span className={`px-3 py-1 rounded-full text-xs font-medium ${status.color}`}>{status.label}</span><span className="font-bold">R$ {Number(order.total).toFixed(2)}</span></div>
+                <div key={order.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 md:p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors gap-2 sm:gap-4">
+                  <div className="flex items-center gap-3 md:gap-4"><div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0"><ShoppingCart className="w-4 h-4 md:w-5 md:h-5 text-primary" /></div><div className="min-w-0"><p className="font-medium text-sm md:text-base truncate">Pedido #{order.id.slice(0, 8)}</p><p className="text-xs md:text-sm text-muted-foreground">{new Date(order.created_at).toLocaleString('pt-BR')}</p></div></div>
+                  <div className="flex items-center gap-2 md:gap-4 ml-11 sm:ml-0"><span className={`px-2 md:px-3 py-1 rounded-full text-xs font-medium ${status.color}`}>{status.label}</span><span className="font-bold text-sm md:text-base">R$ {Number(order.total).toFixed(2)}</span></div>
                 </div>
               ); })}
             </div>

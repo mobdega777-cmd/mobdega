@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { 
   LayoutDashboard, 
   Users, 
@@ -63,7 +63,7 @@ const menuItems = [
 
 const AdminDashboard = () => {
   const [activeSection, setActiveSection] = useState<AdminSection>("overview");
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [pendingPaymentConfirmations, setPendingPaymentConfirmations] = useState(0);
   const { signOut } = useAuth();
   const navigate = useNavigate();
@@ -102,6 +102,11 @@ const AdminDashboard = () => {
     navigate("/");
   };
 
+  const handleMenuClick = (sectionId: AdminSection) => {
+    setActiveSection(sectionId);
+    setSidebarOpen(false); // Close sidebar on mobile after selection
+  };
+
   const renderContent = () => {
     switch (activeSection) {
       case "overview":
@@ -130,37 +135,92 @@ const AdminDashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex">
-      {/* Sidebar */}
+    <div className="min-h-screen bg-background flex flex-col md:flex-row">
+      {/* Mobile Header */}
+      <header className="md:hidden gradient-dark border-b border-border p-4 flex items-center justify-between sticky top-0 z-50">
+        <div className="flex items-center gap-3">
+          <img src={logoMobdega} alt="Mobdega" className="h-8" />
+          <div>
+            <h1 className="font-display text-sm font-bold text-primary-foreground">
+              Admin
+            </h1>
+            <p className="text-[10px] text-primary-foreground/60">Master Panel</p>
+          </div>
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
+        >
+          <Menu className="w-6 h-6" />
+        </Button>
+      </header>
+
+      {/* Mobile Overlay */}
+      <AnimatePresence>
+        {sidebarOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-40 md:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Sidebar - Drawer on mobile, fixed on desktop */}
       <motion.aside
         initial={false}
-        animate={{ width: sidebarOpen ? 280 : 80 }}
-        className="gradient-dark border-r border-border flex flex-col h-screen sticky top-0"
+        animate={{ 
+          x: typeof window !== 'undefined' && window.innerWidth < 768 
+            ? (sidebarOpen ? 0 : -280) 
+            : 0 
+        }}
+        transition={{ type: "spring", damping: 25, stiffness: 200 }}
+        className={`
+          fixed md:sticky top-0 left-0 z-50 md:z-auto
+          w-[280px] h-screen
+          gradient-dark border-r border-border flex flex-col
+          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+        `}
       >
-        {/* Logo */}
-        <div className="p-4 border-b border-border/50 flex items-center justify-between">
-          {sidebarOpen && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="flex items-center gap-3"
-            >
-              <img src={logoMobdega} alt="Mobdega" className="h-10" />
-              <div>
-                <h1 className="font-display text-lg font-bold text-primary-foreground">
-                  Admin
-                </h1>
-                <p className="text-xs text-primary-foreground/60">Master Panel</p>
-              </div>
-            </motion.div>
-          )}
+        {/* Logo - Desktop only */}
+        <div className="p-4 border-b border-border/50 hidden md:flex items-center justify-between">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="flex items-center gap-3"
+          >
+            <img src={logoMobdega} alt="Mobdega" className="h-10" />
+            <div>
+              <h1 className="font-display text-lg font-bold text-primary-foreground">
+                Admin
+              </h1>
+              <p className="text-xs text-primary-foreground/60">Master Panel</p>
+            </div>
+          </motion.div>
+        </div>
+
+        {/* Mobile close button */}
+        <div className="p-4 border-b border-border/50 flex md:hidden items-center justify-between">
+          <div className="flex items-center gap-3">
+            <img src={logoMobdega} alt="Mobdega" className="h-8" />
+            <div>
+              <h1 className="font-display text-sm font-bold text-primary-foreground">
+                Admin
+              </h1>
+              <p className="text-[10px] text-primary-foreground/60">Master Panel</p>
+            </div>
+          </div>
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setSidebarOpen(!sidebarOpen)}
+            onClick={() => setSidebarOpen(false)}
             className="text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
           >
-            {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            <X className="w-5 h-5" />
           </Button>
         </div>
 
@@ -173,25 +233,21 @@ const AdminDashboard = () => {
             return (
               <button
                 key={item.id}
-                onClick={() => setActiveSection(item.id)}
+                onClick={() => handleMenuClick(item.id)}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all group ${
                   isActive
                     ? "gradient-primary text-primary-foreground shadow-glow-primary"
                     : "text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
                 }`}
               >
-                <Icon className={`w-5 h-5 ${!sidebarOpen && 'mx-auto'}`} />
-                {sidebarOpen && (
-                  <>
-                    <span className="flex-1 text-left font-medium">{item.label}</span>
-                    {item.showBadge && pendingPaymentConfirmations > 0 && (
-                      <Badge variant="destructive" className="text-xs px-2 py-0.5">
-                        {pendingPaymentConfirmations}
-                      </Badge>
-                    )}
-                    {isActive && <ChevronRight className="w-4 h-4" />}
-                  </>
+                <Icon className="w-5 h-5 flex-shrink-0" />
+                <span className="flex-1 text-left font-medium text-sm">{item.label}</span>
+                {item.showBadge && pendingPaymentConfirmations > 0 && (
+                  <Badge variant="destructive" className="text-xs px-2 py-0.5">
+                    {pendingPaymentConfirmations}
+                  </Badge>
                 )}
+                {isActive && <ChevronRight className="w-4 h-4" />}
               </button>
             );
           })}
@@ -202,19 +258,17 @@ const AdminDashboard = () => {
           <Button
             variant="ghost"
             onClick={handleLogout}
-            className={`w-full text-red-400 hover:text-red-300 hover:bg-red-500/10 ${
-              sidebarOpen ? "justify-start" : "justify-center"
-            }`}
+            className="w-full justify-start text-red-400 hover:text-red-300 hover:bg-red-500/10"
           >
             <LogOut className="w-5 h-5" />
-            {sidebarOpen && <span className="ml-3">Sair</span>}
+            <span className="ml-3">Sair</span>
           </Button>
         </div>
       </motion.aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-auto">
-        <div className="p-6 lg:p-8">
+      <main className="flex-1 overflow-auto min-w-0">
+        <div className="p-4 md:p-6 lg:p-8">
           <motion.div
             key={activeSection}
             initial={{ opacity: 0, y: 10 }}
