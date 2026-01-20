@@ -98,6 +98,15 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
   });
   const { toast } = useToast();
 
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(value);
+  };
+
   const handleDateChange = (start: Date, end: Date) => {
     setDateFilter({ start, end });
   };
@@ -274,7 +283,7 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Faturamento do Período</p>
-                <p className="text-2xl font-bold text-green-500">R$ {stats.monthlyRevenue.toFixed(2)}</p>
+                <p className="text-2xl font-bold text-green-500">{formatCurrency(stats.monthlyRevenue)}</p>
                 <p className={`text-xs mt-1 flex items-center gap-1 ${stats.growthRate >= 0 ? 'text-green-600' : 'text-red-500'}`}>
                   {stats.growthRate >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
                   {stats.growthRate.toFixed(1)}% vs mês anterior
@@ -292,7 +301,7 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Lucro Estimado</p>
-                <p className="text-2xl font-bold text-blue-500">R$ {stats.monthlyProfit.toFixed(2)}</p>
+                <p className="text-2xl font-bold text-blue-500">{formatCurrency(stats.monthlyProfit)}</p>
                 <p className="text-xs mt-1 text-muted-foreground">Margem: {stats.profitMargin.toFixed(1)}%</p>
               </div>
               <div className="p-3 rounded-xl bg-blue-500/10">
@@ -307,7 +316,7 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">A Pagar (Pendente)</p>
-                <p className="text-2xl font-bold text-yellow-500">R$ {stats.pendingPayments.toFixed(2)}</p>
+                <p className="text-2xl font-bold text-yellow-500">{formatCurrency(stats.pendingPayments)}</p>
               </div>
               <div className="p-3 rounded-xl bg-yellow-500/10">
                 <ArrowDownCircle className="w-6 h-6 text-yellow-500" />
@@ -321,7 +330,7 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Vencidos</p>
-                <p className="text-2xl font-bold text-red-500">R$ {stats.overduePayments.toFixed(2)}</p>
+                <p className="text-2xl font-bold text-red-500">{formatCurrency(stats.overduePayments)}</p>
               </div>
               <div className="p-3 rounded-xl bg-red-500/10">
                 <TrendingDownIcon className="w-6 h-6 text-red-500" />
@@ -355,7 +364,7 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Ticket Médio</p>
-                <p className="text-lg font-bold">R$ {stats.avgTicket.toFixed(2)}</p>
+                <p className="text-lg font-bold">{formatCurrency(stats.avgTicket)}</p>
               </div>
             </div>
           </CardContent>
@@ -369,7 +378,7 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Projeção Mensal</p>
-                <p className="text-lg font-bold">R$ {stats.projectedRevenue.toFixed(2)}</p>
+                <p className="text-lg font-bold">{formatCurrency(stats.projectedRevenue)}</p>
               </div>
             </div>
           </CardContent>
@@ -406,18 +415,18 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
             <div className="grid grid-cols-2 gap-4">
               <div className="p-4 rounded-lg bg-blue-500/5 border border-blue-500/20">
                 <p className="text-sm text-muted-foreground">Valor de Custo</p>
-                <p className="text-xl font-bold text-blue-500">R$ {stats.stockCostValue.toFixed(2)}</p>
+                <p className="text-xl font-bold text-blue-500">{formatCurrency(stats.stockCostValue)}</p>
               </div>
               <div className="p-4 rounded-lg bg-green-500/5 border border-green-500/20">
                 <p className="text-sm text-muted-foreground">Valor de Venda</p>
-                <p className="text-xl font-bold text-green-500">R$ {stats.stockSaleValue.toFixed(2)}</p>
+                <p className="text-xl font-bold text-green-500">{formatCurrency(stats.stockSaleValue)}</p>
               </div>
             </div>
             <div className="p-4 rounded-lg bg-purple-500/5 border border-purple-500/20">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Lucro Potencial em Estoque</p>
-                  <p className="text-2xl font-bold text-purple-500">R$ {stats.potentialProfit.toFixed(2)}</p>
+                  <p className="text-2xl font-bold text-purple-500">{formatCurrency(stats.potentialProfit)}</p>
                 </div>
                 <div className="p-3 rounded-lg bg-purple-500/10">
                   <BarChart3 className="w-6 h-6 text-purple-500" />
