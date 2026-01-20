@@ -237,6 +237,7 @@ export type Database = {
           plan_id: string | null
           rejection_reason: string | null
           status: Database["public"]["Enums"]["commerce_status"]
+          table_payment_required: boolean
           updated_at: string
           whatsapp: string | null
         }
@@ -265,6 +266,7 @@ export type Database = {
           plan_id?: string | null
           rejection_reason?: string | null
           status?: Database["public"]["Enums"]["commerce_status"]
+          table_payment_required?: boolean
           updated_at?: string
           whatsapp?: string | null
         }
@@ -293,6 +295,7 @@ export type Database = {
           plan_id?: string | null
           rejection_reason?: string | null
           status?: Database["public"]["Enums"]["commerce_status"]
+          table_payment_required?: boolean
           updated_at?: string
           whatsapp?: string | null
         }

@@ -107,14 +107,21 @@ const UserDashboard = () => {
     birthday: "",
   });
 
+  // Initial fetch only once when component mounts
+  const [initialLoadDone, setInitialLoadDone] = useState(false);
+  
   useEffect(() => {
     if (!user) {
       navigate('/');
       return;
     }
     
-    fetchAllData();
-  }, [user, navigate]);
+    // Only fetch data on initial load, not on every tab change
+    if (!initialLoadDone) {
+      fetchAllData();
+      setInitialLoadDone(true);
+    }
+  }, [user, navigate, initialLoadDone]);
 
   const fetchAllData = async () => {
     if (!user) return;
