@@ -28,15 +28,18 @@ import {
   CreditCard,
   Wallet,
   TrendingDown as TrendingDownIcon,
-  Bell
+  Bell,
+  Loader2
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import DateFilter from "./DateFilter";
 import InvoicePaymentModal from "./InvoicePaymentModal";
-import { startOfDay, endOfDay, subDays, startOfMonth } from "date-fns";
+import CommerceExpenses from "./CommerceExpenses";
+import { startOfDay, endOfDay, subDays, startOfMonth, format } from "date-fns";
 import { formatCurrency, formatPercentage } from "@/lib/formatCurrency";
 import HelpTooltip from "@/components/ui/help-tooltip";
+import { generateSalesReportPDF, generateStockReportPDF } from "@/lib/pdfReportGenerator";
 
 interface CommerceFinancialProps {
   commerceId: string;
@@ -71,9 +74,16 @@ interface FinancialStats {
   growthRate: number;
 }
 
+interface Commerce {
+  fantasy_name: string;
+  logo_url: string | null;
+}
+
 const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
+  const [generatingPdf, setGeneratingPdf] = useState<string | null>(null);
+  const [commerce, setCommerce] = useState<Commerce | null>(null);
   const [pendingInvoicesCount, setPendingInvoicesCount] = useState(0);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -81,6 +91,7 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
     start: startOfMonth(new Date()), 
     end: endOfDay(new Date()) 
   });
+  const [operatorFees, setOperatorFees] = useState(0);
   const [stats, setStats] = useState<FinancialStats>({
     monthlyRevenue: 0,
     monthlyCost: 0,
@@ -111,10 +122,21 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
     const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1).toISOString();
     const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0).toISOString();
     
+    // Fetch commerce info
+    const { data: commerceData } = await supabase
+      .from('commerces')
+      .select('fantasy_name, logo_url')
+      .eq('id', commerceId)
+      .single();
+    
+    if (commerceData) {
+      setCommerce(commerceData);
+    }
+    
     // Fetch orders for revenue (filtered by date)
     const { data: orders } = await supabase
       .from('orders')
-      .select('total, status, created_at')
+      .select('total, status, created_at, payment_method')
       .eq('commerce_id', commerceId)
       .eq('status', 'delivered')
       .gte('created_at', dateFilter.start.toISOString())
@@ -123,17 +145,42 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
     // Fetch cash movements (POS sales)
     const { data: cashMovements } = await supabase
       .from('cash_movements')
-      .select('amount, type, created_at')
+      .select('amount, type, created_at, payment_method')
       .eq('commerce_id', commerceId)
       .eq('type', 'sale')
       .gte('created_at', dateFilter.start.toISOString())
       .lte('created_at', dateFilter.end.toISOString());
+
+    // Fetch payment methods for fee calculation
+    const { data: paymentMethods } = await supabase
+      .from('payment_methods')
+      .select('name, fee_percentage, fee_fixed')
+      .eq('commerce_id', commerceId)
+      .eq('is_active', true);
+
+    const feeMap = new Map(paymentMethods?.map(pm => [pm.name, { pct: pm.fee_percentage || 0, fixed: pm.fee_fixed || 0 }]) || []);
 
     const ordersRevenue = orders?.reduce((sum, o) => sum + Number(o.total), 0) || 0;
     const movementsRevenue = cashMovements?.reduce((sum, m) => sum + Number(m.amount), 0) || 0;
     const monthlyRevenue = ordersRevenue + movementsRevenue;
     const totalOrders = (orders?.length || 0) + (cashMovements?.length || 0);
     const avgTicket = totalOrders > 0 ? monthlyRevenue / totalOrders : 0;
+
+    // Calculate operator fees
+    let calculatedFees = 0;
+    orders?.forEach(order => {
+      const fee = feeMap.get(order.payment_method || '');
+      if (fee) {
+        calculatedFees += Number(order.total) * (fee.pct / 100) + fee.fixed;
+      }
+    });
+    cashMovements?.forEach(movement => {
+      const fee = feeMap.get(movement.payment_method || '');
+      if (fee) {
+        calculatedFees += Number(movement.amount) * (fee.pct / 100) + fee.fixed;
+      }
+    });
+    setOperatorFees(calculatedFees);
 
     // Fetch last month orders for comparison
     const { data: lastMonthOrders } = await supabase
@@ -276,8 +323,184 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
     return config[status] || config.pending;
   };
 
-  const handleExportReport = (type: string) => {
-    toast({ title: `Relatório de ${type} será gerado em breve!` });
+  const handleGenerateSalesReport = async () => {
+    if (!commerce) return;
+    setGeneratingPdf('vendas');
+    
+    try {
+      // Fetch detailed data for the report
+      const { data: orders } = await supabase
+        .from('orders')
+        .select('total, status, created_at, payment_method')
+        .eq('commerce_id', commerceId)
+        .eq('status', 'delivered')
+        .gte('created_at', dateFilter.start.toISOString())
+        .lte('created_at', dateFilter.end.toISOString());
+
+      const { data: cashMovements } = await supabase
+        .from('cash_movements')
+        .select('amount, payment_method, created_at')
+        .eq('commerce_id', commerceId)
+        .eq('type', 'sale')
+        .gte('created_at', dateFilter.start.toISOString())
+        .lte('created_at', dateFilter.end.toISOString());
+
+      // Payment method breakdown
+      const paymentMap = new Map<string, { total: number; count: number }>();
+      orders?.forEach(o => {
+        const method = o.payment_method || 'Não informado';
+        const existing = paymentMap.get(method) || { total: 0, count: 0 };
+        paymentMap.set(method, { total: existing.total + Number(o.total), count: existing.count + 1 });
+      });
+      cashMovements?.forEach(m => {
+        const method = m.payment_method || 'Dinheiro';
+        const existing = paymentMap.get(method) || { total: 0, count: 0 };
+        paymentMap.set(method, { total: existing.total + Number(m.amount), count: existing.count + 1 });
+      });
+
+      // Daily sales
+      const dailyMap = new Map<string, { revenue: number; orders: number }>();
+      orders?.forEach(o => {
+        const date = format(new Date(o.created_at), 'dd/MM/yyyy');
+        const existing = dailyMap.get(date) || { revenue: 0, orders: 0 };
+        dailyMap.set(date, { revenue: existing.revenue + Number(o.total), orders: existing.orders + 1 });
+      });
+      cashMovements?.forEach(m => {
+        const date = format(new Date(m.created_at), 'dd/MM/yyyy');
+        const existing = dailyMap.get(date) || { revenue: 0, orders: 0 };
+        dailyMap.set(date, { revenue: existing.revenue + Number(m.amount), orders: existing.orders + 1 });
+      });
+
+      // Fetch categories with sales
+      const { data: orderItems } = await supabase
+        .from('order_items')
+        .select('total_price, product_id, orders!inner(commerce_id, status, created_at)')
+        .eq('orders.commerce_id', commerceId)
+        .eq('orders.status', 'delivered')
+        .gte('orders.created_at', dateFilter.start.toISOString())
+        .lte('orders.created_at', dateFilter.end.toISOString());
+
+      const { data: productsWithCategories } = await supabase
+        .from('products')
+        .select('id, category_id')
+        .eq('commerce_id', commerceId);
+
+      const { data: categoriesData } = await supabase
+        .from('categories')
+        .select('id, name')
+        .eq('commerce_id', commerceId);
+
+      const categoryMap = new Map(categoriesData?.map(c => [c.id, c.name]) || []);
+      const productCategoryMap = new Map(productsWithCategories?.map(p => [p.id, p.category_id]) || []);
+      
+      const salesByCategory: Record<string, number> = {};
+      orderItems?.forEach(item => {
+        const categoryId = productCategoryMap.get(item.product_id || '');
+        const categoryName = categoryId ? categoryMap.get(categoryId) : 'Sem categoria';
+        const name = categoryName || 'Sem categoria';
+        salesByCategory[name] = (salesByCategory[name] || 0) + Number(item.total_price);
+      });
+
+      const topCategories = Object.entries(salesByCategory)
+        .sort((a, b) => b[1] - a[1])
+        .map(([name, revenue]) => ({ name, revenue }));
+
+      await generateSalesReportPDF({
+        commerceName: commerce.fantasy_name,
+        logoUrl: commerce.logo_url,
+        period: `${format(dateFilter.start, 'dd/MM/yyyy')} a ${format(dateFilter.end, 'dd/MM/yyyy')}`,
+        totalRevenue: stats.monthlyRevenue,
+        totalOrders: stats.totalOrders,
+        avgTicket: stats.avgTicket,
+        profitMargin: stats.profitMargin,
+        growthRate: stats.growthRate,
+        topCategories,
+        paymentMethodBreakdown: Array.from(paymentMap.entries()).map(([method, data]) => ({
+          method,
+          total: data.total,
+          count: data.count
+        })),
+        dailySales: Array.from(dailyMap.entries()).map(([date, data]) => ({
+          date,
+          revenue: data.revenue,
+          orders: data.orders
+        })).sort((a, b) => {
+          const [dA, mA, yA] = a.date.split('/').map(Number);
+          const [dB, mB, yB] = b.date.split('/').map(Number);
+          return new Date(yA, mA - 1, dA).getTime() - new Date(yB, mB - 1, dB).getTime();
+        })
+      });
+
+      toast({ title: "Relatório de Vendas gerado com sucesso!" });
+    } catch (error) {
+      toast({ variant: "destructive", title: "Erro ao gerar relatório" });
+    }
+    
+    setGeneratingPdf(null);
+  };
+
+  const handleGenerateStockReport = async () => {
+    if (!commerce) return;
+    setGeneratingPdf('estoque');
+    
+    try {
+      const { data: products } = await supabase
+        .from('products')
+        .select('id, name, price, stock, category_id')
+        .eq('commerce_id', commerceId)
+        .eq('is_active', true);
+
+      const { data: categoriesData } = await supabase
+        .from('categories')
+        .select('id, name')
+        .eq('commerce_id', commerceId);
+
+      const categoryMap = new Map(categoriesData?.map(c => [c.id, c.name]) || []);
+
+      const productsWithValue = (products || []).map(p => ({
+        name: p.name,
+        category: categoryMap.get(p.category_id || '') || 'Sem categoria',
+        stock: p.stock || 0,
+        price: p.price,
+        value: (p.stock || 0) * p.price
+      }));
+
+      const lowStockProducts = productsWithValue
+        .filter(p => p.stock <= 5 && p.stock > 0)
+        .map(p => ({ name: p.name, stock: p.stock, minStock: 5 }));
+
+      // Group by category
+      const categoryStats: Record<string, { productCount: number; totalValue: number }> = {};
+      productsWithValue.forEach(p => {
+        if (!categoryStats[p.category]) {
+          categoryStats[p.category] = { productCount: 0, totalValue: 0 };
+        }
+        categoryStats[p.category].productCount += 1;
+        categoryStats[p.category].totalValue += p.value;
+      });
+
+      await generateStockReportPDF({
+        commerceName: commerce.fantasy_name,
+        logoUrl: commerce.logo_url,
+        period: format(new Date(), 'dd/MM/yyyy'),
+        totalProducts: products?.length || 0,
+        stockValue: stats.stockCostValue,
+        potentialRevenue: stats.stockSaleValue,
+        lowStockProducts,
+        products: productsWithValue,
+        categories: Object.entries(categoryStats).map(([name, data]) => ({
+          name,
+          productCount: data.productCount,
+          totalValue: data.totalValue
+        }))
+      });
+
+      toast({ title: "Relatório de Estoque gerado com sucesso!" });
+    } catch (error) {
+      toast({ variant: "destructive", title: "Erro ao gerar relatório" });
+    }
+    
+    setGeneratingPdf(null);
   };
 
   const handlePayInvoice = (invoice: Invoice) => {
@@ -302,12 +525,30 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
         </div>
         <div className="flex items-center gap-2">
           <DateFilter onDateChange={handleDateChange} defaultValue="30days" />
-          <Button variant="outline" size="sm" onClick={() => handleExportReport("vendas")}>
-            <Download className="w-4 h-4 mr-2" />
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleGenerateSalesReport}
+            disabled={!!generatingPdf}
+          >
+            {generatingPdf === 'vendas' ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Download className="w-4 h-4 mr-2" />
+            )}
             Relatório de Vendas
           </Button>
-          <Button variant="outline" size="sm" onClick={() => handleExportReport("estoque")}>
-            <Download className="w-4 h-4 mr-2" />
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleGenerateStockReport}
+            disabled={!!generatingPdf}
+          >
+            {generatingPdf === 'estoque' ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Download className="w-4 h-4 mr-2" />
+            )}
             Relatório de Estoque
           </Button>
         </div>
@@ -539,6 +780,13 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
         </Card>
       </div>
 
+      {/* Expenses Management Section */}
+      <CommerceExpenses 
+        commerceId={commerceId} 
+        monthlyRevenue={stats.monthlyRevenue}
+        operatorFees={operatorFees}
+      />
+
       {/* Invoices Table */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
@@ -557,7 +805,7 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
               </Badge>
             )}
           </div>
-          <Button variant="outline" size="sm" onClick={() => handleExportReport("faturas")}>
+          <Button variant="outline" size="sm" onClick={() => toast({ title: "Exportando faturas..." })}>
             <Download className="w-4 h-4 mr-2" />
             Exportar
           </Button>
