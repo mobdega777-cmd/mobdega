@@ -36,6 +36,7 @@ interface CommerceExpensesProps {
   commerceId: string;
   monthlyRevenue: number;
   operatorFees?: number;
+  productCost?: number;
 }
 
 interface Expense {
@@ -47,7 +48,7 @@ interface Expense {
   is_active: boolean;
 }
 
-const CommerceExpenses = ({ commerceId, monthlyRevenue, operatorFees = 0 }: CommerceExpensesProps) => {
+const CommerceExpenses = ({ commerceId, monthlyRevenue, operatorFees = 0, productCost = 0 }: CommerceExpensesProps) => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -157,7 +158,8 @@ const CommerceExpenses = ({ commerceId, monthlyRevenue, operatorFees = 0 }: Comm
   const totalVariableExpenses = variableExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
   const totalExpenses = totalFixedExpenses + totalVariableExpenses + operatorFees;
   const netProfit = monthlyRevenue - totalExpenses;
-  const profitMargin = monthlyRevenue > 0 ? (netProfit / monthlyRevenue) * 100 : 0;
+  const finalProfit = netProfit - productCost;
+  const profitMargin = monthlyRevenue > 0 ? (finalProfit / monthlyRevenue) * 100 : 0;
 
   if (loading) {
     return (
@@ -211,14 +213,28 @@ const CommerceExpenses = ({ commerceId, monthlyRevenue, operatorFees = 0 }: Comm
         <Card className={`border-${netProfit >= 0 ? 'blue' : 'red'}-500/20 bg-${netProfit >= 0 ? 'blue' : 'red'}-500/5`}>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
-              <div>
+              <div className="flex-1">
                 <div className="flex items-center gap-2">
                   <p className="text-xs text-muted-foreground">Lucro Líquido</p>
                   <HelpTooltip content="Faturamento menos todos os custos (fixos, variáveis e taxas)" />
                 </div>
-                <p className={`text-xl font-bold ${netProfit >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                <p className={`text-lg font-bold ${netProfit >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
                   {formatCurrency(netProfit)}
                 </p>
+                {productCost > 0 && (
+                  <div className="mt-1 pt-1 border-t border-border/50">
+                    <p className="text-xs text-muted-foreground flex justify-between">
+                      <span>Custo produtos:</span>
+                      <span className="text-red-500">- {formatCurrency(productCost)}</span>
+                    </p>
+                    <p className="text-xs font-medium flex justify-between mt-0.5">
+                      <span>Lucro final:</span>
+                      <span className={finalProfit >= 0 ? 'text-green-600' : 'text-red-600'}>
+                        {formatCurrency(finalProfit)}
+                      </span>
+                    </p>
+                  </div>
+                )}
               </div>
               <div className={`p-2 rounded-lg ${netProfit >= 0 ? 'bg-blue-500/10' : 'bg-red-500/10'}`}>
                 <Wallet className={`w-5 h-5 ${netProfit >= 0 ? 'text-blue-600' : 'text-red-600'}`} />
@@ -238,6 +254,7 @@ const CommerceExpenses = ({ commerceId, monthlyRevenue, operatorFees = 0 }: Comm
                 <p className={`text-xl font-bold ${profitMargin >= 0 ? 'text-purple-600' : 'text-red-600'}`}>
                   {profitMargin.toFixed(1)}%
                 </p>
+                <p className="text-xs text-muted-foreground mt-0.5">(com custo produtos)</p>
               </div>
               <div className="p-2 rounded-lg bg-purple-500/10">
                 <Receipt className="w-5 h-5 text-purple-600" />

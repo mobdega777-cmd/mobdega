@@ -49,6 +49,10 @@ interface Customer {
   phone: string | null;
   city: string | null;
   neighborhood: string | null;
+  address: string | null;
+  address_number: string | null;
+  cep: string | null;
+  complement: string | null;
   created_at: string;
   total_orders: number;
   total_spent: number;
@@ -132,7 +136,7 @@ const CommerceCustomers = ({ commerceId }: CommerceCustomersProps) => {
     // Fetch profiles for these users
     const { data: profilesData } = await supabase
       .from('profiles')
-      .select('user_id, full_name, email, phone, city, neighborhood, created_at')
+      .select('user_id, full_name, email, phone, city, neighborhood, address, address_number, cep, complement, created_at')
       .in('user_id', userIds);
 
     // Fetch ALL favorites for this commerce (not just customers with orders)
@@ -153,6 +157,10 @@ const CommerceCustomers = ({ commerceId }: CommerceCustomersProps) => {
         phone: profile.phone,
         city: profile.city,
         neighborhood: profile.neighborhood,
+        address: profile.address,
+        address_number: profile.address_number,
+        cep: profile.cep,
+        complement: profile.complement,
         created_at: profile.created_at,
         total_orders: stats?.count || 0,
         total_spent: stats?.total || 0,
@@ -630,6 +638,32 @@ const CommerceCustomers = ({ commerceId }: CommerceCustomersProps) => {
                     </p>
                   </div>
                 </div>
+
+                {/* Address Info */}
+                {(selectedCustomer.address || selectedCustomer.city || selectedCustomer.cep) && (
+                  <div className="mt-4 pt-4 border-t border-border">
+                    <h4 className="text-sm font-medium flex items-center gap-2 mb-2">
+                      <MapPin className="w-4 h-4" />
+                      Endereço
+                    </h4>
+                    <div className="text-sm text-muted-foreground space-y-1">
+                      {selectedCustomer.address && (
+                        <p>
+                          {selectedCustomer.address}
+                          {selectedCustomer.address_number && `, ${selectedCustomer.address_number}`}
+                          {selectedCustomer.complement && ` - ${selectedCustomer.complement}`}
+                        </p>
+                      )}
+                      {selectedCustomer.neighborhood && (
+                        <p>{selectedCustomer.neighborhood}</p>
+                      )}
+                      <p>
+                        {selectedCustomer.city && selectedCustomer.city}
+                        {selectedCustomer.cep && ` - CEP: ${selectedCustomer.cep}`}
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Estatísticas do Cliente */}
