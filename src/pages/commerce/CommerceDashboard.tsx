@@ -44,21 +44,25 @@ import CommerceDelivery from "@/components/commerce/CommerceDelivery";
 import CommerceSettings from "@/components/commerce/CommerceSettings";
 import DeliveryZonesConfig from "@/components/commerce/DeliveryZonesConfig";
 import CommercePaymentConfig from "@/components/commerce/CommercePaymentConfig";
+import CommerceStockControl from "@/components/commerce/CommerceStockControl";
+import CommerceCustomers from "@/components/commerce/CommerceCustomers";
 
 type CommerceSection = 
   | "overview" 
   | "products" 
   | "categories"
+  | "stockcontrol"
   | "orders" 
   | "tables"
   | "financial" 
+  | "customers"
   | "cashregister"
   | "delivery"
   | "deliveryzones"
   | "paymentconfig"
   | "settings";
 
-// Ordem atualizada: Caixa/PDV agora é a segunda opção (logo após Visão Geral)
+// Ordem atualizada com Controle de Estoque e Clientes
 const menuItems = [
   { id: "overview" as CommerceSection, label: "Visão Geral", icon: LayoutDashboard },
   { id: "cashregister" as CommerceSection, label: "Caixa/PDV", icon: Calculator },
@@ -69,7 +73,9 @@ const menuItems = [
   { id: "tables" as CommerceSection, label: "Mesas/Comandas", icon: Utensils },
   { id: "products" as CommerceSection, label: "Produtos", icon: Package },
   { id: "categories" as CommerceSection, label: "Categorias", icon: FolderOpen },
+  { id: "stockcontrol" as CommerceSection, label: "Controle Estoque", icon: Package },
   { id: "financial" as CommerceSection, label: "Financeiro", icon: DollarSign, showBadge: true },
+  { id: "customers" as CommerceSection, label: "Clientes", icon: Store },
   { id: "settings" as CommerceSection, label: "Configurações", icon: Settings },
 ];
 
@@ -318,12 +324,16 @@ const CommerceDashboard = () => {
         return <CommerceProducts commerceId={commerce.id} />;
       case "categories":
         return <CommerceCategories commerceId={commerce.id} />;
+      case "stockcontrol":
+        return <CommerceStockControl commerceId={commerce.id} />;
       case "orders":
         return <CommerceOrders commerceId={commerce.id} />;
       case "tables":
         return <CommerceTables commerceId={commerce.id} />;
       case "financial":
         return <CommerceFinancial commerceId={commerce.id} />;
+      case "customers":
+        return <CommerceCustomers commerceId={commerce.id} />;
       case "cashregister":
         return <CommerceCashRegister commerceId={commerce.id} />;
       case "delivery":
