@@ -36,7 +36,9 @@ import { useToast } from "@/hooks/use-toast";
 import DateFilter from "./DateFilter";
 import InvoicePaymentModal from "./InvoicePaymentModal";
 import CommerceExpenses from "./CommerceExpenses";
-import { startOfDay, endOfDay, subDays, startOfMonth, format } from "date-fns";
+import SalesEvolutionChart from "./SalesEvolutionChart";
+import { startOfDay, endOfDay, subDays, startOfMonth, format, eachDayOfInterval } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { formatCurrency, formatPercentage } from "@/lib/formatCurrency";
 import HelpTooltip from "@/components/ui/help-tooltip";
 import { generateSalesReportPDF, generateStockReportPDF } from "@/lib/pdfReportGenerator";
@@ -405,6 +407,34 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
         .sort((a, b) => b[1] - a[1])
         .map(([name, revenue]) => ({ name, revenue }));
 
+      // Prepare daily sales
+      const dailySalesArray = Array.from(dailyMap.entries()).map(([date, data]) => ({
+        date,
+        revenue: data.revenue,
+        orders: data.orders
+      })).sort((a, b) => {
+        const [dA, mA, yA] = a.date.split('/').map(Number);
+        const [dB, mB, yB] = b.date.split('/').map(Number);
+        return new Date(yA, mA - 1, dA).getTime() - new Date(yB, mB - 1, dB).getTime();
+      });
+
+      // Calculate weekly sales
+      const weeklyMap = new Map<number, { revenue: number; orders: number }>();
+      dailySalesArray.forEach((day, index) => {
+        const weekIndex = Math.floor(index / 7);
+        const existing = weeklyMap.get(weekIndex) || { revenue: 0, orders: 0 };
+        weeklyMap.set(weekIndex, {
+          revenue: existing.revenue + day.revenue,
+          orders: existing.orders + day.orders
+        });
+      });
+
+      const weeklySalesArray = Array.from(weeklyMap.entries()).map(([weekNum, data]) => ({
+        week: `Semana ${weekNum + 1}`,
+        revenue: data.revenue,
+        orders: data.orders
+      }));
+
       await generateSalesReportPDF({
         commerceName: commerce.fantasy_name,
         logoUrl: commerce.logo_url,
@@ -420,15 +450,8 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
           total: data.total,
           count: data.count
         })),
-        dailySales: Array.from(dailyMap.entries()).map(([date, data]) => ({
-          date,
-          revenue: data.revenue,
-          orders: data.orders
-        })).sort((a, b) => {
-          const [dA, mA, yA] = a.date.split('/').map(Number);
-          const [dB, mB, yB] = b.date.split('/').map(Number);
-          return new Date(yA, mA - 1, dA).getTime() - new Date(yB, mB - 1, dB).getTime();
-        })
+        dailySales: dailySalesArray,
+        weeklySales: weeklySalesArray
       });
 
       toast({ title: "Relatório de Vendas gerado com sucesso!" });
@@ -702,6 +725,9 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Sales Evolution Chart */}
+      <SalesEvolutionChart commerceId={commerceId} dateFilter={dateFilter} />
 
       {/* Estoque e Insights */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
