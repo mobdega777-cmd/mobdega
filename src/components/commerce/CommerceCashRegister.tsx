@@ -393,15 +393,10 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
     const saleAmount = parseFloat(saleForm.amount);
     const quantity = parseInt(saleForm.quantity) || 1;
 
-    // Update product stock
-    if (selectedProduct.stock !== null) {
-      await supabase
-        .from('products')
-        .update({ stock: selectedProduct.stock - quantity })
-        .eq('id', selectedProduct.id);
-    }
+    // Stock deduction is now handled by the database trigger when order status becomes 'delivered'
+    // No need for manual stock deduction here
 
-    // Create order for this sale
+    // Create order for this sale (status=delivered triggers stock deduction automatically)
     const { data: orderData, error: orderError } = await supabase
       .from('orders')
       .insert({
@@ -421,7 +416,7 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
     if (orderError) {
       console.error('Error creating order:', orderError);
     } else {
-      // Create order item
+      // Create order item (the trigger will deduct stock based on this)
       await supabase
         .from('order_items')
         .insert({
@@ -654,36 +649,17 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
     // Obter todos os order_ids que fazem parte desta mesa consolidada
     const allOrderIds = (selectedTableOrder as TableOrder & { all_order_ids?: string[] }).all_order_ids || [selectedTableOrder.id];
 
-    // Deduzir estoque para todos os itens consolidados (apenas se tiver product_id)
-    for (const item of selectedTableOrder.items) {
-      const productId = (item as { product_id?: string | null }).product_id;
-      if (productId) {
-        // Get current stock
-        const { data: product } = await supabase
-          .from('products')
-          .select('stock')
-          .eq('id', productId)
-          .single();
+    // Stock deduction is now handled by the database trigger when status becomes 'delivered'
+    // No need for manual stock deduction here
 
-        if (product && product.stock !== null) {
-          const newStock = Math.max(0, product.stock - item.quantity);
-          await supabase
-            .from('products')
-            .update({ stock: newStock })
-            .eq('id', productId);
-        }
-      }
-    }
-
-    // Atualizar TODOS os pedidos da mesa com payment_method, status e stock_deducted
+    // Atualizar TODOS os pedidos da mesa com payment_method, status (trigger will handle stock)
     for (const orderId of allOrderIds) {
       await supabase
         .from('orders')
         .update({
           payment_method: tablePaymentMethod,
           status: 'delivered',
-          delivered_at: new Date().toISOString(),
-          stock_deducted: true
+          delivered_at: new Date().toISOString()
         })
         .eq('id', orderId);
     }

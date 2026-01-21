@@ -166,6 +166,27 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
 
   useEffect(() => {
     fetchOrders();
+
+    // Subscribe to orders changes for real-time updates
+    const channel = supabase
+      .channel(`commerce-orders-${commerceId}`)
+      .on(
+        'postgres_changes',
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'orders',
+          filter: `commerce_id=eq.${commerceId}` 
+        },
+        () => {
+          fetchOrders();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [commerceId, statusFilter, dateFilter]);
 
   const fetchOrderDetails = async (orderId: string) => {
@@ -201,20 +222,10 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
   const updateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
     const order = orders.find(o => o.id === orderId);
     
-    // Buscar se o estoque já foi deduzido para este pedido
-    const { data: orderData } = await supabase
-      .from('orders')
-      .select('stock_deducted')
-      .eq('id', orderId)
-      .single();
-    
-    const stockAlreadyDeducted = orderData?.stock_deducted ?? false;
-    
-    const updateData: { status: typeof newStatus; delivered_at?: string; stock_deducted?: boolean } = { status: newStatus };
+    const updateData: { status: typeof newStatus; delivered_at?: string } = { status: newStatus };
     
     if (newStatus === 'delivered') {
       updateData.delivered_at = new Date().toISOString();
-      updateData.stock_deducted = true;
     }
 
     const { error } = await supabase
@@ -225,50 +236,24 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
     if (error) {
       toast({ variant: "destructive", title: "Erro ao atualizar pedido", description: error.message });
     } else {
-      // Se o pedido for finalizado E o estoque ainda não foi deduzido
-      if (newStatus === 'delivered' && !stockAlreadyDeducted) {
-        if (order) {
-          // Buscar itens do pedido para deduzir estoque
-          const { data: orderItems } = await supabase
-            .from('order_items')
-            .select('product_id, quantity')
-            .eq('order_id', orderId);
-
-          if (orderItems) {
-            for (const item of orderItems) {
-              if (item.product_id) {
-                const { data: product } = await supabase
-                  .from('products')
-                  .select('stock')
-                  .eq('id', item.product_id)
-                  .single();
-
-                if (product && product.stock !== null) {
-                  const newStock = Math.max(0, product.stock - item.quantity);
-                  await supabase
-                    .from('products')
-                    .update({ stock: newStock })
-                    .eq('id', item.product_id);
-                }
-              }
-            }
-          }
-
-          // Liberar a mesa se for pedido de mesa
-          if (order.order_type === 'table' && order.table_id) {
-            await supabase
-              .from('tables')
-              .update({ 
-                status: 'available', 
-                current_order_id: null,
-                closed_at: new Date().toISOString()
-              })
-              .eq('id', order.table_id);
-          }
-
-          // Criar movimentação de caixa automaticamente para consolidar vendas
-          await createCashMovementForOrder(order);
+      // Stock deduction is now handled by the database trigger automatically
+      // when status becomes 'delivered'
+      
+      if (newStatus === 'delivered' && order) {
+        // Liberar a mesa se for pedido de mesa
+        if (order.order_type === 'table' && order.table_id) {
+          await supabase
+            .from('tables')
+            .update({ 
+              status: 'available', 
+              current_order_id: null,
+              closed_at: new Date().toISOString()
+            })
+            .eq('id', order.table_id);
         }
+
+        // Criar movimentação de caixa automaticamente para consolidar vendas
+        await createCashMovementForOrder(order);
       }
       
       toast({ title: "Status atualizado com sucesso!" });

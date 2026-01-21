@@ -1058,6 +1058,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      apply_stock_deduction_for_order: {
+        Args: { _order_id: string }
+        Returns: undefined
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

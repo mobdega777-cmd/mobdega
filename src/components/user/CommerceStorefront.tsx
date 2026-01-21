@@ -158,8 +158,42 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
   const [createdOrderId, setCreatedOrderId] = useState<string | null>(null);
   const [orderStatus, setOrderStatus] = useState<string>("pending");
 
+  // Fetch tables separately for real-time updates
+  const fetchTables = async () => {
+    const { data: tablesData } = await supabase
+      .from('tables')
+      .select('id, number, name, capacity, status')
+      .eq('commerce_id', commerceId)
+      .order('number');
+    
+    setTables(tablesData || []);
+  };
+
   useEffect(() => {
     fetchCommerceData();
+  }, [commerceId]);
+
+  // Real-time subscription for tables status changes (so user sees updated availability)
+  useEffect(() => {
+    const channel = supabase
+      .channel(`storefront-tables-${commerceId}`)
+      .on(
+        'postgres_changes',
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'tables',
+          filter: `commerce_id=eq.${commerceId}` 
+        },
+        () => {
+          fetchTables();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [commerceId]);
 
   const fetchCommerceData = async () => {
@@ -230,14 +264,8 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
       setReviews([]);
     }
 
-    // Fetch tables
-    const { data: tablesData } = await supabase
-      .from('tables')
-      .select('id, number, name, capacity, status')
-      .eq('commerce_id', commerceId)
-      .order('number');
-    
-    setTables(tablesData || []);
+    // Fetch tables - fetch fresh data
+    await fetchTables();
 
     // Fetch delivery zones
     const { data: zonesData } = await supabase
