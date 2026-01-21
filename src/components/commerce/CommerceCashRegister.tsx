@@ -561,7 +561,8 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
   };
 
   const calculateTotals = () => {
-    const movementsToCalculate = currentRegister ? movements : filteredMovements;
+    // Always use filteredMovements to respect date filter
+    const movementsToCalculate = filteredMovements;
     const sales = movementsToCalculate.filter(m => m.type === 'sale').reduce((sum, m) => sum + Number(m.amount), 0);
     const deposits = movementsToCalculate.filter(m => m.type === 'deposit').reduce((sum, m) => sum + Number(m.amount), 0);
     const withdrawals = movementsToCalculate.filter(m => m.type === 'withdrawal').reduce((sum, m) => sum + Number(m.amount), 0);
@@ -575,7 +576,8 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
 
   // Calcular totais por forma de pagamento para o fechamento
   const calculatePaymentMethodTotals = () => {
-    const movementsToCalculate = currentRegister ? movements : filteredMovements;
+    // Always use filteredMovements to respect date filter
+    const movementsToCalculate = filteredMovements;
     const salesMovements = movementsToCalculate.filter(m => m.type === 'sale');
     
     const byPaymentMethod = {

@@ -158,11 +158,12 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
     // Fetch payment methods for fee calculation
     const { data: paymentMethods } = await supabase
       .from('payment_methods')
-      .select('name, fee_percentage, fee_fixed')
+      .select('type, fee_percentage, fee_fixed')
       .eq('commerce_id', commerceId)
       .eq('is_active', true);
 
-    const feeMap = new Map(paymentMethods?.map(pm => [pm.name, { pct: pm.fee_percentage || 0, fixed: pm.fee_fixed || 0 }]) || []);
+    // Use 'type' as key for matching with order.payment_method (e.g., 'cash', 'credit', 'debit', 'pix')
+    const feeMap = new Map(paymentMethods?.map(pm => [pm.type, { pct: pm.fee_percentage || 0, fixed: pm.fee_fixed || 0 }]) || []);
 
     const ordersRevenue = orders?.reduce((sum, o) => sum + Number(o.total), 0) || 0;
     const movementsRevenue = cashMovements?.reduce((sum, m) => sum + Number(m.amount), 0) || 0;
