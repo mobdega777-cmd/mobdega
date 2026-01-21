@@ -199,10 +199,22 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
   };
 
   const updateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
-    const updateData: { status: typeof newStatus; delivered_at?: string } = { status: newStatus };
+    const order = orders.find(o => o.id === orderId);
+    
+    // Buscar se o estoque já foi deduzido para este pedido
+    const { data: orderData } = await supabase
+      .from('orders')
+      .select('stock_deducted')
+      .eq('id', orderId)
+      .single();
+    
+    const stockAlreadyDeducted = orderData?.stock_deducted ?? false;
+    
+    const updateData: { status: typeof newStatus; delivered_at?: string; stock_deducted?: boolean } = { status: newStatus };
     
     if (newStatus === 'delivered') {
       updateData.delivered_at = new Date().toISOString();
+      updateData.stock_deducted = true;
     }
 
     const { error } = await supabase
@@ -213,9 +225,8 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
     if (error) {
       toast({ variant: "destructive", title: "Erro ao atualizar pedido", description: error.message });
     } else {
-      // Se o pedido for finalizado, deduzir estoque e registrar movimentação de caixa
-      if (newStatus === 'delivered') {
-        const order = orders.find(o => o.id === orderId);
+      // Se o pedido for finalizado E o estoque ainda não foi deduzido
+      if (newStatus === 'delivered' && !stockAlreadyDeducted) {
         if (order) {
           // Buscar itens do pedido para deduzir estoque
           const { data: orderItems } = await supabase

@@ -613,6 +613,7 @@ export type Database = {
           order_type: string | null
           payment_method: string | null
           status: Database["public"]["Enums"]["order_status"]
+          stock_deducted: boolean
           subtotal: number
           table_id: string | null
           total: number
@@ -634,6 +635,7 @@ export type Database = {
           order_type?: string | null
           payment_method?: string | null
           status?: Database["public"]["Enums"]["order_status"]
+          stock_deducted?: boolean
           subtotal: number
           table_id?: string | null
           total: number
@@ -655,6 +657,7 @@ export type Database = {
           order_type?: string | null
           payment_method?: string | null
           status?: Database["public"]["Enums"]["order_status"]
+          stock_deducted?: boolean
           subtotal?: number
           table_id?: string | null
           total?: number

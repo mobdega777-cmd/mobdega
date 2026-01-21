@@ -305,30 +305,30 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
   const checkActiveTableOrder = async () => {
     if (!user) return;
 
-    // Find active order (pending/confirmed/preparing/delivered with pending payment) for this user at this commerce with a table
-    const { data: activeOrder } = await supabase
+    // Find ALL active orders (pending/confirmed/preparing/delivered with pending payment) for this user at this commerce with a table
+    const { data: activeOrders } = await supabase
       .from('orders')
       .select('id, table_id, status, payment_method')
       .eq('user_id', user.id)
       .eq('commerce_id', commerceId)
       .not('table_id', 'is', null)
+      .eq('payment_method', 'pending')
       .in('status', ['pending', 'confirmed', 'preparing', 'delivered'])
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .order('created_at', { ascending: false });
 
-    // Only show as active if order is not yet paid (delivered with payment_method = pending OR not delivered yet)
-    if (activeOrder && (activeOrder.status !== 'delivered' || activeOrder.payment_method === 'pending')) {
+    // Only show as active if order is not yet paid
+    if (activeOrders && activeOrders.length > 0) {
+      const primaryOrder = activeOrders[0];
       setHasActiveTableOrder(true);
-      setActiveOrderId(activeOrder.id);
+      setActiveOrderId(primaryOrder.id);
       setOrderMode('table');
 
-      // Fetch table info directly from database (don't rely on tables state which may not be loaded yet)
-      if (activeOrder.table_id) {
+      // Fetch table info directly from database
+      if (primaryOrder.table_id) {
         const { data: tableData } = await supabase
           .from('tables')
           .select('id, number, name, capacity, status')
-          .eq('id', activeOrder.table_id)
+          .eq('id', primaryOrder.table_id)
           .single();
         
         if (tableData) {
@@ -336,8 +336,8 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
         }
       }
 
-      // Fetch order items
-      await fetchActiveOrderItems(activeOrder.id);
+      // Fetch order items from ALL active orders for this table
+      await fetchActiveOrderItems(activeOrders.map(o => o.id));
     } else {
       setHasActiveTableOrder(false);
       setActiveOrderId(null);
@@ -345,33 +345,35 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
     }
   };
 
-  // Fetch order items for an active order
-  const fetchActiveOrderItems = async (orderId: string) => {
+  // Fetch order items for active orders (can be multiple orders for same table)
+  const fetchActiveOrderItems = async (orderIds: string | string[]) => {
+    const ids = Array.isArray(orderIds) ? orderIds : [orderIds];
+    
     const { data: items } = await supabase
       .from('order_items')
-      .select('id, product_name, quantity, unit_price, total_price, product_id, notes')
-      .eq('order_id', orderId)
+      .select('id, product_name, quantity, unit_price, total_price, product_id, notes, order_id')
+      .in('order_id', ids)
       .order('created_at');
 
     setActiveOrderItems(items || []);
   };
 
-  // Real-time subscription for active order items
+  // Real-time subscription for order_items changes for this user's table orders
   useEffect(() => {
-    if (!activeOrderId) return;
+    if (!user || !hasActiveTableOrder) return;
 
     const channel = supabase
-      .channel(`order-items-${activeOrderId}`)
+      .channel(`table-order-items-${user.id}-${commerceId}`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
-          table: 'order_items',
-          filter: `order_id=eq.${activeOrderId}`
+          table: 'order_items'
         },
         () => {
-          fetchActiveOrderItems(activeOrderId);
+          // Re-check all active orders when any order_items change
+          checkActiveTableOrder();
         }
       )
       .subscribe();
@@ -379,7 +381,33 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [activeOrderId]);
+  }, [user, hasActiveTableOrder, commerceId]);
+
+  // Real-time subscription for new orders on this table
+  useEffect(() => {
+    if (!user || !selectedTable) return;
+
+    const channel = supabase
+      .channel(`table-orders-${selectedTable.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'orders',
+          filter: `table_id=eq.${selectedTable.id}`
+        },
+        () => {
+          // Re-check active orders when any order on this table changes
+          checkActiveTableOrder();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, selectedTable]);
 
   // Re-check active order when user changes or loading completes
   useEffect(() => {

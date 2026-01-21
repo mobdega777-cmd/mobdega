@@ -107,7 +107,8 @@ const CommerceOverview = ({ commerce }: CommerceOverviewProps) => {
       const dateRangeRevenue = filteredOrders.reduce((s, o) => s + Number(o.total), 0) + filteredMovements.reduce((s, m) => s + Number(m.amount), 0);
       const activeDeliveries = orders?.filter(o => o.status === 'delivering' && o.order_type === 'delivery').length || 0;
       const { count: productsCount } = await supabase.from('products').select('id', { count: 'exact', head: true }).eq('commerce_id', commerce.id);
-      const { data: recent } = await supabase.from('orders').select('*').eq('commerce_id', commerce.id).order('created_at', { ascending: false }).limit(5);
+      // Fetch recent orders filtered by date range
+      const { data: recent } = await supabase.from('orders').select('*').eq('commerce_id', commerce.id).gte('created_at', dateFilter.start.toISOString()).lte('created_at', dateFilter.end.toISOString()).order('created_at', { ascending: false }).limit(10);
       setStats({ totalOrders: orders?.length || 0, pendingOrders, todayRevenue: dateRangeRevenue, totalProducts: productsCount || 0, activeDeliveries, completedToday: filteredOrders.length + filteredMovements.length });
       setRecentOrders(recent || []);
       setLoading(false);
