@@ -597,13 +597,24 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
   // Handle table selection
   const handleSelectTable = async (table: Table) => {
     // Double-check table is still available before proceeding
-    const { data: currentTable } = await supabase
+    const { data: currentTable, error: currentTableError } = await supabase
       .from('tables')
       .select('status')
       .eq('id', table.id)
       .single();
 
-    if (currentTable?.status !== 'available') {
+    if (currentTableError) {
+      toast({
+        variant: "destructive",
+        title: "Erro ao verificar mesa",
+        description: currentTableError.message,
+      });
+      return;
+    }
+
+    const normalizedStatus = (currentTable?.status ?? 'available') as string;
+
+    if (normalizedStatus !== 'available') {
       toast({ 
         variant: "destructive", 
         title: "Mesa não disponível", 
@@ -621,17 +632,18 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
         opened_at: new Date().toISOString()
       })
       .eq('id', table.id)
-      .eq('status', 'available') // Only update if still available (prevent race condition)
+      // Allow both explicit 'available' and NULL (some rows may not have been initialized)
+      .or('status.eq.available,status.is.null')
       .select()
-      .single();
+      .maybeSingle();
 
+    // If no row was updated, it means another user took it (or status changed) in-between.
     if (error || !updatedTable) {
-      toast({ 
-        variant: "destructive", 
-        title: "Erro ao selecionar mesa", 
-        description: "A mesa pode não estar mais disponível. Tente outra." 
+      toast({
+        variant: "destructive",
+        title: "Mesa não disponível",
+        description: error?.message || "Esta mesa acabou de ser ocupada. Por favor, escolha outra.",
       });
-      // Refresh tables to get updated status
       fetchTables();
       return;
     }
