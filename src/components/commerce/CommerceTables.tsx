@@ -19,9 +19,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Pencil, Trash2, Utensils, Users, Clock, DollarSign, CreditCard } from "lucide-react";
+import { Plus, Pencil, Trash2, Utensils, Users, Clock, DollarSign, CreditCard, QrCode, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { generateTableQRCodePDF } from "@/lib/tableQRCodeGenerator";
 
 interface CommerceTablesProps {
   commerceId: string;
@@ -50,6 +51,9 @@ const CommerceTables = ({ commerceId }: CommerceTablesProps) => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingTable, setEditingTable] = useState<Table | null>(null);
   const [tablePaymentRequired, setTablePaymentRequired] = useState(true);
+  const [generatingQR, setGeneratingQR] = useState<string | null>(null);
+  const [commerceName, setCommerceName] = useState<string>('');
+  const [commerceLogoUrl, setCommerceLogoUrl] = useState<string | null>(null);
   const { toast } = useToast();
 
   const [formData, setFormData] = useState({
@@ -76,12 +80,14 @@ const CommerceTables = ({ commerceId }: CommerceTablesProps) => {
   const fetchPaymentSetting = async () => {
     const { data, error } = await supabase
       .from('commerces')
-      .select('table_payment_required')
+      .select('table_payment_required, fantasy_name, logo_url')
       .eq('id', commerceId)
       .single();
 
     if (!error && data) {
       setTablePaymentRequired(data.table_payment_required ?? true);
+      setCommerceName(data.fantasy_name || 'Comércio');
+      setCommerceLogoUrl(data.logo_url);
     }
   };
 
@@ -210,6 +216,24 @@ const CommerceTables = ({ commerceId }: CommerceTablesProps) => {
     const hours = Math.floor(diff / 60);
     const minutes = diff % 60;
     return hours > 0 ? `${hours}h ${minutes}min` : `${minutes}min`;
+  };
+
+  const handleGenerateQRCode = async (table: Table) => {
+    setGeneratingQR(table.id);
+    try {
+      await generateTableQRCodePDF({
+        tableNumber: table.number,
+        tableName: table.name,
+        tableCapacity: table.capacity,
+        commerceName,
+        commerceLogoUrl,
+        commerceId,
+      });
+      toast({ title: "PDF gerado com sucesso!", description: `QR Code da mesa ${table.number} está pronto para impressão.` });
+    } catch (error) {
+      toast({ variant: "destructive", title: "Erro ao gerar PDF" });
+    }
+    setGeneratingQR(null);
   };
 
   if (loading) {
@@ -411,6 +435,19 @@ const CommerceTables = ({ commerceId }: CommerceTablesProps) => {
                     <Button
                       size="icon"
                       variant="ghost"
+                      onClick={() => handleGenerateQRCode(table)}
+                      disabled={generatingQR === table.id}
+                      title="Gerar QR Code para impressão"
+                    >
+                      {generatingQR === table.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <QrCode className="w-4 h-4" />
+                      )}
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
                       onClick={() => handleEdit(table)}
                     >
                       <Pencil className="w-4 h-4" />
@@ -419,7 +456,7 @@ const CommerceTables = ({ commerceId }: CommerceTablesProps) => {
                       size="icon"
                       variant="ghost"
                       onClick={() => handleDelete(table.id)}
-                      className="text-red-500 hover:text-red-600"
+                      className="text-destructive hover:text-destructive"
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>

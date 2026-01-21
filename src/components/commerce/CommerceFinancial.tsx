@@ -74,6 +74,7 @@ interface FinancialStats {
   worstSellingCategory: string;
   projectedRevenue: number;
   growthRate: number;
+  productCostSold: number;
 }
 
 interface Commerce {
@@ -110,6 +111,7 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
     worstSellingCategory: "-",
     projectedRevenue: 0,
     growthRate: 0,
+    productCostSold: 0,
   });
   const { toast } = useToast();
 
@@ -249,11 +251,16 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
     const productCategoryMap = new Map(productsWithCategories?.map(p => [p.id, p.category_id]) || []);
     
     const salesByCategory: Record<string, number> = {};
+    let productCostSold = 0;
+    
     orderItems?.forEach(item => {
       const categoryId = productCategoryMap.get(item.product_id || '');
       const categoryName = categoryId ? categoryMap.get(categoryId) : 'Sem categoria';
       const name = categoryName || 'Sem categoria';
       salesByCategory[name] = (salesByCategory[name] || 0) + Number(item.total_price);
+      
+      // Estimate cost as 60% of sale price (can be improved with actual cost data)
+      productCostSold += Number(item.total_price) * 0.6;
     });
 
     // Ordenar categorias por vendas
@@ -306,6 +313,7 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
       worstSellingCategory: worstCategory,
       projectedRevenue,
       growthRate,
+      productCostSold,
     });
     setInvoices(invoicesData || []);
     setLoading(false);
@@ -811,6 +819,7 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
         commerceId={commerceId} 
         monthlyRevenue={stats.monthlyRevenue}
         operatorFees={operatorFees}
+        productCost={stats.productCostSold}
       />
 
       {/* Invoices Table */}
