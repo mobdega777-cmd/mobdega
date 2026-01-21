@@ -166,7 +166,9 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
       .eq('commerce_id', commerceId)
       .order('number');
     
-    setTables(tablesData || []);
+    if (tablesData) {
+      setTables(tablesData);
+    }
   };
 
   useEffect(() => {
@@ -175,12 +177,44 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
 
   // Real-time subscription for tables status changes (so user sees updated availability)
   useEffect(() => {
+    // Fetch tables immediately when modal opens or commerce changes
+    fetchTables();
+
     const channel = supabase
-      .channel(`storefront-tables-${commerceId}`)
+      .channel(`storefront-tables-realtime-${commerceId}-${Date.now()}`)
       .on(
         'postgres_changes',
         { 
-          event: '*', 
+          event: 'UPDATE', 
+          schema: 'public', 
+          table: 'tables',
+          filter: `commerce_id=eq.${commerceId}` 
+        },
+        (payload) => {
+          // Update only the changed table in state for immediate feedback
+          setTables(prev => prev.map(t => 
+            t.id === payload.new.id 
+              ? { ...t, status: payload.new.status as string }
+              : t
+          ));
+        }
+      )
+      .on(
+        'postgres_changes',
+        { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'tables',
+          filter: `commerce_id=eq.${commerceId}` 
+        },
+        () => {
+          fetchTables();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { 
+          event: 'DELETE', 
           schema: 'public', 
           table: 'tables',
           filter: `commerce_id=eq.${commerceId}` 
@@ -562,17 +596,36 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
 
   // Handle table selection
   const handleSelectTable = async (table: Table) => {
+    // Double-check table is still available before proceeding
+    const { data: currentTable } = await supabase
+      .from('tables')
+      .select('status')
+      .eq('id', table.id)
+      .single();
+
+    if (currentTable?.status !== 'available') {
+      toast({ 
+        variant: "destructive", 
+        title: "Mesa não disponível", 
+        description: "Esta mesa acabou de ser ocupada. Por favor, escolha outra." 
+      });
+      fetchTables();
+      return;
+    }
+
     // Update table status to occupied in database immediately
-    const { error } = await supabase
+    const { error, data: updatedTable } = await supabase
       .from('tables')
       .update({ 
         status: 'occupied',
         opened_at: new Date().toISOString()
       })
       .eq('id', table.id)
-      .eq('status', 'available'); // Only update if still available (prevent race condition)
+      .eq('status', 'available') // Only update if still available (prevent race condition)
+      .select()
+      .single();
 
-    if (error) {
+    if (error || !updatedTable) {
       toast({ 
         variant: "destructive", 
         title: "Erro ao selecionar mesa", 
@@ -587,9 +640,6 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
     setOrderMode('table');
     setShowTableModal(false);
     toast({ title: `Mesa ${table.number} selecionada!` });
-    
-    // Refresh tables list to reflect the change
-    fetchTables();
   };
 
   // Handle order modes - exclusive selection (toggle behavior)

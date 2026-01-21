@@ -135,10 +135,10 @@ const CommerceCustomers = ({ commerceId }: CommerceCustomersProps) => {
       .select('user_id, full_name, email, phone, city, neighborhood, created_at')
       .in('user_id', userIds);
 
-    // Fetch favorites for this commerce
-    const { data: favoritesData } = await supabase
+    // Fetch ALL favorites for this commerce (not just customers with orders)
+    const { data: favoritesData, count: totalFavorites } = await supabase
       .from('favorites')
-      .select('user_id')
+      .select('user_id', { count: 'exact' })
       .eq('commerce_id', commerceId);
 
     const favoriteUserIds = new Set(favoritesData?.map(f => f.user_id) || []);
@@ -199,7 +199,7 @@ const CommerceCustomers = ({ commerceId }: CommerceCustomersProps) => {
     };
   }, [commerceId]);
 
-  const calculateStats = (): CustomerStats => {
+  const calculateStats = async (): Promise<CustomerStats> => {
     const now = new Date();
     const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
@@ -208,9 +208,18 @@ const CommerceCustomers = ({ commerceId }: CommerceCustomersProps) => {
     ).length;
 
     const totalRevenue = customers.reduce((sum, c) => sum + c.total_spent, 0);
-    const favoritesCount = customers.filter(c => c.is_favorite).length;
-    const avgTicket = customers.length > 0 
-      ? totalRevenue / customers.reduce((sum, c) => sum + c.total_orders, 0) 
+    
+    // Fetch total favorites count for this commerce directly
+    const { count: totalFavorites } = await supabase
+      .from('favorites')
+      .select('*', { count: 'exact', head: true })
+      .eq('commerce_id', commerceId);
+
+    const favoritesCount = totalFavorites || 0;
+    
+    const totalOrders = customers.reduce((sum, c) => sum + c.total_orders, 0);
+    const avgTicket = totalOrders > 0 
+      ? totalRevenue / totalOrders 
       : 0;
 
     const topSpender = customers.length > 0
@@ -233,7 +242,25 @@ const CommerceCustomers = ({ commerceId }: CommerceCustomersProps) => {
     };
   };
 
-  const stats = calculateStats();
+  const [stats, setStats] = useState<CustomerStats>({
+    totalCustomers: 0,
+    newCustomersThisMonth: 0,
+    totalRevenue: 0,
+    favoritesCount: 0,
+    avgTicket: 0,
+    topSpender: null,
+    mostFrequent: null
+  });
+
+  useEffect(() => {
+    const updateStats = async () => {
+      const newStats = await calculateStats();
+      setStats(newStats);
+    };
+    if (customers.length > 0 || !loading) {
+      updateStats();
+    }
+  }, [customers, commerceId, loading]);
 
   const openCustomerDetails = async (customer: Customer) => {
     setSelectedCustomer(customer);
