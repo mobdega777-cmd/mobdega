@@ -601,7 +601,7 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
       .from('tables')
       .select('status')
       .eq('id', table.id)
-      .single();
+      .maybeSingle();
 
     if (currentTableError) {
       toast({
@@ -625,7 +625,7 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
     }
 
     // Update table status to occupied in database immediately
-    const { error, data: updatedTable } = await supabase
+    const { error } = await supabase
       .from('tables')
       .update({ 
         status: 'occupied',
@@ -633,16 +633,22 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
       })
       .eq('id', table.id)
       // Allow both explicit 'available' and NULL (some rows may not have been initialized)
-      .or('status.eq.available,status.is.null')
-      .select()
+      .or('status.eq.available,status.is.null');
+
+    // Re-check status after update attempt (avoids 406 when 0 rows are returned)
+    const { data: afterUpdateTable, error: afterUpdateError } = await supabase
+      .from('tables')
+      .select('status')
+      .eq('id', table.id)
       .maybeSingle();
 
     // If no row was updated, it means another user took it (or status changed) in-between.
-    if (error || !updatedTable) {
+    const afterStatus = (afterUpdateTable?.status ?? 'available') as string;
+    if (error || afterUpdateError || afterStatus !== 'occupied') {
       toast({
         variant: "destructive",
         title: "Mesa não disponível",
-        description: error?.message || "Esta mesa acabou de ser ocupada. Por favor, escolha outra.",
+        description: error?.message || afterUpdateError?.message || "Esta mesa acabou de ser ocupada. Por favor, escolha outra.",
       });
       fetchTables();
       return;
