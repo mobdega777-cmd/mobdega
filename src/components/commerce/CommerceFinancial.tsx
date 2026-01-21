@@ -36,6 +36,7 @@ import DateFilter from "./DateFilter";
 import InvoicePaymentModal from "./InvoicePaymentModal";
 import { startOfDay, endOfDay, subDays, startOfMonth } from "date-fns";
 import { formatCurrency, formatPercentage } from "@/lib/formatCurrency";
+import HelpTooltip from "@/components/ui/help-tooltip";
 
 interface CommerceFinancialProps {
   commerceId: string;
@@ -157,7 +158,7 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
       ? ((monthlyRevenue - lastMonthRevenue) / lastMonthRevenue) * 100 
       : 0;
 
-    // Fetch products for cost/stock calculations
+    // Fetch products for cost/stock calculations with category info
     const { data: products } = await supabase
       .from('products')
       .select('price, promotional_price, stock, category_id')
@@ -170,6 +171,48 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
       stockCostValue += (p.price || 0) * stock;
       stockSaleValue += (p.promotional_price || p.price || 0) * stock;
     });
+
+    // Calcular categorias com base em vendas reais
+    const { data: orderItems } = await supabase
+      .from('order_items')
+      .select(`
+        quantity,
+        total_price,
+        product_id,
+        orders!inner(commerce_id, status, created_at)
+      `)
+      .eq('orders.commerce_id', commerceId)
+      .eq('orders.status', 'delivered');
+
+    // Buscar produtos com suas categorias
+    const { data: productsWithCategories } = await supabase
+      .from('products')
+      .select('id, category_id')
+      .eq('commerce_id', commerceId);
+
+    const { data: categoriesData } = await supabase
+      .from('categories')
+      .select('id, name')
+      .eq('commerce_id', commerceId);
+
+    // Mapear vendas por categoria
+    const categoryMap = new Map(categoriesData?.map(c => [c.id, c.name]) || []);
+    const productCategoryMap = new Map(productsWithCategories?.map(p => [p.id, p.category_id]) || []);
+    
+    const salesByCategory: Record<string, number> = {};
+    orderItems?.forEach(item => {
+      const categoryId = productCategoryMap.get(item.product_id || '');
+      const categoryName = categoryId ? categoryMap.get(categoryId) : 'Sem categoria';
+      const name = categoryName || 'Sem categoria';
+      salesByCategory[name] = (salesByCategory[name] || 0) + Number(item.total_price);
+    });
+
+    // Ordenar categorias por vendas
+    const sortedCategories = Object.entries(salesByCategory).sort((a, b) => b[1] - a[1]);
+    const bestCategory = sortedCategories.length > 0 ? sortedCategories[0][0] : "Nenhuma venda";
+    const worstCategory = sortedCategories.length > 1 
+      ? sortedCategories[sortedCategories.length - 1][0] 
+      : sortedCategories.length === 1 ? sortedCategories[0][0] : "Nenhuma venda";
 
     const potentialProfit = stockSaleValue - stockCostValue;
     const monthlyCost = monthlyRevenue * 0.6;
@@ -210,8 +253,8 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
       stockCostValue,
       stockSaleValue,
       potentialProfit,
-      bestSellingCategory: "Bebidas",
-      worstSellingCategory: "Outros",
+      bestSellingCategory: bestCategory,
+      worstSellingCategory: worstCategory,
       projectedRevenue,
       growthRate,
     });
@@ -276,7 +319,10 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Faturamento do Período</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm text-muted-foreground">Faturamento do Período</p>
+                  <HelpTooltip content="Total de vendas realizadas no período selecionado, incluindo pedidos de delivery, mesa e vendas do PDV." />
+                </div>
                 <p className="text-2xl font-bold text-green-500">{formatCurrency(stats.monthlyRevenue)}</p>
                 <p className={`text-xs mt-1 flex items-center gap-1 ${stats.growthRate >= 0 ? 'text-green-600' : 'text-red-500'}`}>
                   {stats.growthRate >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
@@ -294,7 +340,10 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Lucro Estimado</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm text-muted-foreground">Lucro Estimado</p>
+                  <HelpTooltip content="Lucro estimado com base em uma margem média de 40%. Para maior precisão, cadastre o custo de cada produto." />
+                </div>
                 <p className="text-2xl font-bold text-blue-500">{formatCurrency(stats.monthlyProfit)}</p>
                 <p className="text-xs mt-1 text-muted-foreground">Margem: {stats.profitMargin.toFixed(1)}%</p>
               </div>
@@ -309,7 +358,10 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">A Pagar (Pendente)</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm text-muted-foreground">A Pagar (Pendente)</p>
+                  <HelpTooltip content="Valor total de faturas pendentes como mensalidades e outras cobranças que você ainda precisa pagar." />
+                </div>
                 <p className="text-2xl font-bold text-yellow-500">{formatCurrency(stats.pendingPayments)}</p>
               </div>
               <div className="p-3 rounded-xl bg-yellow-500/10">
@@ -323,7 +375,10 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Vencidos</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm text-muted-foreground">Vencidos</p>
+                  <HelpTooltip content="Faturas que já passaram da data de vencimento e precisam ser regularizadas para evitar suspensão." />
+                </div>
                 <p className="text-2xl font-bold text-red-500">{formatCurrency(stats.overduePayments)}</p>
               </div>
               <div className="p-3 rounded-xl bg-red-500/10">
@@ -342,8 +397,11 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
               <div className="p-2 rounded-lg bg-primary/10">
                 <ShoppingCart className="w-5 h-5 text-primary" />
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Pedidos no Período</p>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="text-xs text-muted-foreground">Pedidos no Período</p>
+                  <HelpTooltip content="Quantidade total de pedidos finalizados no período, incluindo todas as modalidades." />
+                </div>
                 <p className="text-lg font-bold">{stats.totalOrders}</p>
               </div>
             </div>
@@ -356,8 +414,11 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
               <div className="p-2 rounded-lg bg-purple-500/10">
                 <CreditCard className="w-5 h-5 text-purple-500" />
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Ticket Médio</p>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="text-xs text-muted-foreground">Ticket Médio</p>
+                  <HelpTooltip content="Valor médio gasto por pedido. Calculado dividindo o faturamento total pelo número de pedidos." />
+                </div>
                 <p className="text-lg font-bold">{formatCurrency(stats.avgTicket)}</p>
               </div>
             </div>
@@ -370,8 +431,11 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
               <div className="p-2 rounded-lg bg-orange-500/10">
                 <Target className="w-5 h-5 text-orange-500" />
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Projeção Mensal</p>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="text-xs text-muted-foreground">Projeção Mensal</p>
+                  <HelpTooltip content="Estimativa de faturamento até o fim do mês, baseada na média diária de vendas até agora." />
+                </div>
                 <p className="text-lg font-bold">{formatCurrency(stats.projectedRevenue)}</p>
               </div>
             </div>
@@ -384,8 +448,11 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
               <div className="p-2 rounded-lg bg-cyan-500/10">
                 <Activity className="w-5 h-5 text-cyan-500" />
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Taxa de Crescimento</p>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="text-xs text-muted-foreground">Taxa de Crescimento</p>
+                  <HelpTooltip content="Comparativo do faturamento atual com o mês anterior. Verde indica crescimento, vermelho indica queda." />
+                </div>
                 <p className={`text-lg font-bold ${stats.growthRate >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                   {stats.growthRate >= 0 ? '+' : ''}{stats.growthRate.toFixed(1)}%
                 </p>
