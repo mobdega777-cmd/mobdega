@@ -102,11 +102,14 @@ interface TableOrder {
   total: number;
   status: string;
   payment_method: string | null;
+  all_order_ids?: string[];
   items: {
+    id?: string;
     product_name: string;
     quantity: number;
     unit_price: number;
     total_price: number;
+    product_id?: string | null;
   }[];
 }
 
@@ -222,10 +225,12 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
         status,
         payment_method,
         order_items (
+          id,
           product_name,
           quantity,
           unit_price,
-          total_price
+          total_price,
+          product_id
         )
       `)
       .eq('commerce_id', commerceId)
@@ -245,7 +250,8 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
       const tableMap = new Map(tablesData?.map(t => [t.id, t]) || []);
 
       // Consolidar pedidos por mesa - agrupar itens de múltiplos pedidos na mesma mesa
-      const ordersByTable = new Map<string, TableOrder>();
+      // Agora armazenamos todos os order_ids para fechar todos juntos
+      const ordersByTable = new Map<string, TableOrder & { all_order_ids: string[] }>();
       
       tableOrdersData.forEach(order => {
         const table = tableMap.get(order.table_id);
@@ -256,9 +262,11 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
           const existingOrder = ordersByTable.get(tableKey)!;
           existingOrder.items = [...existingOrder.items, ...(order.order_items || [])];
           existingOrder.total = Number(existingOrder.total) + Number(order.total);
-          // Manter o status mais avançado
+          existingOrder.all_order_ids.push(order.id);
+          // Manter o status mais avançado (delivered = pronto pra fechar)
           const statusPriority: Record<string, number> = { pending: 1, confirmed: 2, preparing: 3, delivered: 4 };
-          if (statusPriority[order.status] > statusPriority[existingOrder.status]) {
+          if (statusPriority[order.status] < statusPriority[existingOrder.status]) {
+            // Manter o status MENOS avançado para não habilitar fechamento antes de todos estarem prontos
             existingOrder.status = order.status;
           }
         } else {
@@ -274,7 +282,8 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
             total: order.total,
             status: order.status,
             payment_method: order.payment_method,
-            items: order.order_items || []
+            items: order.order_items || [],
+            all_order_ids: [order.id]
           });
         }
       });
@@ -642,23 +651,18 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
   const closeTableOrder = async () => {
     if (!selectedTableOrder || !currentRegister || !user) return;
 
-    // Deduct stock for all items in the order
-    for (const item of selectedTableOrder.items) {
-      // Get product info to find the product_id
-      const { data: orderItem } = await supabase
-        .from('order_items')
-        .select('product_id')
-        .eq('order_id', selectedTableOrder.id)
-        .eq('product_name', item.product_name)
-        .limit(1)
-        .maybeSingle();
+    // Obter todos os order_ids que fazem parte desta mesa consolidada
+    const allOrderIds = (selectedTableOrder as TableOrder & { all_order_ids?: string[] }).all_order_ids || [selectedTableOrder.id];
 
-      if (orderItem?.product_id) {
+    // Deduzir estoque para todos os itens consolidados (apenas se tiver product_id)
+    for (const item of selectedTableOrder.items) {
+      const productId = (item as { product_id?: string | null }).product_id;
+      if (productId) {
         // Get current stock
         const { data: product } = await supabase
           .from('products')
           .select('stock')
-          .eq('id', orderItem.product_id)
+          .eq('id', productId)
           .single();
 
         if (product && product.stock !== null) {
@@ -666,22 +670,25 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
           await supabase
             .from('products')
             .update({ stock: newStock })
-            .eq('id', orderItem.product_id);
+            .eq('id', productId);
         }
       }
     }
 
-    // Update order with payment method and status
-    await supabase
-      .from('orders')
-      .update({
-        payment_method: tablePaymentMethod,
-        status: 'delivered',
-        delivered_at: new Date().toISOString()
-      })
-      .eq('id', selectedTableOrder.id);
+    // Atualizar TODOS os pedidos da mesa com payment_method, status e stock_deducted
+    for (const orderId of allOrderIds) {
+      await supabase
+        .from('orders')
+        .update({
+          payment_method: tablePaymentMethod,
+          status: 'delivered',
+          delivered_at: new Date().toISOString(),
+          stock_deducted: true
+        })
+        .eq('id', orderId);
+    }
 
-    // Create cash movement for this sale
+    // Criar movimentação de caixa para o total da mesa
     await supabase
       .from('cash_movements')
       .insert({
@@ -692,10 +699,10 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
         payment_method: tablePaymentMethod,
         description: `Mesa ${selectedTableOrder.table_number} - ${selectedTableOrder.customer_name || 'Cliente'}`,
         created_by: user.id,
-        order_id: selectedTableOrder.id,
+        order_id: allOrderIds[0], // Usar o primeiro order_id como referência
       });
 
-    // Free up the table
+    // Liberar a mesa
     if (selectedTableOrder.table_id) {
       await supabase
         .from('tables')
@@ -1190,7 +1197,55 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
             </CardContent>
           </Card>
 
-          {/* Open Tables Section */}
+          {/* Summary Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <ArrowUpCircle className="w-8 h-8 text-green-500" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">Vendas</p>
+                    <p className="text-lg font-bold">R$ {totals.sales.toFixed(2)}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <Plus className="w-8 h-8 text-blue-500" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">Entradas</p>
+                    <p className="text-lg font-bold">R$ {totals.deposits.toFixed(2)}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <Minus className="w-8 h-8 text-orange-500" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">Sangrias</p>
+                    <p className="text-lg font-bold">R$ {totals.withdrawals.toFixed(2)}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="border-primary/20 bg-primary/5">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <DollarSign className="w-8 h-8 text-primary" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">Em Caixa</p>
+                    <p className="text-lg font-bold text-primary">R$ {totals.cashInRegister.toFixed(2)}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Open Tables Section - Below cards, above movements */}
           {tableOrders.length > 0 && (
             <div className="space-y-4">
               <div className="flex items-center gap-2">
@@ -1298,54 +1353,6 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
               </div>
             </div>
           )}
-
-          {/* Summary Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <ArrowUpCircle className="w-8 h-8 text-green-500" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Vendas</p>
-                    <p className="text-lg font-bold">R$ {totals.sales.toFixed(2)}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <Plus className="w-8 h-8 text-blue-500" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Entradas</p>
-                    <p className="text-lg font-bold">R$ {totals.deposits.toFixed(2)}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <Minus className="w-8 h-8 text-orange-500" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Sangrias</p>
-                    <p className="text-lg font-bold">R$ {totals.withdrawals.toFixed(2)}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="border-primary/20 bg-primary/5">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <DollarSign className="w-8 h-8 text-primary" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Em Caixa</p>
-                    <p className="text-lg font-bold text-primary">R$ {totals.cashInRegister.toFixed(2)}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
 
           {/* Movements Table */}
           <Card>
