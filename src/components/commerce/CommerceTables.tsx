@@ -398,14 +398,14 @@ const CommerceTables = ({ commerceId }: CommerceTablesProps) => {
                     )}
                   </div>
 
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-1.5 items-center">
                     {table.status === 'available' && (
                       <Button
                         size="sm"
-                        className="flex-1"
+                        className="text-xs px-2 h-7"
                         onClick={() => updateTableStatus(table.id, 'occupied')}
                       >
-                        Abrir Mesa
+                        Abrir
                       </Button>
                     )}
                     {table.status === 'occupied' && (
@@ -413,52 +413,54 @@ const CommerceTables = ({ commerceId }: CommerceTablesProps) => {
                         <Button
                           size="sm"
                           variant="outline"
-                          className="flex-1"
+                          className="text-xs px-2 h-7"
                           onClick={() => updateTableStatus(table.id, 'available')}
                         >
                           Fechar
                         </Button>
-                        <Button size="sm" className="flex-1">
-                          <DollarSign className="w-4 h-4" />
+                        <Button size="sm" className="h-7 w-7 p-0">
+                          <DollarSign className="w-3.5 h-3.5" />
                         </Button>
                       </>
                     )}
                     {table.status === 'reserved' && (
                       <Button
                         size="sm"
-                        className="flex-1"
+                        className="text-xs px-2 h-7"
                         onClick={() => updateTableStatus(table.id, 'occupied')}
                       >
                         Check-in
                       </Button>
                     )}
                     <Button
-                      size="icon"
+                      size="sm"
                       variant="ghost"
+                      className="h-7 w-7 p-0"
                       onClick={() => handleGenerateQRCode(table)}
                       disabled={generatingQR === table.id}
                       title="Gerar QR Code para impressão"
                     >
                       {generatingQR === table.id ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
                       ) : (
-                        <QrCode className="w-4 h-4" />
+                        <QrCode className="w-3.5 h-3.5" />
                       )}
                     </Button>
                     <Button
-                      size="icon"
+                      size="sm"
                       variant="ghost"
+                      className="h-7 w-7 p-0"
                       onClick={() => handleEdit(table)}
                     >
-                      <Pencil className="w-4 h-4" />
+                      <Pencil className="w-3.5 h-3.5" />
                     </Button>
                     <Button
-                      size="icon"
+                      size="sm"
                       variant="ghost"
+                      className="h-7 w-7 p-0 text-destructive hover:text-destructive"
                       onClick={() => handleDelete(table.id)}
-                      className="text-destructive hover:text-destructive"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Trash2 className="w-3.5 h-3.5" />
                     </Button>
                   </div>
                 </CardContent>
