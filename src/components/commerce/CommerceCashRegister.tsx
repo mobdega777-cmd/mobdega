@@ -209,7 +209,7 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
 
     setProducts(productsData || []);
 
-    // Fetch table orders with pending payment (status = delivered, payment_method = pending, order_type = table)
+  // Fetch table orders with pending payment (status = delivered, payment_method = pending, order_type = table)
     const { data: tableOrdersData } = await supabase
       .from('orders')
       .select(`
@@ -244,24 +244,42 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
 
       const tableMap = new Map(tablesData?.map(t => [t.id, t]) || []);
 
-      const formattedOrders: TableOrder[] = tableOrdersData.map(order => {
+      // Consolidar pedidos por mesa - agrupar itens de múltiplos pedidos na mesma mesa
+      const ordersByTable = new Map<string, TableOrder>();
+      
+      tableOrdersData.forEach(order => {
         const table = tableMap.get(order.table_id);
-        return {
-          id: order.id,
-          table_id: order.table_id || '',
-          table_number: table?.number || 0,
-          table_name: table?.name || null,
-          customer_name: order.customer_name,
-          customer_phone: order.customer_phone,
-          created_at: order.created_at,
-          total: order.total,
-          status: order.status,
-          payment_method: order.payment_method,
-          items: order.order_items || []
-        };
+        const tableKey = order.table_id || order.id;
+        
+        if (ordersByTable.has(tableKey)) {
+          // Mesa já existe - adicionar itens e somar total
+          const existingOrder = ordersByTable.get(tableKey)!;
+          existingOrder.items = [...existingOrder.items, ...(order.order_items || [])];
+          existingOrder.total = Number(existingOrder.total) + Number(order.total);
+          // Manter o status mais avançado
+          const statusPriority: Record<string, number> = { pending: 1, confirmed: 2, preparing: 3, delivered: 4 };
+          if (statusPriority[order.status] > statusPriority[existingOrder.status]) {
+            existingOrder.status = order.status;
+          }
+        } else {
+          // Nova mesa
+          ordersByTable.set(tableKey, {
+            id: order.id,
+            table_id: order.table_id || '',
+            table_number: table?.number || 0,
+            table_name: table?.name || null,
+            customer_name: order.customer_name,
+            customer_phone: order.customer_phone,
+            created_at: order.created_at,
+            total: order.total,
+            status: order.status,
+            payment_method: order.payment_method,
+            items: order.order_items || []
+          });
+        }
       });
 
-      setTableOrders(formattedOrders);
+      setTableOrders(Array.from(ordersByTable.values()));
     } else {
       setTableOrders([]);
     }
@@ -985,6 +1003,79 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
                       </div>
                     </div>
 
+                    {/* Conferência por Forma de Pagamento */}
+                    <div className="p-4 rounded-lg border space-y-3">
+                      <h4 className="font-semibold text-sm flex items-center gap-2">
+                        <CheckCircle className="w-4 h-4" />
+                        Conferência Manual (opcional)
+                      </h4>
+                      <p className="text-xs text-muted-foreground">
+                        Preencha os valores contabilizados manualmente para comparar com o sistema.
+                      </p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <Label className="text-xs flex items-center gap-1">
+                            <Banknote className="w-3 h-3 text-green-600" />
+                            Dinheiro Contado
+                          </Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder="0,00"
+                            className="h-8 text-sm"
+                          />
+                          <p className="text-[10px] text-muted-foreground">
+                            Sistema: {formatCurrency(paymentTotals.byPaymentMethod.cash)}
+                          </p>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs flex items-center gap-1">
+                            <CreditCard className="w-3 h-3 text-blue-600" />
+                            Crédito Contado
+                          </Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder="0,00"
+                            className="h-8 text-sm"
+                          />
+                          <p className="text-[10px] text-muted-foreground">
+                            Sistema: {formatCurrency(paymentTotals.byPaymentMethod.credit)}
+                          </p>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs flex items-center gap-1">
+                            <CreditCard className="w-3 h-3 text-purple-600" />
+                            Débito Contado
+                          </Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder="0,00"
+                            className="h-8 text-sm"
+                          />
+                          <p className="text-[10px] text-muted-foreground">
+                            Sistema: {formatCurrency(paymentTotals.byPaymentMethod.debit)}
+                          </p>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs flex items-center gap-1">
+                            <Smartphone className="w-3 h-3 text-teal-600" />
+                            PIX Contado
+                          </Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder="0,00"
+                            className="h-8 text-sm"
+                          />
+                          <p className="text-[10px] text-muted-foreground">
+                            Sistema: {formatCurrency(paymentTotals.byPaymentMethod.pix)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
                     {/* Valor esperado em caixa (apenas dinheiro) */}
                     <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20">
                       <div className="flex items-center gap-2 mb-1">
@@ -998,7 +1089,7 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
                     </div>
 
                     <div>
-                      <Label htmlFor="closing_amount">Valor Contado em Dinheiro (R$)</Label>
+                      <Label htmlFor="closing_amount">Valor Final em Dinheiro no Caixa (R$)</Label>
                       <Input
                         id="closing_amount"
                         type="number"
@@ -1315,25 +1406,6 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-1">
-                              {movement.order_id && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => {
-                                    // Find the table order with this order_id
-                                    const tableOrder = tableOrders.find(o => o.id === movement.order_id);
-                                    if (tableOrder) {
-                                      openTableOrderDetails(tableOrder);
-                                    } else {
-                                      // Fetch order details if not in tableOrders
-                                      toast({ title: "Detalhes do pedido", description: `ID: ${movement.order_id?.slice(0, 8)}...` });
-                                    }
-                                  }}
-                                  title="Ver detalhes"
-                                >
-                                  <Eye className="w-4 h-4" />
-                                </Button>
-                              )}
                               <Button
                                 variant="ghost"
                                 size="sm"

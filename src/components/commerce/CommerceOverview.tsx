@@ -20,6 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import DateFilter from "./DateFilter";
 import { startOfDay, endOfDay } from "date-fns";
 import { formatCurrency } from "@/lib/formatCurrency";
+import HelpTooltip from "@/components/ui/help-tooltip";
 
 interface OpeningHours {
   [key: string]: { open: string; close: string; enabled: boolean };
@@ -117,12 +118,12 @@ const CommerceOverview = ({ commerce }: CommerceOverviewProps) => {
   // Using centralized formatCurrency from @/lib/formatCurrency
 
   const statCards = [
-    { title: "Pedidos Pendentes", value: stats.pendingOrders, icon: Clock, color: "text-yellow-500", bgColor: "bg-yellow-500/10" },
-    { title: "Faturamento do Período", value: formatCurrency(stats.todayRevenue), icon: DollarSign, color: "text-green-500", bgColor: "bg-green-500/10" },
-    { title: "Entregas Ativas", value: stats.activeDeliveries, icon: Truck, color: "text-blue-500", bgColor: "bg-blue-500/10" },
-    { title: "Finalizados no Período", value: stats.completedToday, icon: CheckCircle, color: "text-emerald-500", bgColor: "bg-emerald-500/10" },
-    { title: "Total de Produtos", value: stats.totalProducts, icon: Package, color: "text-purple-500", bgColor: "bg-purple-500/10" },
-    { title: "Total de Pedidos", value: stats.totalOrders, icon: ShoppingCart, color: "text-primary", bgColor: "bg-primary/10" },
+    { title: "Pedidos Pendentes", value: stats.pendingOrders, icon: Clock, color: "text-yellow-500", bgColor: "bg-yellow-500/10", tooltip: "Pedidos que estão aguardando confirmação, em preparo ou para serem entregues." },
+    { title: "Faturamento do Período", value: formatCurrency(stats.todayRevenue), icon: DollarSign, color: "text-green-500", bgColor: "bg-green-500/10", tooltip: "Total de vendas concluídas no período selecionado (Delivery + Mesa + PDV)." },
+    { title: "Entregas Ativas", value: stats.activeDeliveries, icon: Truck, color: "text-blue-500", bgColor: "bg-blue-500/10", tooltip: "Pedidos de delivery que estão em rota de entrega neste momento." },
+    { title: "Finalizados no Período", value: stats.completedToday, icon: CheckCircle, color: "text-emerald-500", bgColor: "bg-emerald-500/10", tooltip: "Quantidade de pedidos concluídos com sucesso no período selecionado." },
+    { title: "Total de Produtos", value: stats.totalProducts, icon: Package, color: "text-purple-500", bgColor: "bg-purple-500/10", tooltip: "Quantidade de produtos cadastrados no seu cardápio." },
+    { title: "Total de Pedidos", value: stats.totalOrders, icon: ShoppingCart, color: "text-primary", bgColor: "bg-primary/10", tooltip: "Todos os pedidos recebidos desde a criação do comércio." },
   ];
 
   const getStatusBadge = (status: string) => {
@@ -187,7 +188,22 @@ const CommerceOverview = ({ commerce }: CommerceOverviewProps) => {
 
       <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
         {statCards.map((stat) => { const Icon = stat.icon; return (
-          <Card key={stat.title} className="border-border/50"><CardContent className="p-3 md:p-6"><div className="flex items-center justify-between"><div className="min-w-0"><p className="text-xs md:text-sm text-muted-foreground truncate">{stat.title}</p><p className="text-lg md:text-2xl font-bold mt-1">{stat.value}</p></div><div className={`p-2 md:p-3 rounded-xl ${stat.bgColor}`}><Icon className={`w-4 h-4 md:w-6 md:h-6 ${stat.color}`} /></div></div></CardContent></Card>
+          <Card key={stat.title} className="border-border/50">
+            <CardContent className="p-3 md:p-6">
+              <div className="flex items-center justify-between">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1">
+                    <p className="text-xs md:text-sm text-muted-foreground truncate">{stat.title}</p>
+                    <HelpTooltip content={stat.tooltip} className="flex-shrink-0" />
+                  </div>
+                  <p className="text-lg md:text-2xl font-bold mt-1">{stat.value}</p>
+                </div>
+                <div className={`p-2 md:p-3 rounded-xl ${stat.bgColor}`}>
+                  <Icon className={`w-4 h-4 md:w-6 md:h-6 ${stat.color}`} />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         ); })}
       </div>
 
