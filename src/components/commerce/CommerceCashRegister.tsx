@@ -48,7 +48,8 @@ import {
   XCircle,
   User,
   Phone,
-  Eye
+  Eye,
+  Percent
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -56,6 +57,7 @@ import { useToast } from "@/hooks/use-toast";
 import DateFilter, { getDateRange } from "./DateFilter";
 import { startOfDay, endOfDay, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { HelpTooltip } from "@/components/ui/help-tooltip";
 
 interface CommerceCashRegisterProps {
   commerceId: string;
@@ -126,6 +128,11 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
   const [filteredMovements, setFilteredMovements] = useState<CashMovement[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [tableOrders, setTableOrders] = useState<TableOrder[]>([]);
+  const [paymentMethodsConfig, setPaymentMethodsConfig] = useState<Array<{
+    type: string;
+    fee_percentage: number;
+    fee_fixed: number;
+  }>>([]);
   const [loading, setLoading] = useState(true);
   const [isOpenDialogOpen, setIsOpenDialogOpen] = useState(false);
   const [isCloseDialogOpen, setIsCloseDialogOpen] = useState(false);
@@ -292,6 +299,14 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
     } else {
       setTableOrders([]);
     }
+
+    // Fetch payment methods config for fee calculation
+    const { data: paymentMethodsData } = await supabase
+      .from('payment_methods')
+      .select('type, fee_percentage, fee_fixed')
+      .eq('commerce_id', commerceId);
+
+    setPaymentMethodsConfig(paymentMethodsData || []);
 
     setLoading(false);
   };
@@ -581,6 +596,33 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
   };
 
   const paymentTotals = calculatePaymentMethodTotals();
+
+  // Calculate total fees based on payment methods configuration
+  const calculateTotalFees = () => {
+    const paymentTypes = ['cash', 'credit', 'debit', 'pix'];
+    let fees = 0;
+
+    paymentTypes.forEach(type => {
+      const config = paymentMethodsConfig.find(pm => pm.type === type);
+      const amount = paymentTotals.byPaymentMethod[type as keyof typeof paymentTotals.byPaymentMethod] || 0;
+      const count = paymentTotals.countByPaymentMethod[type as keyof typeof paymentTotals.countByPaymentMethod] || 0;
+      
+      if (config && amount > 0) {
+        // Percentage fee
+        if (config.fee_percentage > 0) {
+          fees += amount * (config.fee_percentage / 100);
+        }
+        // Fixed fee per transaction
+        if (config.fee_fixed > 0) {
+          fees += count * config.fee_fixed;
+        }
+      }
+    });
+
+    return fees;
+  };
+
+  const totalFees = calculateTotalFees();
 
   const totals = calculateTotals();
 
@@ -1174,14 +1216,17 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
           </Card>
 
           {/* Summary Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
                   <ArrowUpCircle className="w-8 h-8 text-green-500" />
                   <div>
-                    <p className="text-xs text-muted-foreground">Vendas</p>
-                    <p className="text-lg font-bold">R$ {totals.sales.toFixed(2)}</p>
+                    <div className="flex items-center gap-1">
+                      <p className="text-xs text-muted-foreground">Vendas</p>
+                      <HelpTooltip content="Total de vendas realizadas no período" />
+                    </div>
+                    <p className="text-lg font-bold">{formatCurrency(totals.sales)}</p>
                   </div>
                 </div>
               </CardContent>
@@ -1191,8 +1236,11 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
                 <div className="flex items-center gap-3">
                   <Plus className="w-8 h-8 text-blue-500" />
                   <div>
-                    <p className="text-xs text-muted-foreground">Entradas</p>
-                    <p className="text-lg font-bold">R$ {totals.deposits.toFixed(2)}</p>
+                    <div className="flex items-center gap-1">
+                      <p className="text-xs text-muted-foreground">Entradas</p>
+                      <HelpTooltip content="Depósitos e entradas manuais de dinheiro" />
+                    </div>
+                    <p className="text-lg font-bold">{formatCurrency(totals.deposits)}</p>
                   </div>
                 </div>
               </CardContent>
@@ -1202,8 +1250,25 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
                 <div className="flex items-center gap-3">
                   <Minus className="w-8 h-8 text-orange-500" />
                   <div>
-                    <p className="text-xs text-muted-foreground">Sangrias</p>
-                    <p className="text-lg font-bold">R$ {totals.withdrawals.toFixed(2)}</p>
+                    <div className="flex items-center gap-1">
+                      <p className="text-xs text-muted-foreground">Sangrias</p>
+                      <HelpTooltip content="Retiradas de dinheiro do caixa" />
+                    </div>
+                    <p className="text-lg font-bold">{formatCurrency(totals.withdrawals)}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="border-red-500/20 bg-red-500/5">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <Percent className="w-8 h-8 text-red-500" />
+                  <div>
+                    <div className="flex items-center gap-1">
+                      <p className="text-xs text-muted-foreground">Taxas</p>
+                      <HelpTooltip content="Total de taxas cobradas pelas operadoras de cartão e PIX" />
+                    </div>
+                    <p className="text-lg font-bold text-red-500">{formatCurrency(totalFees)}</p>
                   </div>
                 </div>
               </CardContent>
@@ -1213,8 +1278,11 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
                 <div className="flex items-center gap-3">
                   <DollarSign className="w-8 h-8 text-primary" />
                   <div>
-                    <p className="text-xs text-muted-foreground">Em Caixa</p>
-                    <p className="text-lg font-bold text-primary">R$ {totals.cashInRegister.toFixed(2)}</p>
+                    <div className="flex items-center gap-1">
+                      <p className="text-xs text-muted-foreground">Em Caixa</p>
+                      <HelpTooltip content="Valor esperado em dinheiro no caixa (abertura + vendas em dinheiro - sangrias)" />
+                    </div>
+                    <p className="text-lg font-bold text-primary">{formatCurrency(totals.cashInRegister)}</p>
                   </div>
                 </div>
               </CardContent>
