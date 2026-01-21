@@ -16,6 +16,11 @@ const ProtectedCommerceRoute = ({ children }: ProtectedCommerceRouteProps) => {
     let cancelled = false;
 
     const check = async () => {
+      // Wait for auth to finish loading before checking commerce
+      if (isLoading) {
+        return;
+      }
+
       if (!user) {
         if (!cancelled) {
           setHasCommerce(false);
@@ -43,8 +48,9 @@ const ProtectedCommerceRoute = ({ children }: ProtectedCommerceRouteProps) => {
     return () => {
       cancelled = true;
     };
-  }, [user]);
+  }, [user, isLoading]);
 
+  // Show loading while auth is still loading OR while checking commerce
   if (isLoading || checkingCommerce) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
