@@ -1433,21 +1433,21 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
               </div>
               <div className="grid grid-cols-3 gap-3">
                 {tables.map((table) => {
-                  const isOccupied = table.status === 'occupied' || table.status === 'reserved';
-                  const isAvailable = table.status === 'available';
+                  // Normalize status check - handle null/undefined as available
+                  const tableStatus = table.status || 'available';
+                  const isOccupied = tableStatus === 'occupied' || tableStatus === 'reserved';
+                  const isAvailable = tableStatus === 'available';
                   return (
                     <Button
                       key={table.id}
                       variant="outline"
-                      disabled={!isAvailable}
+                      disabled={isOccupied}
                       className={`h-20 flex flex-col border-2 ${
                         isOccupied 
-                          ? 'bg-red-500/10 border-red-500 text-red-600 hover:bg-red-500/20' 
-                          : isAvailable 
-                            ? 'bg-green-500/10 border-green-500 text-green-700 hover:bg-green-500/20' 
-                            : 'bg-muted border-muted-foreground/30'
+                          ? 'bg-red-500/10 border-red-500 text-red-600 cursor-not-allowed opacity-60' 
+                          : 'bg-green-500/10 border-green-500 text-green-700 hover:bg-green-500/20'
                       }`}
-                      onClick={() => handleSelectTable(table)}
+                      onClick={() => !isOccupied && handleSelectTable(table)}
                     >
                       <span className="text-lg font-bold">Mesa {table.number}</span>
                       {table.name && <span className="text-xs opacity-70">{table.name}</span>}
