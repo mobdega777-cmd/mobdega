@@ -14,6 +14,7 @@ interface SalesReportData {
   topCategories: { name: string; revenue: number }[];
   paymentMethodBreakdown: { method: string; total: number; count: number }[];
   dailySales: { date: string; revenue: number; orders: number }[];
+  weeklySales?: { week: string; revenue: number; orders: number }[];
 }
 
 interface StockReportData {
@@ -155,6 +156,76 @@ export const generateSalesReportPDF = async (data: SalesReportData) => {
       headStyles: { fillColor: [245, 158, 11], textColor: [255, 255, 255] },
       margin: { left: 14, right: 14 },
     });
+
+    yPos = (doc as any).lastAutoTable.finalY + 15;
+  }
+
+  // Weekly Sales Table
+  if (data.weeklySales && data.weeklySales.length > 0) {
+    // Check if we need a new page
+    if (yPos > 220) {
+      doc.addPage();
+      yPos = 20;
+    }
+
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Vendas Semanais', 14, yPos);
+    yPos += 5;
+
+    autoTable(doc, {
+      startY: yPos,
+      head: [['Semana', 'Pedidos', 'Receita']],
+      body: data.weeklySales.map(week => [
+        week.week,
+        week.orders.toString(),
+        formatCurrency(week.revenue)
+      ]),
+      theme: 'striped',
+      headStyles: { fillColor: [245, 158, 11], textColor: [255, 255, 255] },
+      margin: { left: 14, right: 14 },
+    });
+
+    yPos = (doc as any).lastAutoTable.finalY + 15;
+  }
+
+  // Sales Evolution Mini Chart (visual representation using bars)
+  if (data.dailySales.length > 0) {
+    if (yPos > 200) {
+      doc.addPage();
+      yPos = 20;
+    }
+
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Gráfico de Evolução de Vendas', 14, yPos);
+    yPos += 10;
+
+    const chartWidth = pageWidth - 28;
+    const chartHeight = 40;
+    const maxRevenue = Math.max(...data.dailySales.map(d => d.revenue), 1);
+    const barWidth = Math.min(chartWidth / data.dailySales.length - 2, 15);
+
+    // Draw chart background
+    doc.setFillColor(248, 250, 252);
+    doc.roundedRect(14, yPos, chartWidth, chartHeight + 20, 3, 3, 'F');
+
+    // Draw bars
+    data.dailySales.slice(-14).forEach((day, index) => {
+      const barHeight = (day.revenue / maxRevenue) * chartHeight;
+      const x = 20 + (index * (barWidth + 4));
+      const y = yPos + 5 + (chartHeight - barHeight);
+      
+      doc.setFillColor(245, 158, 11);
+      doc.roundedRect(x, y, barWidth, barHeight, 1, 1, 'F');
+      
+      // Date label
+      doc.setFontSize(6);
+      doc.setTextColor(128, 128, 128);
+      doc.text(day.date.slice(0, 5), x + barWidth / 2, yPos + chartHeight + 12, { align: 'center' });
+    });
+
+    doc.setTextColor(0, 0, 0);
   }
 
   // Footer
