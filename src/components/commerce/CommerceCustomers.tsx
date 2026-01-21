@@ -185,8 +185,8 @@ const CommerceCustomers = ({ commerceId }: CommerceCustomersProps) => {
     fetchCustomers();
 
     // Subscribe to order changes
-    const channel = supabase
-      .channel(`commerce-customers-${commerceId}`)
+    const ordersChannel = supabase
+      .channel(`commerce-customers-orders-${commerceId}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'orders', filter: `commerce_id=eq.${commerceId}` },
@@ -194,12 +194,34 @@ const CommerceCustomers = ({ commerceId }: CommerceCustomersProps) => {
       )
       .subscribe();
 
+    // Subscribe to favorites changes to update count in real-time
+    const favoritesChannel = supabase
+      .channel(`commerce-customers-favorites-${commerceId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'favorites', filter: `commerce_id=eq.${commerceId}` },
+        async () => {
+          const favCount = await fetchFavoritesCount();
+          setStats(prev => ({ ...prev, favoritesCount: favCount }));
+        }
+      )
+      .subscribe();
+
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(ordersChannel);
+      supabase.removeChannel(favoritesChannel);
     };
   }, [commerceId]);
 
-  const calculateStats = async (): Promise<CustomerStats> => {
+  const fetchFavoritesCount = async (): Promise<number> => {
+    const { count } = await supabase
+      .from('favorites')
+      .select('*', { count: 'exact', head: true })
+      .eq('commerce_id', commerceId);
+    return count || 0;
+  };
+
+  const calculateStats = (favoritesCount: number): CustomerStats => {
     const now = new Date();
     const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
@@ -208,14 +230,6 @@ const CommerceCustomers = ({ commerceId }: CommerceCustomersProps) => {
     ).length;
 
     const totalRevenue = customers.reduce((sum, c) => sum + c.total_spent, 0);
-    
-    // Fetch total favorites count for this commerce directly
-    const { count: totalFavorites } = await supabase
-      .from('favorites')
-      .select('*', { count: 'exact', head: true })
-      .eq('commerce_id', commerceId);
-
-    const favoritesCount = totalFavorites || 0;
     
     const totalOrders = customers.reduce((sum, c) => sum + c.total_orders, 0);
     const avgTicket = totalOrders > 0 
@@ -254,10 +268,13 @@ const CommerceCustomers = ({ commerceId }: CommerceCustomersProps) => {
 
   useEffect(() => {
     const updateStats = async () => {
-      const newStats = await calculateStats();
+      // Always fetch favorites count, even if there are no customers with orders
+      const favCount = await fetchFavoritesCount();
+      const newStats = calculateStats(favCount);
       setStats(newStats);
     };
-    if (customers.length > 0 || !loading) {
+    // Run when loading is complete (regardless of customer count)
+    if (!loading) {
       updateStats();
     }
   }, [customers, commerceId, loading]);
