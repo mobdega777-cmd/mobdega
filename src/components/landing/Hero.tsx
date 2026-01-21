@@ -1,12 +1,46 @@
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { MapPin, Clock, Star, ShoppingBag } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface HeroProps {
   onRegisterClick: () => void;
 }
 
+interface HeroCustomization {
+  title: string | null;
+  subtitle: string | null;
+  description: string | null;
+  cta_text: string | null;
+  cta_link: string | null;
+}
+
 const Hero = ({ onRegisterClick }: HeroProps) => {
+  const [customization, setCustomization] = useState<HeroCustomization | null>(null);
+
+  useEffect(() => {
+    const fetchCustomization = async () => {
+      const { data } = await supabase
+        .from('site_customizations')
+        .select('title, subtitle, description, cta_text, cta_link')
+        .eq('section', 'hero')
+        .eq('is_active', true)
+        .maybeSingle();
+      
+      if (data) {
+        setCustomization(data);
+      }
+    };
+    fetchCustomization();
+  }, []);
+
+  // Default values for when customization is not loaded
+  const heroTitle = customization?.title || "Sua adega favorita";
+  const heroSubtitle = customization?.subtitle || "na palma da mão";
+  const heroDescription = customization?.description || "Encontre as melhores adegas e tabacarias perto de você. Peça bebidas, narguilés e muito mais com entrega rápida e segura.";
+  const ctaText = customization?.cta_text || "Começar agora";
+
   return (
     <section className="relative min-h-screen gradient-hero overflow-hidden pt-20">
       {/* Decorative elements */}
@@ -35,19 +69,18 @@ const Hero = ({ onRegisterClick }: HeroProps) => {
             </motion.div>
 
             <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold text-foreground leading-tight mb-6">
-              Sua adega favorita
-              <span className="text-gradient-primary block">na palma da mão</span>
+              {heroTitle}
+              <span className="text-gradient-primary block">{heroSubtitle}</span>
             </h1>
 
             <p className="text-lg sm:text-xl text-muted-foreground max-w-xl mx-auto lg:mx-0 mb-8">
-              Encontre as melhores adegas e tabacarias perto de você. Peça bebidas, 
-              narguilés e muito mais com entrega rápida e segura.
+              {heroDescription}
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-12">
               <Button variant="hero" size="xl" onClick={onRegisterClick}>
                 <ShoppingBag className="w-5 h-5" />
-                Começar agora
+                {ctaText}
               </Button>
               <Button variant="outline" size="xl">
                 Sou comerciante

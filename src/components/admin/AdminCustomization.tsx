@@ -68,16 +68,23 @@ const AdminCustomization = () => {
     setIsSaving(true);
 
     for (const customization of customizations) {
+      const updateData: any = {
+        title: customization.title,
+        subtitle: customization.subtitle,
+        description: customization.description,
+        image_url: customization.image_url,
+        cta_text: customization.cta_text,
+        cta_link: customization.cta_link,
+      };
+      
+      // Include metadata for footer section
+      if (customization.section === 'footer') {
+        updateData.metadata = customization.metadata;
+      }
+
       const { error } = await supabase
         .from('site_customizations')
-        .update({
-          title: customization.title,
-          subtitle: customization.subtitle,
-          description: customization.description,
-          image_url: customization.image_url,
-          cta_text: customization.cta_text,
-          cta_link: customization.cta_link,
-        })
+        .update(updateData)
         .eq('id', customization.id);
 
       if (error) {
@@ -103,6 +110,42 @@ const AdminCustomization = () => {
     hero: 'Banner Principal (Hero)',
     benefits: 'Seção de Benefícios',
     featured: 'Lojas em Destaque',
+    footer: 'Rodapé',
+  };
+
+  // Footer metadata state
+  const [footerMetadata, setFooterMetadata] = useState({
+    email: '',
+    phone: '',
+    address: '',
+    instagram: '',
+    facebook: '',
+    twitter: '',
+  });
+
+  useEffect(() => {
+    const footer = customizations.find(c => c.section === 'footer');
+    if (footer?.metadata) {
+      setFooterMetadata({
+        email: footer.metadata.email || '',
+        phone: footer.metadata.phone || '',
+        address: footer.metadata.address || '',
+        instagram: footer.metadata.instagram || '',
+        facebook: footer.metadata.facebook || '',
+        twitter: footer.metadata.twitter || '',
+      });
+    }
+  }, [customizations]);
+
+  const updateFooterMetadata = (field: string, value: string) => {
+    setFooterMetadata(prev => ({ ...prev, [field]: value }));
+    setCustomizations(prev => 
+      prev.map(item => 
+        item.section === 'footer' 
+          ? { ...item, metadata: { ...item.metadata, [field]: value } }
+          : item
+      )
+    );
   };
 
   return (
@@ -149,6 +192,10 @@ const AdminCustomization = () => {
             <TabsTrigger value="featured" className="gap-2">
               <Image className="w-4 h-4" />
               Destaques
+            </TabsTrigger>
+            <TabsTrigger value="footer" className="gap-2">
+              <Layout className="w-4 h-4" />
+              Rodapé
             </TabsTrigger>
           </TabsList>
 
@@ -279,6 +326,96 @@ const AdminCustomization = () => {
               </TabsContent>
             );
           })}
+
+          {/* Footer Tab Content */}
+          <TabsContent value="footer">
+            <Card className="border-border/50">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Palette className="w-5 h-5 text-primary" />
+                  {sectionLabels.footer}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="footer-description">Descrição da Marca</Label>
+                  <Textarea
+                    id="footer-description"
+                    value={getSectionByKey('footer')?.description || ''}
+                    onChange={(e) => updateCustomization('footer', 'description', e.target.value)}
+                    placeholder="Descrição sobre a plataforma"
+                    rows={3}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="footer-email">E-mail de Contato</Label>
+                    <Input
+                      id="footer-email"
+                      type="email"
+                      value={footerMetadata.email}
+                      onChange={(e) => updateFooterMetadata('email', e.target.value)}
+                      placeholder="contato@mobdega.com.br"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="footer-phone">Telefone</Label>
+                    <Input
+                      id="footer-phone"
+                      value={footerMetadata.phone}
+                      onChange={(e) => updateFooterMetadata('phone', e.target.value)}
+                      placeholder="(11) 99999-9999"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="footer-address">Endereço</Label>
+                  <Textarea
+                    id="footer-address"
+                    value={footerMetadata.address}
+                    onChange={(e) => updateFooterMetadata('address', e.target.value)}
+                    placeholder="São Paulo, SP&#10;Brasil"
+                    rows={2}
+                  />
+                </div>
+
+                <div className="border-t border-border pt-6">
+                  <h4 className="text-sm font-medium text-muted-foreground mb-4">Redes Sociais</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="footer-instagram">Instagram URL</Label>
+                      <Input
+                        id="footer-instagram"
+                        value={footerMetadata.instagram}
+                        onChange={(e) => updateFooterMetadata('instagram', e.target.value)}
+                        placeholder="https://instagram.com/mobdega"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="footer-facebook">Facebook URL</Label>
+                      <Input
+                        id="footer-facebook"
+                        value={footerMetadata.facebook}
+                        onChange={(e) => updateFooterMetadata('facebook', e.target.value)}
+                        placeholder="https://facebook.com/mobdega"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="footer-twitter">Twitter URL</Label>
+                      <Input
+                        id="footer-twitter"
+                        value={footerMetadata.twitter}
+                        onChange={(e) => updateFooterMetadata('twitter', e.target.value)}
+                        placeholder="https://twitter.com/mobdega"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
       )}
     </div>
