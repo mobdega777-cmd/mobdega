@@ -23,6 +23,12 @@ interface OpeningHours {
   };
 }
 
+interface FeaturedCustomization {
+  title: string | null;
+  subtitle: string | null;
+  description: string | null;
+}
+
 const getDayKey = (date: Date): string => {
   const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
   return days[date.getDay()];
@@ -85,9 +91,28 @@ const FeaturedStores = () => {
   const [searchCep, setSearchCep] = useState("");
   const [lookingUpCep, setLookingUpCep] = useState(false);
   const [locationInfo, setLocationInfo] = useState<string | null>(null);
+  const [customization, setCustomization] = useState<FeaturedCustomization | null>(null);
 
   const [deliveryZones, setDeliveryZones] = useState<DeliveryZone[]>([]);
   const [noStoresInArea, setNoStoresInArea] = useState(false);
+
+  // Fetch customization from site_customizations
+  useEffect(() => {
+    const fetchCustomization = async () => {
+      const { data } = await supabase
+        .from('site_customizations')
+        .select('title, subtitle, description')
+        .eq('section', 'featured')
+        .eq('is_active', true)
+        .single();
+
+      if (data) {
+        setCustomization(data);
+      }
+    };
+
+    fetchCustomization();
+  }, []);
 
   const fetchDeliveryZones = async () => {
     const { data } = await supabase
@@ -191,6 +216,12 @@ const FeaturedStores = () => {
     }
   };
 
+  // Use customized values or fallbacks
+  const sectionTitle = customization?.title || "Adegas e Tabacarias perto de você";
+  const sectionSubtitle = customization?.subtitle || "Destaques";
+  const sectionDescription = customization?.description || 
+    "Encontre as melhores adegas e tabacarias que entregam na sua região.";
+
   return (
     <section id="comercios" className="py-20 bg-muted/30">
       <div className="container mx-auto px-4">
@@ -202,13 +233,20 @@ const FeaturedStores = () => {
           className="text-center mb-12"
         >
           <span className="inline-block text-primary font-semibold text-sm uppercase tracking-wider mb-4">
-            Destaques
+            {sectionSubtitle}
           </span>
           <h2 className="font-display text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-4">
-            Adegas e Tabacarias <span className="text-gradient-primary">perto de você</span>
+            {sectionTitle.includes('perto de você') ? (
+              <>
+                {sectionTitle.split('perto de você')[0]}
+                <span className="text-gradient-primary">perto de você</span>
+              </>
+            ) : (
+              sectionTitle
+            )}
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-8">
-            Encontre as melhores adegas e tabacarias que entregam na sua região.
+            {sectionDescription}
           </p>
 
           {/* CEP Search */}

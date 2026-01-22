@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { 
   Truck, 
@@ -9,6 +10,13 @@ import {
   BarChart3,
   Users
 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+
+interface BenefitsCustomization {
+  title: string | null;
+  subtitle: string | null;
+  description: string | null;
+}
 
 const userBenefits = [
   {
@@ -57,6 +65,31 @@ const businessBenefits = [
 ];
 
 const Benefits = () => {
+  const [customization, setCustomization] = useState<BenefitsCustomization | null>(null);
+
+  useEffect(() => {
+    const fetchCustomization = async () => {
+      const { data } = await supabase
+        .from('site_customizations')
+        .select('title, subtitle, description')
+        .eq('section', 'benefits')
+        .eq('is_active', true)
+        .single();
+
+      if (data) {
+        setCustomization(data);
+      }
+    };
+
+    fetchCustomization();
+  }, []);
+
+  // Use customized values or fallbacks
+  const sectionTitle = customization?.title || "Por que usar o Mobdega?";
+  const sectionSubtitle = customization?.subtitle || "Para Consumidores";
+  const sectionDescription = customization?.description || 
+    "A melhor experiência para encontrar e pedir das melhores adegas e tabacarias da sua região.";
+
   return (
     <section id="beneficios" className="py-20 bg-background">
       <div className="container mx-auto px-4">
@@ -69,13 +102,21 @@ const Benefits = () => {
           className="text-center mb-16"
         >
           <span className="inline-block text-primary font-semibold text-sm uppercase tracking-wider mb-4">
-            Para Consumidores
+            {sectionSubtitle}
           </span>
           <h2 className="font-display text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-4">
-            Por que usar o <span className="text-gradient-primary">Mobdega</span>?
+            {sectionTitle.includes('Mobdega') ? (
+              <>
+                {sectionTitle.split('Mobdega')[0]}
+                <span className="text-gradient-primary">Mobdega</span>
+                {sectionTitle.split('Mobdega')[1]}
+              </>
+            ) : (
+              sectionTitle
+            )}
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            A melhor experiência para encontrar e pedir das melhores adegas e tabacarias da sua região.
+            {sectionDescription}
           </p>
         </motion.div>
 

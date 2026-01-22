@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import UserDetailsModal from "./UserDetailsModal";
 
 interface Profile {
   id: string;
@@ -36,14 +37,26 @@ interface Profile {
   full_name: string;
   email: string;
   phone: string | null;
+  document: string | null;
+  birthday: string | null;
+  cep: string | null;
   city: string | null;
+  neighborhood: string | null;
+  address: string | null;
+  address_number: string | null;
+  complement: string | null;
+  avatar_url: string | null;
+  bio: string | null;
   created_at: string;
+  updated_at: string;
 }
 
 const AdminUsers = () => {
   const [users, setUsers] = useState<Profile[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
+  const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -96,6 +109,11 @@ const AdminUsers = () => {
       });
       fetchUsers();
     }
+  };
+
+  const handleViewDetails = (user: Profile) => {
+    setSelectedUser(user);
+    setDetailsModalOpen(true);
   };
 
   return (
@@ -217,12 +235,15 @@ const AdminUsers = () => {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem className="gap-2">
+                            <DropdownMenuItem 
+                              className="gap-2"
+                              onClick={() => handleViewDetails(user)}
+                            >
                               <Eye className="w-4 h-4" />
                               Ver detalhes
                             </DropdownMenuItem>
                             <DropdownMenuItem 
-                              className="gap-2 text-red-500"
+                              className="gap-2 text-destructive"
                               onClick={() => handleDeleteUser(user.id)}
                             >
                               <Trash2 className="w-4 h-4" />
@@ -239,6 +260,13 @@ const AdminUsers = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* User Details Modal */}
+      <UserDetailsModal
+        user={selectedUser}
+        open={detailsModalOpen}
+        onOpenChange={setDetailsModalOpen}
+      />
     </div>
   );
 };
