@@ -9,13 +9,18 @@ import {
   AlertCircle,
   XCircle,
   Download,
-  Send
+  Send,
+  Settings,
+  CalendarClock,
+  ToggleLeft,
+  ToggleRight
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -63,6 +68,8 @@ interface Invoice {
 interface Commerce {
   id: string;
   fantasy_name: string;
+  auto_invoice_enabled: boolean | null;
+  auto_invoice_day: number | null;
   plans: { price: number } | null;
 }
 
@@ -73,6 +80,10 @@ const AdminInvoices = () => {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [isLoading, setIsLoading] = useState(true);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [autoInvoiceDialogOpen, setAutoInvoiceDialogOpen] = useState(false);
+  const [selectedCommerce, setSelectedCommerce] = useState<Commerce | null>(null);
+  const [autoInvoiceDay, setAutoInvoiceDay] = useState<string>("5");
+  const [autoInvoiceEnabled, setAutoInvoiceEnabled] = useState(false);
   const [newInvoice, setNewInvoice] = useState({
     commerce_id: '',
     type: 'receivable' as InvoiceType,
@@ -106,10 +117,10 @@ const AdminInvoices = () => {
   const fetchCommerces = async () => {
     const { data } = await supabase
       .from('commerces')
-      .select('id, fantasy_name, plans(price)')
+      .select('id, fantasy_name, auto_invoice_enabled, auto_invoice_day, plans(price)')
       .eq('status', 'approved');
     
-    setCommerces(data || []);
+    setCommerces((data as Commerce[]) || []);
   };
 
   const handleCreateInvoice = async () => {
@@ -194,7 +205,7 @@ const AdminInvoices = () => {
   };
 
   const updateInvoiceStatus = async (invoiceId: string, status: InvoiceStatus) => {
-    const updateData: any = { 
+    const updateData: Record<string, unknown> = { 
       status,
       payment_confirmed_by_commerce: false // Reset confirmation when admin marks as paid
     };
@@ -216,6 +227,42 @@ const AdminInvoices = () => {
     } else {
       toast({ title: 'Status atualizado!' });
       fetchInvoices();
+    }
+  };
+
+  const openAutoInvoiceConfig = (commerce: Commerce) => {
+    setSelectedCommerce(commerce);
+    setAutoInvoiceDay(String(commerce.auto_invoice_day || 5));
+    setAutoInvoiceEnabled(commerce.auto_invoice_enabled || false);
+    setAutoInvoiceDialogOpen(true);
+  };
+
+  const saveAutoInvoiceConfig = async () => {
+    if (!selectedCommerce) return;
+
+    const { error } = await supabase
+      .from('commerces')
+      .update({
+        auto_invoice_enabled: autoInvoiceEnabled,
+        auto_invoice_day: parseInt(autoInvoiceDay),
+      })
+      .eq('id', selectedCommerce.id);
+
+    if (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao salvar configuração',
+        description: error.message,
+      });
+    } else {
+      toast({ 
+        title: 'Configuração salva!',
+        description: autoInvoiceEnabled 
+          ? `Fatura será gerada todo dia ${autoInvoiceDay}` 
+          : 'Fatura automática desativada'
+      });
+      setAutoInvoiceDialogOpen(false);
+      fetchCommerces();
     }
   };
 
@@ -247,6 +294,9 @@ const AdminInvoices = () => {
     );
   };
 
+  // Generate day options (1-28)
+  const dayOptions = Array.from({ length: 28 }, (_, i) => i + 1);
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -277,6 +327,44 @@ const AdminInvoices = () => {
           </Button>
         </div>
       </div>
+
+      {/* Auto Invoice Config Card */}
+      <Card className="border-border/50 bg-muted/30">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <CalendarClock className="w-5 h-5 text-primary" />
+            Configurar Fatura Automática por Comércio
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground mb-4">
+            Configure o envio automático de faturas mensais para cada comércio. Defina o dia do mês e ative/desative o envio.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {commerces.map(commerce => (
+              <Button
+                key={commerce.id}
+                variant={commerce.auto_invoice_enabled ? "default" : "outline"}
+                size="sm"
+                className="gap-2"
+                onClick={() => openAutoInvoiceConfig(commerce)}
+              >
+                {commerce.auto_invoice_enabled ? (
+                  <ToggleRight className="w-4 h-4" />
+                ) : (
+                  <ToggleLeft className="w-4 h-4" />
+                )}
+                {commerce.fantasy_name}
+                {commerce.auto_invoice_enabled && commerce.auto_invoice_day && (
+                  <Badge variant="secondary" className="ml-1 text-xs">
+                    Dia {commerce.auto_invoice_day}
+                  </Badge>
+                )}
+              </Button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Filters */}
       <Card className="border-border/50">
@@ -463,6 +551,77 @@ const AdminInvoices = () => {
             </Button>
             <Button onClick={handleCreateInvoice}>
               Criar Fatura
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Auto Invoice Config Dialog */}
+      <Dialog open={autoInvoiceDialogOpen} onOpenChange={setAutoInvoiceDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CalendarClock className="w-5 h-5 text-primary" />
+              Configurar Fatura Automática
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-6">
+            {selectedCommerce && (
+              <>
+                <div className="p-4 bg-muted/50 rounded-lg">
+                  <p className="font-medium text-foreground">{selectedCommerce.fantasy_name}</p>
+                  {selectedCommerce.plans?.price && (
+                    <p className="text-sm text-muted-foreground">
+                      Valor do plano: R$ {selectedCommerce.plans.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="auto-invoice-toggle" className="text-base">
+                      Enviar Fatura Automaticamente
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Ative para gerar fatura todo mês
+                    </p>
+                  </div>
+                  <Switch
+                    id="auto-invoice-toggle"
+                    checked={autoInvoiceEnabled}
+                    onCheckedChange={setAutoInvoiceEnabled}
+                  />
+                </div>
+
+                {autoInvoiceEnabled && (
+                  <div className="space-y-2">
+                    <Label>Dia do Mês para Gerar Fatura</Label>
+                    <Select value={autoInvoiceDay} onValueChange={setAutoInvoiceDay}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {dayOptions.map(day => (
+                          <SelectItem key={day} value={String(day)}>
+                            Dia {day}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      A fatura será gerada automaticamente todo dia {autoInvoiceDay} de cada mês
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAutoInvoiceDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={saveAutoInvoiceConfig}>
+              Salvar Configuração
             </Button>
           </DialogFooter>
         </DialogContent>

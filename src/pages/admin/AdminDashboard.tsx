@@ -23,6 +23,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import logoMobdega from "@/assets/logo-mobdega.png";
+import AdminNotificationBell from "@/components/admin/AdminNotificationBell";
 
 // Admin sections
 import AdminOverview from "@/components/admin/AdminOverview";
@@ -152,14 +153,17 @@ const AdminDashboard = () => {
             <p className="text-[10px] text-primary-foreground/60">Master Panel</p>
           </div>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
-        >
-          <Menu className="w-6 h-6" />
-        </Button>
+        <div className="flex items-center gap-2">
+          <AdminNotificationBell />
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
+          >
+            <Menu className="w-6 h-6" />
+          </Button>
+        </div>
       </header>
 
       {/* Mobile Overlay */}
@@ -206,6 +210,7 @@ const AdminDashboard = () => {
               <p className="text-xs text-primary-foreground/60">Master Panel</p>
             </div>
           </motion.div>
+          <AdminNotificationBell />
         </div>
 
         {/* Mobile close button */}
