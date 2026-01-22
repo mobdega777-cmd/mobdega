@@ -14,6 +14,54 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_notifications: {
+        Row: {
+          commerce_id: string | null
+          created_at: string
+          id: string
+          invoice_id: string | null
+          is_read: boolean | null
+          message: string
+          title: string
+          type: string
+        }
+        Insert: {
+          commerce_id?: string | null
+          created_at?: string
+          id?: string
+          invoice_id?: string | null
+          is_read?: boolean | null
+          message: string
+          title: string
+          type: string
+        }
+        Update: {
+          commerce_id?: string | null
+          created_at?: string
+          id?: string
+          invoice_id?: string | null
+          is_read?: boolean | null
+          message?: string
+          title?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_notifications_commerce_id_fkey"
+            columns: ["commerce_id"]
+            isOneToOne: false
+            referencedRelation: "commerces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "admin_notifications_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       billing_config: {
         Row: {
           account_holder: string
@@ -216,6 +264,8 @@ export type Database = {
           address: string | null
           address_number: string | null
           approved_at: string | null
+          auto_invoice_day: number | null
+          auto_invoice_enabled: boolean | null
           cep: string | null
           city: string | null
           complement: string | null
@@ -246,6 +296,8 @@ export type Database = {
           address?: string | null
           address_number?: string | null
           approved_at?: string | null
+          auto_invoice_day?: number | null
+          auto_invoice_enabled?: boolean | null
           cep?: string | null
           city?: string | null
           complement?: string | null
@@ -276,6 +328,8 @@ export type Database = {
           address?: string | null
           address_number?: string | null
           approved_at?: string | null
+          auto_invoice_day?: number | null
+          auto_invoice_enabled?: boolean | null
           cep?: string | null
           city?: string | null
           complement?: string | null
