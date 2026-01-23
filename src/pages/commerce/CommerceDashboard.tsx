@@ -68,7 +68,7 @@ const menuItems = [
   { id: "cashregister" as CommerceSection, label: "Caixa/PDV", icon: Calculator },
   { id: "paymentconfig" as CommerceSection, label: "Configurar Pagamentos", icon: Wallet },
   { id: "orders" as CommerceSection, label: "Pedidos", icon: ShoppingCart, showPendingBadge: true },
-  { id: "delivery" as CommerceSection, label: "Delivery", icon: Truck },
+  { id: "delivery" as CommerceSection, label: "Delivery", icon: Truck, showDeliveryBadge: true },
   { id: "deliveryzones" as CommerceSection, label: "Áreas de Entrega", icon: MapPin },
   { id: "tables" as CommerceSection, label: "Mesas/Comandas", icon: Utensils },
   { id: "products" as CommerceSection, label: "Produtos", icon: Package },
@@ -100,6 +100,7 @@ const CommerceDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [pendingInvoicesCount, setPendingInvoicesCount] = useState(0);
   const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
+  const [pendingDeliveryOrdersCount, setPendingDeliveryOrdersCount] = useState(0);
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
 
@@ -170,6 +171,17 @@ const CommerceDashboard = () => {
     setPendingOrdersCount(count || 0);
   };
 
+  const fetchPendingDeliveryOrders = async (commerceId: string) => {
+    const { count } = await supabase
+      .from('orders')
+      .select('*', { count: 'exact', head: true })
+      .eq('commerce_id', commerceId)
+      .eq('order_type', 'delivery')
+      .in('status', ['pending', 'confirmed', 'preparing']);
+    
+    setPendingDeliveryOrdersCount(count || 0);
+  };
+
   useEffect(() => {
     fetchCommerce();
   }, [user]);
@@ -178,6 +190,7 @@ const CommerceDashboard = () => {
     if (commerce?.id) {
       fetchPendingInvoices(commerce.id);
       fetchPendingOrders(commerce.id);
+      fetchPendingDeliveryOrders(commerce.id);
 
       // Subscribe to invoice changes for this commerce
       const invoicesChannel = supabase
@@ -195,7 +208,10 @@ const CommerceDashboard = () => {
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'orders', filter: `commerce_id=eq.${commerce.id}` },
-          () => fetchPendingOrders(commerce.id)
+          () => {
+            fetchPendingOrders(commerce.id);
+            fetchPendingDeliveryOrders(commerce.id);
+          }
         )
         .subscribe();
 
@@ -490,6 +506,11 @@ const CommerceDashboard = () => {
                   {!isDisabled && item.showPendingBadge && pendingOrdersCount > 0 && (
                     <Badge variant="destructive" className="text-xs px-2 py-0.5">
                       {pendingOrdersCount}
+                    </Badge>
+                  )}
+                  {!isDisabled && (item as any).showDeliveryBadge && pendingDeliveryOrdersCount > 0 && (
+                    <Badge variant="destructive" className="text-xs px-2 py-0.5">
+                      {pendingDeliveryOrdersCount}
                     </Badge>
                   )}
                   {!isDisabled && item.showBadge && pendingInvoicesCount > 0 && (
