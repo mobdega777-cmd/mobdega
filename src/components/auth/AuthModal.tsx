@@ -253,7 +253,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
           owner_id: user.id,
           fantasy_name: formData.tradeName,
           owner_name: formData.ownerName,
-          document: formData.document,
+          document: formData.document.replace(/\D/g, ''), // Store only numbers
           document_type: documentType,
           email: formData.email,
           phone: formData.whatsapp,
@@ -381,15 +381,24 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
 
       // If commerce login with document, lookup email from commerces table
       if (userType === 'commerce' && formData.email) {
-        // Check if input looks like a document (numbers only)
+        // Check if input looks like a document (numbers only or formatted)
         const cleanInput = formData.email.replace(/\D/g, '');
         if (cleanInput.length >= 11) {
-          // Lookup email by document - use cleaned input to match stored format
-          const { data: commerce } = await supabase
+          // Lookup email by document - search with cleaned format
+          // First try exact match with cleaned input
+          let { data: commerce } = await supabase
             .from('commerces')
-            .select('email')
-            .eq('document', cleanInput)
+            .select('email, document')
             .maybeSingle();
+          
+          // Query all commerces and find by cleaned document
+          const { data: allCommerces } = await supabase
+            .from('commerces')
+            .select('email, document');
+          
+          commerce = allCommerces?.find(c => 
+            c.document?.replace(/\D/g, '') === cleanInput
+          ) || null;
           
           if (commerce?.email) {
             emailToUse = commerce.email;
