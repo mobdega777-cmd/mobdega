@@ -70,6 +70,7 @@ const CommerceDetailsModal: React.FC<CommerceDetailsModalProps> = ({
   const [stats, setStats] = useState<CommerceStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [plan, setPlan] = useState<any>(null);
+  const [couponInfo, setCouponInfo] = useState<{ discount_type: string; discount_value: number } | null>(null);
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
 
   useEffect(() => {
@@ -80,6 +81,7 @@ const CommerceDetailsModal: React.FC<CommerceDetailsModalProps> = ({
 
   const fetchCommerceDetails = async () => {
     setLoading(true);
+    setCouponInfo(null);
     
     // Fetch plan details
     if (commerce.plan_id) {
@@ -89,6 +91,19 @@ const CommerceDetailsModal: React.FC<CommerceDetailsModalProps> = ({
         .eq('id', commerce.plan_id)
         .single();
       setPlan(planData);
+    }
+
+    // Fetch coupon info if commerce used one
+    if (commerce.coupon_code) {
+      const { data: couponData } = await supabase
+        .from('discount_coupons')
+        .select('discount_type, discount_value')
+        .eq('code', commerce.coupon_code)
+        .maybeSingle();
+      
+      if (couponData) {
+        setCouponInfo(couponData);
+      }
     }
 
     // Fetch orders stats
@@ -335,11 +350,33 @@ const CommerceDetailsModal: React.FC<CommerceDetailsModalProps> = ({
                         <div>
                           <h3 className="font-semibold text-xl">{plan.name}</h3>
                           <p className="text-muted-foreground">{plan.description}</p>
+                          {commerce.coupon_code && couponInfo && (
+                            <Badge variant="outline" className="mt-2 bg-green-500/10 text-green-600 border-green-500/30">
+                              Cupom: {commerce.coupon_code} ({couponInfo.discount_type === 'percentage' 
+                                ? `${couponInfo.discount_value}%` 
+                                : formatCurrency(couponInfo.discount_value)} OFF)
+                            </Badge>
+                          )}
                         </div>
                         <div className="text-right">
-                          <p className="text-2xl font-bold text-primary">
-                            {formatCurrency(Number(plan.price))}
-                          </p>
+                          {couponInfo ? (
+                            <>
+                              <p className="text-sm text-muted-foreground line-through">
+                                {formatCurrency(Number(plan.price))}
+                              </p>
+                              <p className="text-2xl font-bold text-primary">
+                                {formatCurrency(
+                                  couponInfo.discount_type === 'percentage'
+                                    ? Number(plan.price) * (1 - couponInfo.discount_value / 100)
+                                    : Number(plan.price) - couponInfo.discount_value
+                                )}
+                              </p>
+                            </>
+                          ) : (
+                            <p className="text-2xl font-bold text-primary">
+                              {formatCurrency(Number(plan.price))}
+                            </p>
+                          )}
                           <p className="text-sm text-muted-foreground">/mês</p>
                         </div>
                       </div>

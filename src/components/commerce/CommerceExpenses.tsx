@@ -414,7 +414,9 @@ const CommerceExpenses = ({ commerceId, monthlyRevenue, operatorFees = 0, produc
             </div>
 
             <div>
-              <Label htmlFor="amount">Valor Mensal (R$)</Label>
+              <Label htmlFor="amount">
+                {formData.type === 'fixed' ? 'Valor Mensal (R$)' : 'Valor (R$)'}
+              </Label>
               <Input
                 id="amount"
                 type="number"

@@ -224,7 +224,7 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
       stockSaleValue += (p.promotional_price || p.price || 0) * stock;
     });
 
-    // Calcular categorias com base em vendas reais
+    // Calcular categorias com base em vendas reais - FILTERED BY DATE
     const { data: orderItems } = await supabase
       .from('order_items')
       .select(`
@@ -234,7 +234,9 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
         orders!inner(commerce_id, status, created_at)
       `)
       .eq('orders.commerce_id', commerceId)
-      .eq('orders.status', 'delivered');
+      .eq('orders.status', 'delivered')
+      .gte('orders.created_at', dateFilter.start.toISOString())
+      .lte('orders.created_at', dateFilter.end.toISOString());
 
     // Buscar produtos com suas categorias
     const { data: productsWithCategories } = await supabase
