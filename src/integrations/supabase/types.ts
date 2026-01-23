@@ -1160,6 +1160,7 @@ export type Database = {
         Args: { _order_id: string }
         Returns: undefined
       }
+      get_public_stats: { Args: never; Returns: Json }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
