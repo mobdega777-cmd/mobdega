@@ -4,6 +4,7 @@ import { MapPin, Star, Clock, Search, Loader2, Phone } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAddressByCep, formatCep, getCepProximityScore, isCepInRange } from "@/lib/viaCepService";
 
@@ -92,7 +93,7 @@ const FeaturedStores = () => {
   const [lookingUpCep, setLookingUpCep] = useState(false);
   const [locationInfo, setLocationInfo] = useState<string | null>(null);
   const [customization, setCustomization] = useState<FeaturedCustomization | null>(null);
-
+  const [customizationLoading, setCustomizationLoading] = useState(true);
   const [deliveryZones, setDeliveryZones] = useState<DeliveryZone[]>([]);
   const [noStoresInArea, setNoStoresInArea] = useState(false);
 
@@ -104,11 +105,10 @@ const FeaturedStores = () => {
         .select('title, subtitle, description')
         .eq('section', 'featured')
         .eq('is_active', true)
-        .single();
+        .maybeSingle();
 
-      if (data) {
-        setCustomization(data);
-      }
+      setCustomization(data);
+      setCustomizationLoading(false);
     };
 
     fetchCustomization();
@@ -232,22 +232,32 @@ const FeaturedStores = () => {
           transition={{ duration: 0.6 }}
           className="text-center mb-12"
         >
-          <span className="inline-block text-primary font-semibold text-sm uppercase tracking-wider mb-4">
-            {sectionSubtitle}
-          </span>
-          <h2 className="font-display text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-4">
-            {sectionTitle.includes('perto de você') ? (
-              <>
-                {sectionTitle.split('perto de você')[0]}
-                <span className="text-gradient-primary">perto de você</span>
-              </>
-            ) : (
-              sectionTitle
-            )}
-          </h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-8">
-            {sectionDescription}
-          </p>
+          {customizationLoading ? (
+            <div className="flex flex-col items-center gap-4">
+              <Skeleton className="h-5 w-24" />
+              <Skeleton className="h-12 w-80 max-w-full" />
+              <Skeleton className="h-6 w-64 max-w-full" />
+            </div>
+          ) : (
+            <>
+              <span className="inline-block text-primary font-semibold text-sm uppercase tracking-wider mb-4">
+                {sectionSubtitle}
+              </span>
+              <h2 className="font-display text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-4">
+                {sectionTitle.includes('perto de você') ? (
+                  <>
+                    {sectionTitle.split('perto de você')[0]}
+                    <span className="text-gradient-primary">perto de você</span>
+                  </>
+                ) : (
+                  sectionTitle
+                )}
+              </h2>
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-8">
+                {sectionDescription}
+              </p>
+            </>
+          )}
 
           {/* CEP Search */}
           <div className="max-w-md mx-auto">
