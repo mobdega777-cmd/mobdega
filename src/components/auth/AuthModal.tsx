@@ -1154,15 +1154,35 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
                           {!validatingCoupon && couponValid === false && <AlertCircle className="w-5 h-5 text-red-500" />}
                         </div>
                       </div>
-                      {couponValid === true && couponDiscount && (
-                        <p className="text-xs text-green-600 font-medium">
-                          ✓ Cupom válido! {couponDiscount.message 
-                            ? couponDiscount.message 
-                            : `Desconto de ${couponDiscount.type === 'percentage' 
-                              ? `${couponDiscount.value}%` 
-                              : formatCurrency(couponDiscount.value)}`}
-                        </p>
-                      )}
+                      {couponValid === true && couponDiscount && (() => {
+                        const selectedPlan = plans.find(p => p.type === formData.plan);
+                        const originalPrice = selectedPlan?.price || 0;
+                        const discountedPrice = couponDiscount.type === 'percentage'
+                          ? originalPrice * (1 - couponDiscount.value / 100)
+                          : Math.max(0, originalPrice - couponDiscount.value);
+                        
+                        return (
+                          <div className="space-y-1">
+                            <p className="text-xs text-green-600 font-medium">
+                              ✓ Cupom válido! {couponDiscount.message 
+                                ? couponDiscount.message 
+                                : `Desconto de ${couponDiscount.type === 'percentage' 
+                                  ? `${couponDiscount.value}%` 
+                                  : formatCurrency(couponDiscount.value)}`}
+                            </p>
+                            <div className="bg-green-50 border border-green-200 rounded-lg p-3 mt-2">
+                              <div className="flex justify-between items-center">
+                                <span className="text-sm text-muted-foreground">Valor original:</span>
+                                <span className="text-sm text-muted-foreground line-through">{formatCurrency(originalPrice)}/mês</span>
+                              </div>
+                              <div className="flex justify-between items-center mt-1">
+                                <span className="text-sm font-semibold text-green-700">Você pagará:</span>
+                                <span className="text-lg font-bold text-green-700">{formatCurrency(discountedPrice)}/mês</span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
                       {couponValid === false && formData.couponCode.length >= 3 && (
                         <p className="text-xs text-red-500">
                           Cupom inválido ou expirado
