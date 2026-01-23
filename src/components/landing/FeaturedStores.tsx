@@ -305,7 +305,7 @@ const FeaturedStores = () => {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide -mx-4 px-4">
             {stores.map((store, index) => (
               <motion.div
                 key={store.id}
@@ -314,10 +314,10 @@ const FeaturedStores = () => {
                 viewport={{ once: true }}
                 transition={{ duration: 0.5, delay: index * 0.1 }}
                 whileHover={{ y: -8 }}
-                className="bg-card rounded-xl overflow-hidden shadow-card hover:shadow-elevated transition-all duration-300 cursor-pointer group"
+                className="bg-card rounded-xl overflow-hidden shadow-card hover:shadow-elevated transition-all duration-300 cursor-pointer group flex-shrink-0 w-[160px] sm:w-[200px] md:w-[240px] snap-start"
               >
                 {/* Store Cover Image */}
-                <div className="relative h-28 overflow-hidden bg-gradient-to-br from-primary/20 to-secondary/20">
+                <div className="relative h-20 sm:h-24 overflow-hidden bg-gradient-to-br from-primary/20 to-secondary/20">
                   {store.cover_url ? (
                     <img
                       src={store.cover_url}
@@ -332,7 +332,7 @@ const FeaturedStores = () => {
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
-                      <span className="text-4xl font-bold text-primary/30">
+                      <span className="text-3xl font-bold text-primary/30">
                         {store.fantasy_name.charAt(0)}
                       </span>
                     </div>
@@ -341,7 +341,7 @@ const FeaturedStores = () => {
                   
                   {/* Logo overlay */}
                   {store.logo_url && (
-                    <div className="absolute bottom-2 left-2 w-10 h-10 rounded-lg overflow-hidden border-2 border-card shadow-lg bg-card">
+                    <div className="absolute bottom-2 left-2 w-8 h-8 rounded-lg overflow-hidden border-2 border-card shadow-lg bg-card">
                       <img
                         src={store.logo_url}
                         alt={`Logo ${store.fantasy_name}`}
@@ -351,43 +351,44 @@ const FeaturedStores = () => {
                   )}
 
                   {/* Status badge */}
-                  <div className="absolute top-3 right-3 flex items-center gap-2">
+                  <div className="absolute top-2 right-2 flex items-center gap-1">
                     <Badge 
                       className={`${isStoreOpen(store.is_open, store.opening_hours as OpeningHours) 
                         ? 'bg-green-500/90 text-white' 
-                        : 'bg-red-500/90 text-white'} border-0`}
+                        : 'bg-red-500/90 text-white'} border-0 text-[10px] px-1.5 py-0.5`}
                     >
                       {isStoreOpen(store.is_open, store.opening_hours as OpeningHours) ? 'Aberto' : 'Fechado'}
                     </Badge>
-                    <div className="bg-card/95 backdrop-blur-sm rounded-lg px-2 py-1 flex items-center gap-1">
-                      <Star className="w-4 h-4 text-accent fill-accent" />
-                      <span className="text-sm font-semibold text-foreground">Novo</span>
+                    <div className="bg-card/95 backdrop-blur-sm rounded px-1.5 py-0.5 flex items-center gap-0.5">
+                      <Star className="w-3 h-3 text-accent fill-accent" />
+                      <span className="text-[10px] font-semibold text-foreground">Novo</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Store Info */}
-                <div className="p-3">
-                  <h3 className="font-display text-lg font-semibold text-foreground mb-1 truncate">
+                <div className="p-2 sm:p-3">
+                  <h3 className="font-display text-sm sm:text-base font-semibold text-foreground mb-1 truncate">
                     {store.fantasy_name}
                   </h3>
                   
-                  <div className="flex items-center gap-1 text-muted-foreground text-sm mb-2">
-                    <MapPin className="w-4 h-4 flex-shrink-0" />
+                  <div className="flex items-center gap-1 text-muted-foreground text-xs mb-1">
+                    <MapPin className="w-3 h-3 flex-shrink-0" />
                     <span className="truncate">
                       {store.neighborhood ? `${store.neighborhood}, ` : ''}{store.city || 'Localização não informada'}
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-1 text-muted-foreground text-sm mb-3">
-                    <Clock className="w-4 h-4 flex-shrink-0" />
-                    <span>{getTodayHours(store.opening_hours as OpeningHours) || 'Horário não informado'}</span>
+                  <div className="flex items-center gap-1 text-muted-foreground text-xs mb-2">
+                    <Clock className="w-3 h-3 flex-shrink-0" />
+                    <span className="truncate">{getTodayHours(store.opening_hours as OpeningHours) || 'Horário não informado'}</span>
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1 text-secondary text-sm font-medium">
-                      <Clock className="w-4 h-4" />
-                      Entrega rápida
+                    <div className="flex items-center gap-1 text-secondary text-xs font-medium">
+                      <Clock className="w-3 h-3" />
+                      <span className="hidden sm:inline">Entrega rápida</span>
+                      <span className="sm:hidden">Rápido</span>
                     </div>
                     {(store.whatsapp || store.phone) && (
                       <a 
@@ -397,7 +398,7 @@ const FeaturedStores = () => {
                         onClick={(e) => e.stopPropagation()}
                         className="text-green-600 hover:text-green-500 transition-colors"
                       >
-                        <Phone className="w-5 h-5" />
+                        <Phone className="w-4 h-4" />
                       </a>
                     )}
                   </div>
