@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, User, Store, Eye, EyeOff, Loader2, Check, AlertCircle } from "lucide-react";
@@ -21,6 +21,15 @@ interface AuthModalProps {
   initialMode?: AuthMode;
 }
 
+interface Plan {
+  id: string;
+  name: string;
+  price: number;
+  type: string;
+  features: string[];
+  description: string | null;
+}
+
 const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) => {
   const navigate = useNavigate();
   const { signUp, signIn } = useAuth();
@@ -34,7 +43,9 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
   const [loadingCep, setLoadingCep] = useState(false);
   const [validatingCoupon, setValidatingCoupon] = useState(false);
   const [couponValid, setCouponValid] = useState<boolean | null>(null);
-  const [couponDiscount, setCouponDiscount] = useState<{ type: string; value: number } | null>(null);
+  const [couponDiscount, setCouponDiscount] = useState<{ type: string; value: number; message?: string } | null>(null);
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [loadingPlans, setLoadingPlans] = useState(false);
   // Form states
   const [formData, setFormData] = useState({
     name: "",
@@ -55,6 +66,34 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
     plan: "basic",
     couponCode: "", // New coupon field
   });
+
+  // Fetch plans from database
+  useEffect(() => {
+    const fetchPlans = async () => {
+      setLoadingPlans(true);
+      const { data } = await supabase
+        .from('plans')
+        .select('*')
+        .eq('is_active', true)
+        .order('price', { ascending: true });
+      
+      if (data) {
+        setPlans(data.map(p => ({
+          id: p.id,
+          name: p.name,
+          price: Number(p.price),
+          type: p.type,
+          features: Array.isArray(p.features) ? p.features as string[] : [],
+          description: p.description
+        })));
+      }
+      setLoadingPlans(false);
+    };
+    
+    if (isOpen && mode === 'register' && userType === 'commerce') {
+      fetchPlans();
+    }
+  }, [isOpen, mode, userType]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -149,7 +188,8 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
     setCouponValid(true);
     setCouponDiscount({
       type: coupon.discount_type,
-      value: coupon.discount_value
+      value: coupon.discount_value,
+      message: (coupon as any).custom_message || null
     });
     setValidatingCoupon(false);
   };
@@ -1027,35 +1067,69 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
                     <div className="space-y-3 pt-2">
                       <Label>Escolha seu plano</Label>
                       <div className="grid grid-cols-1 gap-3">
-                        {[
-                          { id: "basic", name: "Básico", price: "R$ 90,00/mês", features: ["PDV básico", "Até 50 produtos"] },
-                          { id: "startup", name: "Startup", price: "R$ 180,00/mês", features: ["PDV completo", "Delivery", "Aparecer na home"] },
-                          { id: "business", name: "Business", price: "R$ 250,00/mês", features: ["Tudo do Startup", "Relatórios avançados", "Prioridade no suporte"] },
-                        ].map((plan) => (
-                          <button
-                            key={plan.id}
-                            onClick={() => setFormData({ ...formData, plan: plan.id })}
-                            className={`p-4 rounded-xl border-2 text-left transition-all ${
-                              formData.plan === plan.id
-                                ? "border-secondary bg-secondary/5"
-                                : "border-border hover:border-secondary/50"
-                            }`}
-                          >
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <div className={`font-semibold ${formData.plan === plan.id ? "text-secondary" : "text-foreground"}`}>
-                                  {plan.name}
+                        {loadingPlans ? (
+                          <div className="flex justify-center py-4">
+                            <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                          </div>
+                        ) : plans.length > 0 ? (
+                          plans.map((plan) => (
+                            <button
+                              key={plan.id}
+                              type="button"
+                              onClick={() => setFormData({ ...formData, plan: plan.type })}
+                              className={`p-4 rounded-xl border-2 text-left transition-all ${
+                                formData.plan === plan.type
+                                  ? "border-secondary bg-secondary/5"
+                                  : "border-border hover:border-secondary/50"
+                              }`}
+                            >
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <div className={`font-semibold ${formData.plan === plan.type ? "text-secondary" : "text-foreground"}`}>
+                                    {plan.name}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground mt-1">
+                                    {plan.features.length > 0 ? plan.features.join(" • ") : plan.description || ''}
+                                  </div>
                                 </div>
-                                <div className="text-xs text-muted-foreground mt-1">
-                                  {plan.features.join(" • ")}
+                                <div className={`font-bold ${formData.plan === plan.type ? "text-secondary" : "text-foreground"}`}>
+                                  {formatCurrency(plan.price)}/mês
                                 </div>
                               </div>
-                              <div className={`font-bold ${formData.plan === plan.id ? "text-secondary" : "text-foreground"}`}>
-                                {plan.price}
+                            </button>
+                          ))
+                        ) : (
+                          [
+                            { type: "basic", name: "Básico", price: 90, features: ["PDV básico", "Até 50 produtos"] },
+                            { type: "startup", name: "Startup", price: 180, features: ["PDV completo", "Delivery", "Aparecer na home"] },
+                            { type: "business", name: "Business", price: 250, features: ["Tudo do Startup", "Relatórios avançados", "Prioridade no suporte"] },
+                          ].map((plan) => (
+                            <button
+                              key={plan.type}
+                              type="button"
+                              onClick={() => setFormData({ ...formData, plan: plan.type })}
+                              className={`p-4 rounded-xl border-2 text-left transition-all ${
+                                formData.plan === plan.type
+                                  ? "border-secondary bg-secondary/5"
+                                  : "border-border hover:border-secondary/50"
+                              }`}
+                            >
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <div className={`font-semibold ${formData.plan === plan.type ? "text-secondary" : "text-foreground"}`}>
+                                    {plan.name}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground mt-1">
+                                    {plan.features.join(" • ")}
+                                  </div>
+                                </div>
+                                <div className={`font-bold ${formData.plan === plan.type ? "text-secondary" : "text-foreground"}`}>
+                                  {formatCurrency(plan.price)}/mês
+                                </div>
                               </div>
-                            </div>
-                          </button>
-                        ))}
+                            </button>
+                          ))
+                        )}
                       </div>
                     </div>
 
@@ -1082,9 +1156,11 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
                       </div>
                       {couponValid === true && couponDiscount && (
                         <p className="text-xs text-green-600 font-medium">
-                          ✓ Cupom válido! Desconto de {couponDiscount.type === 'percentage' 
-                            ? `${couponDiscount.value}%` 
-                            : formatCurrency(couponDiscount.value)} na primeira fatura
+                          ✓ Cupom válido! {couponDiscount.message 
+                            ? couponDiscount.message 
+                            : `Desconto de ${couponDiscount.type === 'percentage' 
+                              ? `${couponDiscount.value}%` 
+                              : formatCurrency(couponDiscount.value)}`}
                         </p>
                       )}
                       {couponValid === false && formData.couponCode.length >= 3 && (

@@ -65,6 +65,7 @@ const AdminCoupons = () => {
     max_uses: "",
     valid_until: "",
     is_active: true,
+    custom_message: "",
   });
 
   const fetchCoupons = async () => {
@@ -97,6 +98,7 @@ const AdminCoupons = () => {
       max_uses: formData.max_uses ? parseInt(formData.max_uses) : null,
       valid_until: formData.valid_until || null,
       is_active: formData.is_active,
+      custom_message: formData.custom_message || null,
     };
 
     if (editingCoupon) {
@@ -158,6 +160,7 @@ const AdminCoupons = () => {
       max_uses: coupon.max_uses?.toString() || "",
       valid_until: coupon.valid_until ? coupon.valid_until.split('T')[0] : "",
       is_active: coupon.is_active,
+      custom_message: (coupon as any).custom_message || "",
     });
     setIsDialogOpen(true);
   };
@@ -172,6 +175,7 @@ const AdminCoupons = () => {
       max_uses: "",
       valid_until: "",
       is_active: true,
+      custom_message: "",
     });
   };
 
@@ -295,6 +299,18 @@ const AdminCoupons = () => {
                     onChange={(e) => setFormData({ ...formData, valid_until: e.target.value })}
                   />
                 </div>
+              </div>
+
+              <div>
+                <Label>Mensagem Personalizada (opcional)</Label>
+                <Input
+                  value={formData.custom_message}
+                  onChange={(e) => setFormData({ ...formData, custom_message: e.target.value })}
+                  placeholder="Ex: Desconto vitalício em todas as mensalidades"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Deixe vazio para usar a mensagem padrão
+                </p>
               </div>
 
               <div className="flex items-center gap-2">

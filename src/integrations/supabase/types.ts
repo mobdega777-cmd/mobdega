@@ -417,6 +417,7 @@ export type Database = {
         Row: {
           code: string
           created_at: string
+          custom_message: string | null
           description: string | null
           discount_type: string
           discount_value: number
@@ -432,6 +433,7 @@ export type Database = {
         Insert: {
           code: string
           created_at?: string
+          custom_message?: string | null
           description?: string | null
           discount_type?: string
           discount_value?: number
@@ -447,6 +449,7 @@ export type Database = {
         Update: {
           code?: string
           created_at?: string
+          custom_message?: string | null
           description?: string | null
           discount_type?: string
           discount_value?: number
