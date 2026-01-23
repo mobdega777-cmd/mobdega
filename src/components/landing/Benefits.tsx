@@ -11,6 +11,7 @@ import {
   Users
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface BenefitsCustomization {
   title: string | null;
@@ -66,6 +67,7 @@ const businessBenefits = [
 
 const Benefits = () => {
   const [customization, setCustomization] = useState<BenefitsCustomization | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const fetchCustomization = async () => {
@@ -74,17 +76,16 @@ const Benefits = () => {
         .select('title, subtitle, description')
         .eq('section', 'benefits')
         .eq('is_active', true)
-        .single();
+        .maybeSingle();
 
-      if (data) {
-        setCustomization(data);
-      }
+      setCustomization(data);
+      setIsLoading(false);
     };
 
     fetchCustomization();
   }, []);
 
-  // Use customized values or fallbacks
+  // Use customized values only when loaded
   const sectionTitle = customization?.title || "Por que usar o Mobdega?";
   const sectionSubtitle = customization?.subtitle || "Para Consumidores";
   const sectionDescription = customization?.description || 
@@ -101,23 +102,33 @@ const Benefits = () => {
           transition={{ duration: 0.6 }}
           className="text-center mb-16"
         >
-          <span className="inline-block text-primary font-semibold text-sm uppercase tracking-wider mb-4">
-            {sectionSubtitle}
-          </span>
-          <h2 className="font-display text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-4">
-            {sectionTitle.includes('Mobdega') ? (
-              <>
-                {sectionTitle.split('Mobdega')[0]}
-                <span className="text-gradient-primary">Mobdega</span>
-                {sectionTitle.split('Mobdega')[1]}
-              </>
-            ) : (
-              sectionTitle
-            )}
-          </h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            {sectionDescription}
-          </p>
+          {isLoading ? (
+            <div className="flex flex-col items-center gap-4">
+              <Skeleton className="h-5 w-32" />
+              <Skeleton className="h-12 w-96 max-w-full" />
+              <Skeleton className="h-6 w-80 max-w-full" />
+            </div>
+          ) : (
+            <>
+              <span className="inline-block text-primary font-semibold text-sm uppercase tracking-wider mb-4">
+                {sectionSubtitle}
+              </span>
+              <h2 className="font-display text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-4">
+                {sectionTitle.includes('Mobdega') ? (
+                  <>
+                    {sectionTitle.split('Mobdega')[0]}
+                    <span className="text-gradient-primary">Mobdega</span>
+                    {sectionTitle.split('Mobdega')[1]}
+                  </>
+                ) : (
+                  sectionTitle
+                )}
+              </h2>
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                {sectionDescription}
+              </p>
+            </>
+          )}
         </motion.div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-24">

@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { MapPin, Clock, Star, ShoppingBag } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface HeroProps {
   onRegisterClick: () => void;
@@ -18,6 +19,7 @@ interface HeroCustomization {
 
 const Hero = ({ onRegisterClick }: HeroProps) => {
   const [customization, setCustomization] = useState<HeroCustomization | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const fetchCustomization = async () => {
@@ -28,14 +30,13 @@ const Hero = ({ onRegisterClick }: HeroProps) => {
         .eq('is_active', true)
         .maybeSingle();
       
-      if (data) {
-        setCustomization(data);
-      }
+      setCustomization(data);
+      setIsLoading(false);
     };
     fetchCustomization();
   }, []);
 
-  // Default values for when customization is not loaded
+  // Use customization data only when loaded
   const heroTitle = customization?.title || "Sua adega favorita";
   const heroSubtitle = customization?.subtitle || "na palma da mão";
   const heroDescription = customization?.description || "Encontre as melhores adegas e tabacarias perto de você. Peça bebidas, narguilés e muito mais com entrega rápida e segura.";
@@ -68,14 +69,24 @@ const Hero = ({ onRegisterClick }: HeroProps) => {
               A plataforma #1 para adegas e tabacarias
             </motion.div>
 
-            <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold text-foreground leading-tight mb-6">
-              {heroTitle}
-              <span className="text-gradient-primary block">{heroSubtitle}</span>
-            </h1>
+            {isLoading ? (
+              <>
+                <Skeleton className="h-14 w-3/4 mb-2" />
+                <Skeleton className="h-14 w-1/2 mb-6" />
+                <Skeleton className="h-6 w-full max-w-xl mb-8" />
+              </>
+            ) : (
+              <>
+                <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold text-foreground leading-tight mb-6">
+                  {heroTitle}
+                  <span className="text-gradient-primary block">{heroSubtitle}</span>
+                </h1>
 
-            <p className="text-lg sm:text-xl text-muted-foreground max-w-xl mx-auto lg:mx-0 mb-8">
-              {heroDescription}
-            </p>
+                <p className="text-lg sm:text-xl text-muted-foreground max-w-xl mx-auto lg:mx-0 mb-8">
+                  {heroDescription}
+                </p>
+              </>
+            )}
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-12">
               <Button variant="hero" size="xl" onClick={onRegisterClick}>
