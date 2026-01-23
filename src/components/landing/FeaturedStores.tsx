@@ -447,19 +447,13 @@ const FeaturedStores = () => {
         >
           <div className="bg-card rounded-xl p-4 shadow-card max-w-md mx-auto">
             <p className="text-muted-foreground">
-              Mais de <span className="font-bold text-primary text-xl">{totalCommerces} comércios</span> cadastrados na plataforma
-            </p>
-            <p className="text-2xl font-bold text-foreground mt-1">
-              +{(totalCommerces * 150).toLocaleString('pt-BR')} <span className="text-sm font-normal text-muted-foreground">pedidos realizados</span>
+              Mais de <span className="font-bold text-primary text-xl">{(totalCommerces * 150).toLocaleString('pt-BR')} comércios</span> cadastrados na plataforma
             </p>
           </div>
           
           <div className="bg-card rounded-xl p-4 shadow-card max-w-md mx-auto">
             <p className="text-muted-foreground">
-              Mais de <span className="font-bold text-secondary text-xl">{totalUsers} usuários</span> cadastrados na plataforma
-            </p>
-            <p className="text-2xl font-bold text-foreground mt-1">
-              +{(totalUsers * 200).toLocaleString('pt-BR')} <span className="text-sm font-normal text-muted-foreground">interações na plataforma</span>
+              Mais de <span className="font-bold text-secondary text-xl">{(totalUsers * 200).toLocaleString('pt-BR')} usuários</span> cadastrados na plataforma
             </p>
           </div>
         </motion.div>
