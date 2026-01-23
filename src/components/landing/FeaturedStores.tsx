@@ -305,7 +305,7 @@ const FeaturedStores = () => {
             </p>
           </div>
         ) : (
-          <div className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide -mx-4 px-4">
+          <div className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-styled -mx-4 px-4">
             {stores.map((store, index) => (
               <motion.div
                 key={store.id}

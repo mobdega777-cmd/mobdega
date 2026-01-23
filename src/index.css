@@ -198,3 +198,23 @@
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+/* Styled scrollbar for carousels */
+.scrollbar-styled {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--primary)) hsl(var(--muted));
+}
+.scrollbar-styled::-webkit-scrollbar {
+  height: 6px;
+}
+.scrollbar-styled::-webkit-scrollbar-track {
+  background: hsl(var(--muted));
+  border-radius: 3px;
+}
+.scrollbar-styled::-webkit-scrollbar-thumb {
+  background: hsl(var(--primary));
+  border-radius: 3px;
+}
+.scrollbar-styled::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--primary) / 0.8);
+}
