@@ -112,20 +112,15 @@ const FeaturedStores = () => {
 
       setCustomization(customData);
 
-      // Fetch total approved commerces count
-      const { count: commerceCount } = await supabase
-        .from('commerces')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'approved');
-
-      setTotalCommerces(commerceCount || 0);
-
-      // Fetch total users count
-      const { count: userCount } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true });
-
-      setTotalUsers(userCount || 0);
+      // Fetch public stats using secure function (bypasses RLS)
+      const { data: stats } = await supabase.rpc('get_public_stats') as { 
+        data: { total_commerces: number; total_users: number } | null 
+      };
+      
+      if (stats) {
+        setTotalCommerces(stats.total_commerces || 0);
+        setTotalUsers(stats.total_users || 0);
+      }
 
       setCustomizationLoading(false);
     };
