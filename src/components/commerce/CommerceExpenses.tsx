@@ -26,7 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, Edit, Receipt, TrendingDown, DollarSign, Wallet } from "lucide-react";
+import { Plus, Trash2, Edit, Receipt, TrendingDown, DollarSign, Wallet, Package } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/formatCurrency";
@@ -37,18 +37,19 @@ interface CommerceExpensesProps {
   monthlyRevenue: number;
   operatorFees?: number;
   productCost?: number;
+  stockPurchasesTotal?: number;
 }
 
 interface Expense {
   id: string;
   name: string;
-  type: 'fixed' | 'variable';
+  type: 'fixed' | 'variable' | 'stock_purchase';
   amount: number;
   description: string | null;
   is_active: boolean;
 }
 
-const CommerceExpenses = ({ commerceId, monthlyRevenue, operatorFees = 0, productCost = 0 }: CommerceExpensesProps) => {
+const CommerceExpenses = ({ commerceId, monthlyRevenue, operatorFees = 0, productCost = 0, stockPurchasesTotal = 0 }: CommerceExpensesProps) => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -57,7 +58,7 @@ const CommerceExpenses = ({ commerceId, monthlyRevenue, operatorFees = 0, produc
 
   const [formData, setFormData] = useState({
     name: '',
-    type: 'fixed' as 'fixed' | 'variable',
+    type: 'fixed' as 'fixed' | 'variable' | 'stock_purchase',
     amount: '',
     description: ''
   });
@@ -154,12 +155,17 @@ const CommerceExpenses = ({ commerceId, monthlyRevenue, operatorFees = 0, produc
 
   const fixedExpenses = expenses.filter(e => e.type === 'fixed');
   const variableExpenses = expenses.filter(e => e.type === 'variable');
+  const stockPurchaseExpenses = expenses.filter(e => e.type === 'stock_purchase');
   const totalFixedExpenses = fixedExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
   const totalVariableExpenses = variableExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
+  const totalStockPurchases = stockPurchaseExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
   const totalExpenses = totalFixedExpenses + totalVariableExpenses + operatorFees;
   const netProfit = monthlyRevenue - totalExpenses;
   const finalProfit = netProfit - productCost;
   const profitMargin = monthlyRevenue > 0 ? (finalProfit / monthlyRevenue) * 100 : 0;
+  const profitMarginWithoutCost = monthlyRevenue > 0 ? (netProfit / monthlyRevenue) * 100 : 0;
+  // Valor disponível estoque = custo produtos vendidos - compras de estoque lançadas
+  const stockAvailableValue = productCost - totalStockPurchases;
 
   if (loading) {
     return (
@@ -255,6 +261,14 @@ const CommerceExpenses = ({ commerceId, monthlyRevenue, operatorFees = 0, produc
                   {profitMargin.toFixed(1)}%
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">(com custo produtos)</p>
+                <div className="mt-1 pt-1 border-t border-border/50">
+                  <p className="text-xs text-muted-foreground flex justify-between">
+                    <span>Sem custo produtos:</span>
+                    <span className={profitMarginWithoutCost >= 0 ? 'text-green-600' : 'text-red-600'}>
+                      {profitMarginWithoutCost.toFixed(1)}%
+                    </span>
+                  </p>
+                </div>
               </div>
               <div className="p-2 rounded-lg bg-purple-500/10">
                 <Receipt className="w-5 h-5 text-purple-600" />
@@ -263,6 +277,40 @@ const CommerceExpenses = ({ commerceId, monthlyRevenue, operatorFees = 0, produc
           </CardContent>
         </Card>
       </div>
+
+      {/* Card Valor Disponível Estoque */}
+      {productCost > 0 && (
+        <div className="grid grid-cols-1 gap-4">
+          <Card className="border-cyan-500/20 bg-cyan-500/5">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs text-muted-foreground">Valor Disponível Estoque</p>
+                    <HelpTooltip content="Valor acumulado de custos de produtos vendidos menos as compras de estoque lançadas. Use para controlar quanto pode reinvestir em estoque." />
+                  </div>
+                  <p className={`text-xl font-bold ${stockAvailableValue >= 0 ? 'text-cyan-600' : 'text-red-600'}`}>
+                    {formatCurrency(stockAvailableValue)}
+                  </p>
+                  <div className="mt-1 pt-1 border-t border-border/50">
+                    <p className="text-xs text-muted-foreground flex justify-between">
+                      <span>Custo produtos vendidos:</span>
+                      <span className="text-green-600">+ {formatCurrency(productCost)}</span>
+                    </p>
+                    <p className="text-xs text-muted-foreground flex justify-between mt-0.5">
+                      <span>Compras de estoque:</span>
+                      <span className="text-red-500">- {formatCurrency(totalStockPurchases)}</span>
+                    </p>
+                  </div>
+                </div>
+                <div className="p-2 rounded-lg bg-cyan-500/10">
+                  <Package className="w-5 h-5 text-cyan-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Expenses Management */}
       <Card>
@@ -302,8 +350,9 @@ const CommerceExpenses = ({ commerceId, monthlyRevenue, operatorFees = 0, produc
                   <TableRow key={expense.id}>
                     <TableCell className="font-medium">{expense.name}</TableCell>
                     <TableCell>
-                      <Badge variant={expense.type === 'fixed' ? 'default' : 'secondary'}>
-                        {expense.type === 'fixed' ? 'Fixo' : 'Variável'}
+                      <Badge variant={expense.type === 'fixed' ? 'default' : expense.type === 'stock_purchase' ? 'outline' : 'secondary'}
+                        className={expense.type === 'stock_purchase' ? 'bg-cyan-500/10 text-cyan-600 border-cyan-500/30' : ''}>
+                        {expense.type === 'fixed' ? 'Fixo' : expense.type === 'stock_purchase' ? 'Compra Estoque' : 'Variável'}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-red-600 font-medium">
@@ -351,7 +400,7 @@ const CommerceExpenses = ({ commerceId, monthlyRevenue, operatorFees = 0, produc
               <Label htmlFor="type">Tipo</Label>
               <Select
                 value={formData.type}
-                onValueChange={(value: 'fixed' | 'variable') => setFormData({ ...formData, type: value })}
+                onValueChange={(value: 'fixed' | 'variable' | 'stock_purchase') => setFormData({ ...formData, type: value })}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -359,6 +408,7 @@ const CommerceExpenses = ({ commerceId, monthlyRevenue, operatorFees = 0, produc
                 <SelectContent>
                   <SelectItem value="fixed">Fixo (recorrente todo mês)</SelectItem>
                   <SelectItem value="variable">Variável (varia conforme vendas)</SelectItem>
+                  <SelectItem value="stock_purchase">Compra de Estoque</SelectItem>
                 </SelectContent>
               </Select>
             </div>

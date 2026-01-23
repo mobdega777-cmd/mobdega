@@ -31,7 +31,9 @@ import {
   Calendar,
   Phone,
   MapPin,
-  Lightbulb
+  Lightbulb,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -86,8 +88,12 @@ const CommerceCustomers = ({ commerceId }: CommerceCustomersProps) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [customerOrders, setCustomerOrders] = useState<CustomerOrder[]>([]);
+  const [totalCustomerOrders, setTotalCustomerOrders] = useState(0);
+  const [customerOrdersPage, setCustomerOrdersPage] = useState(1);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const { toast } = useToast();
+
+  const ORDERS_PER_PAGE = 10;
 
   const fetchCustomers = async () => {
     setLoading(true);
@@ -177,14 +183,27 @@ const CommerceCustomers = ({ commerceId }: CommerceCustomersProps) => {
     setLoading(false);
   };
 
-  const fetchCustomerOrders = async (userId: string) => {
+  const fetchCustomerOrders = async (userId: string, page: number = 1) => {
+    const from = (page - 1) * ORDERS_PER_PAGE;
+    const to = from + ORDERS_PER_PAGE - 1;
+
+    // Get total count
+    const { count } = await supabase
+      .from('orders')
+      .select('*', { count: 'exact', head: true })
+      .eq('commerce_id', commerceId)
+      .eq('user_id', userId);
+
+    setTotalCustomerOrders(count || 0);
+
+    // Get paginated orders
     const { data } = await supabase
       .from('orders')
       .select('id, status, total, order_type, created_at, payment_method')
       .eq('commerce_id', commerceId)
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
-      .limit(20);
+      .range(from, to);
 
     setCustomerOrders(data || []);
   };
@@ -289,9 +308,18 @@ const CommerceCustomers = ({ commerceId }: CommerceCustomersProps) => {
 
   const openCustomerDetails = async (customer: Customer) => {
     setSelectedCustomer(customer);
-    await fetchCustomerOrders(customer.user_id);
+    setCustomerOrdersPage(1);
+    await fetchCustomerOrders(customer.user_id, 1);
     setIsDetailsOpen(true);
   };
+
+  const handleOrdersPageChange = async (newPage: number) => {
+    if (!selectedCustomer) return;
+    setCustomerOrdersPage(newPage);
+    await fetchCustomerOrders(selectedCustomer.user_id, newPage);
+  };
+
+  const totalOrdersPages = Math.ceil(totalCustomerOrders / ORDERS_PER_PAGE);
 
   const getStatusLabel = (status: string) => {
     const labels: Record<string, string> = {
@@ -718,6 +746,33 @@ const CommerceCustomers = ({ commerceId }: CommerceCustomersProps) => {
                         </div>
                       </div>
                     ))}
+                    
+                    {/* Paginação */}
+                    {totalOrdersPages > 1 && (
+                      <div className="flex items-center justify-between pt-4 border-t border-border">
+                        <p className="text-sm text-muted-foreground">
+                          Página {customerOrdersPage} de {totalOrdersPages} ({totalCustomerOrders} pedidos)
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOrdersPageChange(customerOrdersPage - 1)}
+                            disabled={customerOrdersPage === 1}
+                          >
+                            <ChevronLeft className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOrdersPageChange(customerOrdersPage + 1)}
+                            disabled={customerOrdersPage >= totalOrdersPages}
+                          >
+                            <ChevronRight className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
