@@ -1574,31 +1574,34 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
                                 key={po.participant.id} 
                                 className={`p-3 rounded-lg border ${po.participant.bill_requested ? 'border-destructive bg-destructive/5' : 'border-border bg-muted/30'}`}
                               >
-                                <div className="flex items-center justify-between mb-2">
-                                  <div className="flex items-center gap-2">
-                                    <User className="w-4 h-4 text-muted-foreground" />
-                                    <span className="font-medium text-sm">
+                                {/* Header row - name and badges */}
+                                <div className="flex items-start justify-between gap-2 mb-1">
+                                  <div className="flex items-center gap-1.5 flex-wrap min-w-0 flex-1">
+                                    <User className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                                    <span className="font-medium text-sm truncate">
                                       {po.participant.customer_name || 'Cliente'}
                                     </span>
                                     {po.participant.is_host && (
-                                      <Badge variant="secondary" className="text-[10px] px-1">Host</Badge>
+                                      <Badge variant="secondary" className="text-[10px] px-1 flex-shrink-0">Host</Badge>
                                     )}
                                     {po.participant.bill_requested && (
-                                      <Badge variant="destructive" className="text-[10px] px-1 animate-pulse">
+                                      <Badge variant="destructive" className="text-[10px] px-1 animate-pulse flex-shrink-0">
                                         Pediu Conta!
                                       </Badge>
                                     )}
+                                    {po.participant.bill_requested && po.participant.selected_payment_method && (
+                                      <Badge variant="outline" className="text-[10px] px-1.5 bg-background flex-shrink-0">
+                                        {po.participant.selected_payment_method === 'credit' && 'Crédito'}
+                                        {po.participant.selected_payment_method === 'debit' && 'Débito'}
+                                        {po.participant.selected_payment_method === 'pix' && 'PIX'}
+                                        {po.participant.selected_payment_method === 'cash' && 'Dinheiro'}
+                                      </Badge>
+                                    )}
                                   </div>
-                                  {/* Payment method selected by customer */}
-                                  {po.participant.bill_requested && po.participant.selected_payment_method && (
-                                    <Badge variant="outline" className="text-[10px] px-1.5 bg-background">
-                                      {po.participant.selected_payment_method === 'credit' && 'Crédito'}
-                                      {po.participant.selected_payment_method === 'debit' && 'Débito'}
-                                      {po.participant.selected_payment_method === 'pix' && 'PIX'}
-                                      {po.participant.selected_payment_method === 'cash' && 'Dinheiro'}
-                                    </Badge>
-                                  )}
-                                  <span className="font-bold text-primary">{formatCurrency(po.total)}</span>
+                                </div>
+                                {/* Total value on its own line */}
+                                <div className="flex justify-end mb-2">
+                                  <span className="font-bold text-primary text-base">{formatCurrency(po.total)}</span>
                                 </div>
                                 
                                 {/* Participant's items */}
