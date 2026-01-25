@@ -337,6 +337,44 @@ const AdminDatabase = () => {
         </motion.div>
       </div>
 
+      {/* Database Capacity Bar */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+        <Card>
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <HardDrive className="w-4 h-4 text-primary" />
+                <span className="text-sm font-medium">Capacidade do Banco de Dados</span>
+              </div>
+              <span className="text-sm font-semibold text-muted-foreground">
+                {totalRecords.toLocaleString()} / 500.000 registros
+              </span>
+            </div>
+            <div className="relative w-full h-3 bg-muted rounded-full overflow-hidden">
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${Math.min((totalRecords / 500000) * 100, 100)}%` }}
+                transition={{ duration: 1, ease: "easeOut" }}
+                className={`h-full rounded-full ${
+                  (totalRecords / 500000) * 100 < 50 
+                    ? 'bg-gradient-to-r from-green-500 to-green-400' 
+                    : (totalRecords / 500000) * 100 < 80 
+                      ? 'bg-gradient-to-r from-yellow-500 to-orange-400' 
+                      : 'bg-gradient-to-r from-red-500 to-red-400'
+                }`}
+              />
+            </div>
+            <div className="flex justify-between mt-2 text-xs text-muted-foreground">
+              <span>0%</span>
+              <span className="font-medium text-foreground">
+                {((totalRecords / 500000) * 100).toFixed(2)}% utilizado
+              </span>
+              <span>100%</span>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+
       {/* Tabs for detailed info */}
       <Tabs defaultValue="tables" className="w-full">
         <TabsList className="grid w-full grid-cols-3">
