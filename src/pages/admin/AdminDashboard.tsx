@@ -17,7 +17,8 @@ import {
   ChevronRight,
   Crown,
   BookOpen,
-  Trophy
+  Trophy,
+  Database
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -41,6 +42,7 @@ import AdminCustomers from "@/components/admin/AdminCustomers";
 import AdminCoupons from "@/components/admin/AdminCoupons";
 import AdminTraining from "@/components/admin/AdminTraining";
 import AdminRanking from "@/components/admin/AdminRanking";
+import AdminDatabase from "@/components/admin/AdminDatabase";
 
 type AdminSection = 
   | "overview" 
@@ -55,6 +57,7 @@ type AdminSection =
   | "customization" 
   | "training"
   | "ranking"
+  | "database"
   | "settings";
 
 const menuItems = [
@@ -69,6 +72,7 @@ const menuItems = [
   { id: "coupons" as AdminSection, label: "Cupons", icon: Receipt },
   { id: "training" as AdminSection, label: "Treinamento", icon: BookOpen },
   { id: "ranking" as AdminSection, label: "Ranking", icon: Trophy },
+  { id: "database" as AdminSection, label: "Banco de Dados", icon: Database },
   { id: "customization" as AdminSection, label: "Personalização", icon: Palette },
   { id: "settings" as AdminSection, label: "Configurações", icon: Settings },
 ];
@@ -143,6 +147,8 @@ const AdminDashboard = () => {
         return <AdminTraining />;
       case "ranking":
         return <AdminRanking />;
+      case "database":
+        return <AdminDatabase />;
       case "customization":
         return <AdminCustomization />;
       case "settings":

@@ -418,7 +418,7 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
     // Find ALL active orders (pending/confirmed/preparing/delivered with pending payment) for this user at this commerce with a table
     const { data: activeOrders } = await supabase
       .from('orders')
-      .select('id, table_id, status, payment_method')
+      .select('id, table_id, status, payment_method, session_id')
       .eq('user_id', user.id)
       .eq('commerce_id', commerceId)
       .not('table_id', 'is', null)
@@ -437,12 +437,34 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
       if (primaryOrder.table_id) {
         const { data: tableData } = await supabase
           .from('tables')
-          .select('id, number, name, capacity, status')
+          .select('id, number, name, capacity, status, session_id')
           .eq('id', primaryOrder.table_id)
           .single();
         
         if (tableData) {
           setSelectedTable(tableData as Table);
+          
+          // Fetch session info if there's an active session
+          if (tableData.session_id) {
+            const { data: sessionData } = await supabase
+              .from('table_sessions')
+              .select('*')
+              .eq('id', tableData.session_id)
+              .eq('status', 'active')
+              .maybeSingle();
+            
+            if (sessionData) {
+              setCurrentSession(sessionData as TableSession);
+              
+              // Fetch participants for this session
+              const { data: participants } = await supabase
+                .from('table_participants')
+                .select('*')
+                .eq('session_id', sessionData.id);
+              
+              setSessionParticipants((participants as TableParticipant[]) || []);
+            }
+          }
         }
       }
 
@@ -452,6 +474,7 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
       setHasActiveTableOrder(false);
       setActiveOrderId(null);
       setActiveOrderItems([]);
+      // Don't reset session if navigating away - only reset on explicit table change
     }
   };
 
@@ -1284,9 +1307,19 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
             Cardápio
           </TabsTrigger>
           {(orderMode === 'table' || hasActiveTableOrder) && (
-            <TabsTrigger value="comanda" className="gap-2">
+            <TabsTrigger 
+              value="comanda" 
+              className={`gap-2 relative ${
+                (cart.length > 0 || activeOrderItems.length > 0) 
+                  ? 'ring-2 ring-red-500 ring-offset-2 ring-offset-background animate-pulse' 
+                  : ''
+              }`}
+            >
               <UtensilsCrossed className="w-4 h-4" />
               Comanda
+              {(cart.length > 0 || activeOrderItems.length > 0) && (
+                <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-ping" />
+              )}
             </TabsTrigger>
           )}
           <TabsTrigger value="reviews" className="gap-2">
