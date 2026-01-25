@@ -1142,6 +1142,7 @@ export type Database = {
           id: string
           is_host: boolean
           joined_at: string
+          selected_payment_method: string | null
           session_id: string
           user_id: string
         }
@@ -1152,6 +1153,7 @@ export type Database = {
           id?: string
           is_host?: boolean
           joined_at?: string
+          selected_payment_method?: string | null
           session_id: string
           user_id: string
         }
@@ -1162,6 +1164,7 @@ export type Database = {
           id?: string
           is_host?: boolean
           joined_at?: string
+          selected_payment_method?: string | null
           session_id?: string
           user_id?: string
         }

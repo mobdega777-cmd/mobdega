@@ -103,6 +103,7 @@ interface TableParticipant {
   is_host: boolean;
   bill_requested: boolean;
   bill_requested_at: string | null;
+  selected_payment_method: string | null;
 }
 
 interface TableSession {
@@ -316,7 +317,7 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
           // Fetch participants for these sessions
           const { data: participantsData } = await supabase
             .from('table_participants')
-            .select('id, session_id, user_id, customer_name, is_host, bill_requested, bill_requested_at')
+            .select('id, session_id, user_id, customer_name, is_host, bill_requested, bill_requested_at, selected_payment_method')
             .in('session_id', sessionIds);
 
           sessionsData.forEach(session => {
@@ -331,7 +332,8 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
                 customer_name: p.customer_name,
                 is_host: p.is_host,
                 bill_requested: p.bill_requested ?? false,
-                bill_requested_at: p.bill_requested_at
+                bill_requested_at: p.bill_requested_at,
+                selected_payment_method: p.selected_payment_method ?? null
               }))
             });
           });
@@ -1587,6 +1589,15 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
                                       </Badge>
                                     )}
                                   </div>
+                                  {/* Payment method selected by customer */}
+                                  {po.participant.bill_requested && po.participant.selected_payment_method && (
+                                    <Badge variant="outline" className="text-[10px] px-1.5 bg-background">
+                                      {po.participant.selected_payment_method === 'credit' && 'Crédito'}
+                                      {po.participant.selected_payment_method === 'debit' && 'Débito'}
+                                      {po.participant.selected_payment_method === 'pix' && 'PIX'}
+                                      {po.participant.selected_payment_method === 'cash' && 'Dinheiro'}
+                                    </Badge>
+                                  )}
                                   <span className="font-bold text-primary">{formatCurrency(po.total)}</span>
                                 </div>
                                 
