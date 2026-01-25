@@ -21,7 +21,11 @@ import {
   Ban,
   Lock,
   Wallet,
-  Bell
+  Bell,
+  Camera,
+  FileText,
+  BookOpen,
+  Trophy
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -46,6 +50,10 @@ import DeliveryZonesConfig from "@/components/commerce/DeliveryZonesConfig";
 import CommercePaymentConfig from "@/components/commerce/CommercePaymentConfig";
 import CommerceStockControl from "@/components/commerce/CommerceStockControl";
 import CommerceCustomers from "@/components/commerce/CommerceCustomers";
+import CommercePhotos from "@/components/commerce/CommercePhotos";
+import CommerceContract from "@/components/commerce/CommerceContract";
+import CommerceTraining from "@/components/commerce/CommerceTraining";
+import CommerceRanking from "@/components/commerce/CommerceRanking";
 
 type CommerceSection = 
   | "overview" 
@@ -54,15 +62,19 @@ type CommerceSection =
   | "stockcontrol"
   | "orders" 
   | "tables"
+  | "photos"
   | "financial" 
   | "customers"
   | "cashregister"
   | "delivery"
   | "deliveryzones"
   | "paymentconfig"
+  | "contract"
+  | "training"
+  | "ranking"
   | "settings";
 
-// Ordem atualizada com Controle de Estoque e Clientes
+// Ordem atualizada com Fotos, Contrato, Treinamento e Ranking
 const menuItems = [
   { id: "overview" as CommerceSection, label: "Visão Geral", icon: LayoutDashboard },
   { id: "cashregister" as CommerceSection, label: "Caixa/PDV", icon: Calculator },
@@ -71,11 +83,15 @@ const menuItems = [
   { id: "delivery" as CommerceSection, label: "Delivery", icon: Truck, showDeliveryBadge: true },
   { id: "deliveryzones" as CommerceSection, label: "Áreas de Entrega", icon: MapPin },
   { id: "tables" as CommerceSection, label: "Mesas/Comandas", icon: Utensils },
+  { id: "photos" as CommerceSection, label: "Fotos", icon: Camera },
   { id: "products" as CommerceSection, label: "Produtos", icon: Package },
   { id: "categories" as CommerceSection, label: "Categorias", icon: FolderOpen },
   { id: "stockcontrol" as CommerceSection, label: "Controle Estoque", icon: Package },
   { id: "financial" as CommerceSection, label: "Financeiro", icon: DollarSign, showBadge: true },
   { id: "customers" as CommerceSection, label: "Clientes", icon: Store },
+  { id: "contract" as CommerceSection, label: "Contrato", icon: FileText },
+  { id: "training" as CommerceSection, label: "Treinamento", icon: BookOpen },
+  { id: "ranking" as CommerceSection, label: "Ranking", icon: Trophy },
   { id: "settings" as CommerceSection, label: "Configurações", icon: Settings },
 ];
 
@@ -346,6 +362,8 @@ const CommerceDashboard = () => {
         return <CommerceOrders commerceId={commerce.id} />;
       case "tables":
         return <CommerceTables commerceId={commerce.id} />;
+      case "photos":
+        return <CommercePhotos commerceId={commerce.id} />;
       case "financial":
         return <CommerceFinancial commerceId={commerce.id} />;
       case "customers":
@@ -358,6 +376,12 @@ const CommerceDashboard = () => {
         return <DeliveryZonesConfig commerceId={commerce.id} />;
       case "paymentconfig":
         return <CommercePaymentConfig commerceId={commerce.id} />;
+      case "contract":
+        return <CommerceContract commerceId={commerce.id} />;
+      case "training":
+        return <CommerceTraining />;
+      case "ranking":
+        return <CommerceRanking currentCommerceId={commerce.id} />;
       case "settings":
         return <CommerceSettings commerce={commerce} />;
       default:

@@ -15,7 +15,9 @@ import {
   Menu,
   X,
   ChevronRight,
-  Crown
+  Crown,
+  BookOpen,
+  Trophy
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -37,6 +39,8 @@ import AdminBillingConfig from "@/components/admin/AdminBillingConfig";
 import AdminPlans from "@/components/admin/AdminPlans";
 import AdminCustomers from "@/components/admin/AdminCustomers";
 import AdminCoupons from "@/components/admin/AdminCoupons";
+import AdminTraining from "@/components/admin/AdminTraining";
+import AdminRanking from "@/components/admin/AdminRanking";
 
 type AdminSection = 
   | "overview" 
@@ -49,6 +53,8 @@ type AdminSection =
   | "plans"
   | "coupons"
   | "customization" 
+  | "training"
+  | "ranking"
   | "settings";
 
 const menuItems = [
@@ -61,6 +67,8 @@ const menuItems = [
   { id: "customers" as AdminSection, label: "Gestão de Clientes", icon: Users },
   { id: "plans" as AdminSection, label: "Planos", icon: Crown },
   { id: "coupons" as AdminSection, label: "Cupons", icon: Receipt },
+  { id: "training" as AdminSection, label: "Treinamento", icon: BookOpen },
+  { id: "ranking" as AdminSection, label: "Ranking", icon: Trophy },
   { id: "customization" as AdminSection, label: "Personalização", icon: Palette },
   { id: "settings" as AdminSection, label: "Configurações", icon: Settings },
 ];
@@ -131,6 +139,10 @@ const AdminDashboard = () => {
         return <AdminPlans />;
       case "coupons":
         return <AdminCoupons />;
+      case "training":
+        return <AdminTraining />;
+      case "ranking":
+        return <AdminRanking />;
       case "customization":
         return <AdminCustomization />;
       case "settings":

@@ -259,6 +259,44 @@ export type Database = {
           },
         ]
       }
+      commerce_photos: {
+        Row: {
+          caption: string | null
+          commerce_id: string
+          created_at: string
+          id: string
+          image_url: string
+          sort_order: number | null
+          updated_at: string
+        }
+        Insert: {
+          caption?: string | null
+          commerce_id: string
+          created_at?: string
+          id?: string
+          image_url: string
+          sort_order?: number | null
+          updated_at?: string
+        }
+        Update: {
+          caption?: string | null
+          commerce_id?: string
+          created_at?: string
+          id?: string
+          image_url?: string
+          sort_order?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commerce_photos_commerce_id_fkey"
+            columns: ["commerce_id"]
+            isOneToOne: false
+            referencedRelation: "commerces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       commerces: {
         Row: {
           address: string | null
@@ -284,6 +322,7 @@ export type Database = {
           opening_hours: Json | null
           owner_id: string
           owner_name: string
+          payment_due_day: number | null
           phone: string
           plan_id: string | null
           rejection_reason: string | null
@@ -316,6 +355,7 @@ export type Database = {
           opening_hours?: Json | null
           owner_id: string
           owner_name: string
+          payment_due_day?: number | null
           phone: string
           plan_id?: string | null
           rejection_reason?: string | null
@@ -348,6 +388,7 @@ export type Database = {
           opening_hours?: Json | null
           owner_id?: string
           owner_name?: string
+          payment_due_day?: number | null
           phone?: string
           plan_id?: string | null
           rejection_reason?: string | null
@@ -1132,6 +1173,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      training_videos: {
+        Row: {
+          category: string | null
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean | null
+          sort_order: number | null
+          thumbnail_url: string | null
+          title: string
+          updated_at: string
+          video_url: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          sort_order?: number | null
+          thumbnail_url?: string | null
+          title: string
+          updated_at?: string
+          video_url: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          sort_order?: number | null
+          thumbnail_url?: string | null
+          title?: string
+          updated_at?: string
+          video_url?: string
+        }
+        Relationships: []
       }
       user_roles: {
         Row: {
