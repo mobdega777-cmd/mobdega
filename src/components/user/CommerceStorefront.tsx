@@ -842,12 +842,37 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
     setSessionHostName(null);
   };
 
-  // Handle request bill (placeholder for future implementation)
-  const handleRequestBill = () => {
-    toast({ 
-      title: "Conta solicitada!", 
-      description: "O caixa foi notificado sobre sua solicitação."
-    });
+  // Handle request bill - update participant's bill_requested flag
+  const handleRequestBill = async () => {
+    if (!user || !currentSession) {
+      toast({ variant: "destructive", title: "Erro ao solicitar conta" });
+      return;
+    }
+
+    // Find the current user's participant record
+    const participant = sessionParticipants.find(p => p.user_id === user.id);
+    if (!participant) {
+      toast({ variant: "destructive", title: "Você não está nesta sessão" });
+      return;
+    }
+
+    // Update the bill_requested flag
+    const { error } = await supabase
+      .from('table_participants')
+      .update({ 
+        bill_requested: true,
+        bill_requested_at: new Date().toISOString()
+      })
+      .eq('id', participant.id);
+
+    if (error) {
+      toast({ variant: "destructive", title: "Erro ao solicitar conta", description: error.message });
+    } else {
+      toast({ 
+        title: "Conta solicitada!", 
+        description: "O caixa foi notificado sobre sua solicitação."
+      });
+    }
   };
 
   // Handle order modes - exclusive selection (toggle behavior)

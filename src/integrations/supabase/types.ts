@@ -1136,6 +1136,8 @@ export type Database = {
       }
       table_participants: {
         Row: {
+          bill_requested: boolean | null
+          bill_requested_at: string | null
           customer_name: string | null
           id: string
           is_host: boolean
@@ -1144,6 +1146,8 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          bill_requested?: boolean | null
+          bill_requested_at?: string | null
           customer_name?: string | null
           id?: string
           is_host?: boolean
@@ -1152,6 +1156,8 @@ export type Database = {
           user_id: string
         }
         Update: {
+          bill_requested?: boolean | null
+          bill_requested_at?: string | null
           customer_name?: string | null
           id?: string
           is_host?: boolean
