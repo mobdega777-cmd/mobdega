@@ -226,10 +226,14 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
           filter: `commerce_id=eq.${commerceId}` 
         },
         (payload) => {
-          // Update only the changed table in state for immediate feedback
+          // Update the changed table in state - include both status and session_id
           setTables(prev => prev.map(t => 
             t.id === payload.new.id 
-              ? { ...t, status: payload.new.status as string }
+              ? { 
+                  ...t, 
+                  status: payload.new.status as string,
+                  session_id: payload.new.session_id as string | null
+                }
               : t
           ));
         }
@@ -662,17 +666,10 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
     }
 
     const normalizedStatus = (currentTable?.status ?? 'available') as string;
+    const hasActiveSession = !!currentTable?.session_id;
 
-    // If table is available, show bill mode selection
-    if (normalizedStatus === 'available') {
-      setPendingTable(table);
-      setShowTableModal(false);
-      setShowBillModeModal(true);
-      return;
-    }
-
-    // If table is occupied, check if there's an active session the user can join
-    if (normalizedStatus === 'occupied' && currentTable?.session_id) {
+    // If table has an active session, check if user can join (regardless of status)
+    if (hasActiveSession) {
       // Fetch session info
       const { data: sessionData } = await supabase
         .from('table_sessions')
@@ -725,6 +722,14 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
         setShowJoinSessionModal(true);
         return;
       }
+    }
+
+    // If table is available and has no session, show bill mode selection
+    if (normalizedStatus === 'available' && !hasActiveSession) {
+      setPendingTable(table);
+      setShowTableModal(false);
+      setShowBillModeModal(true);
+      return;
     }
 
     // Table not available and no joinable session
@@ -1685,10 +1690,11 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
                 {tables.map((table) => {
                   // Normalize status check - handle null/undefined as available
                   const tableStatus = table.status || 'available';
-                  const isAvailable = tableStatus === 'available';
-                  const isOccupied = tableStatus === 'occupied';
+                  // A table is considered occupied if it has an active session (regardless of status)
+                  const hasSession = !!table.session_id;
+                  const isAvailable = !hasSession && tableStatus === 'available';
+                  const isOccupied = hasSession || tableStatus === 'occupied';
                   const isReservedOrClosed = tableStatus === 'reserved' || tableStatus === 'closed';
-                  const hasSession = isOccupied && table.session_id;
                   
                   return (
                     <Button
