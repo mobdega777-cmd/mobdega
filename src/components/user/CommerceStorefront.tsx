@@ -21,6 +21,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import BillModeModal from "./BillModeModal";
 import JoinSessionModal from "./JoinSessionModal";
+import BillPaymentMethodModal from "./BillPaymentMethodModal";
 
 interface Commerce {
   id: string;
@@ -157,6 +158,8 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
   const [showOrderStatusModal, setShowOrderStatusModal] = useState(false);
   const [showBillModeModal, setShowBillModeModal] = useState(false);
   const [showJoinSessionModal, setShowJoinSessionModal] = useState(false);
+  const [showBillPaymentModal, setShowBillPaymentModal] = useState(false);
+  const [requestingBill, setRequestingBill] = useState(false);
   
   // Session management for split bills
   const [pendingTable, setPendingTable] = useState<Table | null>(null);
@@ -865,8 +868,8 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
     setSessionHostName(null);
   };
 
-  // Handle request bill - update participant's bill_requested flag
-  const handleRequestBill = async () => {
+  // Handle request bill - opens payment method selection modal
+  const handleRequestBill = () => {
     if (!user || !currentSession) {
       toast({ variant: "destructive", title: "Erro ao solicitar conta" });
       return;
@@ -879,18 +882,41 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
       return;
     }
 
-    // Update the bill_requested flag
+    // Open payment method modal
+    setShowBillPaymentModal(true);
+  };
+
+  // Confirm bill request with selected payment method
+  const confirmBillRequest = async (paymentMethod: string) => {
+    if (!user || !currentSession) {
+      toast({ variant: "destructive", title: "Erro ao solicitar conta" });
+      return;
+    }
+
+    const participant = sessionParticipants.find(p => p.user_id === user.id);
+    if (!participant) {
+      toast({ variant: "destructive", title: "Você não está nesta sessão" });
+      return;
+    }
+
+    setRequestingBill(true);
+
+    // Update the bill_requested flag with selected payment method
     const { error } = await supabase
       .from('table_participants')
       .update({ 
         bill_requested: true,
-        bill_requested_at: new Date().toISOString()
+        bill_requested_at: new Date().toISOString(),
+        selected_payment_method: paymentMethod
       })
       .eq('id', participant.id);
+
+    setRequestingBill(false);
 
     if (error) {
       toast({ variant: "destructive", title: "Erro ao solicitar conta", description: error.message });
     } else {
+      setShowBillPaymentModal(false);
       toast({ 
         title: "Conta solicitada!", 
         description: "O caixa foi notificado sobre sua solicitação."
@@ -2209,6 +2235,14 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
         participantsCount={sessionParticipants.length}
         onJoin={handleJoinSession}
         onCancel={handleCancelJoinSession}
+      />
+
+      {/* Bill Payment Method Modal */}
+      <BillPaymentMethodModal
+        open={showBillPaymentModal}
+        onOpenChange={setShowBillPaymentModal}
+        onConfirm={confirmBillRequest}
+        loading={requestingBill}
       />
     </motion.div>
   );
