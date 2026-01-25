@@ -25,7 +25,8 @@ import {
   Camera,
   FileText,
   BookOpen,
-  Trophy
+  Trophy,
+  AlertTriangleIcon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -77,7 +78,7 @@ type CommerceSection =
 // Ordem atualizada com Fotos, Contrato, Treinamento e Ranking
 const menuItems = [
   { id: "overview" as CommerceSection, label: "Visão Geral", icon: LayoutDashboard },
-  { id: "cashregister" as CommerceSection, label: "Caixa/PDV", icon: Calculator },
+  { id: "cashregister" as CommerceSection, label: "Caixa/PDV", icon: Calculator, showBillRequestBadge: true },
   { id: "paymentconfig" as CommerceSection, label: "Configurar Pagamentos", icon: Wallet },
   { id: "orders" as CommerceSection, label: "Pedidos", icon: ShoppingCart, showPendingBadge: true },
   { id: "delivery" as CommerceSection, label: "Delivery", icon: Truck, showDeliveryBadge: true },
@@ -117,6 +118,7 @@ const CommerceDashboard = () => {
   const [pendingInvoicesCount, setPendingInvoicesCount] = useState(0);
   const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
   const [pendingDeliveryOrdersCount, setPendingDeliveryOrdersCount] = useState(0);
+  const [billRequestsCount, setBillRequestsCount] = useState(0);
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
 
@@ -198,6 +200,29 @@ const CommerceDashboard = () => {
     setPendingDeliveryOrdersCount(count || 0);
   };
 
+  const fetchBillRequests = async (commerceId: string) => {
+    // Fetch active sessions for this commerce with pending bill requests
+    const { data: sessions } = await supabase
+      .from('table_sessions')
+      .select('id')
+      .eq('commerce_id', commerceId)
+      .eq('status', 'active');
+
+    if (!sessions || sessions.length === 0) {
+      setBillRequestsCount(0);
+      return;
+    }
+
+    const sessionIds = sessions.map(s => s.id);
+    const { count } = await supabase
+      .from('table_participants')
+      .select('*', { count: 'exact', head: true })
+      .in('session_id', sessionIds)
+      .eq('bill_requested', true);
+    
+    setBillRequestsCount(count || 0);
+  };
+
   useEffect(() => {
     fetchCommerce();
   }, [user]);
@@ -207,6 +232,7 @@ const CommerceDashboard = () => {
       fetchPendingInvoices(commerce.id);
       fetchPendingOrders(commerce.id);
       fetchPendingDeliveryOrders(commerce.id);
+      fetchBillRequests(commerce.id);
 
       // Subscribe to invoice changes for this commerce
       const invoicesChannel = supabase
@@ -231,9 +257,20 @@ const CommerceDashboard = () => {
         )
         .subscribe();
 
+      // Subscribe to bill request changes
+      const billRequestsChannel = supabase
+        .channel('commerce-bill-requests')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'table_participants' },
+          () => fetchBillRequests(commerce.id)
+        )
+        .subscribe();
+
       return () => {
         supabase.removeChannel(invoicesChannel);
         supabase.removeChannel(ordersChannel);
+        supabase.removeChannel(billRequestsChannel);
       };
     }
   }, [commerce?.id]);
@@ -527,6 +564,18 @@ const CommerceDashboard = () => {
                   <Icon className="w-5 h-5 flex-shrink-0" />
                   <span className="flex-1 text-left font-medium text-sm">{item.label}</span>
                   {isDisabled && <Lock className="w-4 h-4 text-primary-foreground/40" />}
+                  {!isDisabled && (item as any).showBillRequestBadge && billRequestsCount > 0 && (
+                    <motion.div
+                      initial={{ scale: 0.8 }}
+                      animate={{ scale: [0.8, 1.1, 1] }}
+                      transition={{ repeat: Infinity, duration: 1.5 }}
+                    >
+                      <Badge variant="destructive" className="text-xs px-2 py-0.5 flex items-center gap-1 animate-pulse">
+                        <AlertTriangleIcon className="w-3 h-3" />
+                        {billRequestsCount}
+                      </Badge>
+                    </motion.div>
+                  )}
                   {!isDisabled && item.showPendingBadge && pendingOrdersCount > 0 && (
                     <Badge variant="destructive" className="text-xs px-2 py-0.5">
                       {pendingOrdersCount}

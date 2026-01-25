@@ -2,63 +2,31 @@
 
 ## Plano: Sistema de Comandas Separadas para Mesas
 
-### Status: ✅ Fase 1 Implementada
+### Status: ✅ Fase 2 Implementada
 
 ---
 
 ### O que foi implementado:
 
-#### 1. ✅ Banco de Dados
-- Tabela `table_sessions` criada - gerencia sessões ativas de mesas
-- Tabela `table_participants` criada - vincula múltiplos usuários a uma sessão
-- Coluna `session_id` adicionada às tabelas `tables` e `orders`
-- Políticas RLS configuradas para segurança
-- Realtime habilitado para sincronização
+#### Fase 1 (Anterior):
+- Tabelas `table_sessions` e `table_participants`
+- Modal de escolha de comanda (BillModeModal)
+- Modal de juntar-se à mesa (JoinSessionModal)
+- Botão "Pedir Conta" na comanda
 
-#### 2. ✅ Modal de Escolha de Comanda (BillModeModal)
-- Quando usuário seleciona mesa disponível, popup aparece
-- Opção "Comanda Única" - todos pagam juntos
-- Opção "Comandas Separadas" - cada pessoa paga sua conta
-- Cria sessão e define usuário como host
-
-#### 3. ✅ Modal de Juntar-se à Mesa (JoinSessionModal)
-- Quando usuário seleciona mesa ocupada com sessão ativa
-- Mostra informações: host, tipo de comanda, participantes
-- Permite juntar-se à sessão existente
-
-#### 4. ✅ Atualização do Modal de Seleção de Mesas
-- Verde: Mesa disponível - abre nova sessão
-- Amarelo/Laranja: Mesa ocupada com sessão - pode juntar-se
-- Vermelho: Mesa reservada/fechada - bloqueada
-
-#### 5. ✅ Botão "Pedir Conta" na Comanda
-- Adicionado abaixo do total
-- Visual placeholder (ação futura)
-
-#### 6. ✅ Indicação de Modo na Comanda
-- Título mostra "Sua Comanda Pessoal" para modo split
-- Badge indica tipo de comanda (Única/Separada)
+#### Fase 2 (Atual):
+1. ✅ **Coluna bill_requested** adicionada à tabela `table_participants`
+2. ✅ **Botão "Pedir Conta"** agora atualiza `bill_requested=true` no banco
+3. ✅ **Badge animado no menu Caixa** quando há pedidos de conta pendentes
+4. ✅ **Card de mesa com destaque** quando participante pede conta
+5. ✅ **Estratificação por participante** no Caixa/PDV para comandas separadas
+6. ✅ **Fechamento individual** de comanda por participante
+7. ✅ **Botão "Unificar Contas"** para fechar todas juntas se necessário
 
 ---
 
-### Próximos Passos (Fase 2 - a implementar):
+### Próximos Passos (Fase 3 - Opcional):
 
-1. **Filtrar itens por usuário em modo split**
-   - Em `bill_mode = 'split'`, mostrar apenas itens do usuário atual
-   - Em `bill_mode = 'single'`, mostrar todos os itens de todos participantes
-
-2. **Vincular orders ao session_id**
-   - Ao criar pedido, incluir `session_id` para rastreabilidade
-
-3. **Painel do Caixa/PDV**
-   - Mostrar lista de participantes quando mesa tem `bill_mode = 'split'`
-   - Permitir fechar conta individual de cada participante
-   - Opção de "Unificar contas" se necessário
-
-4. **Fechamento de Sessão**
-   - Quando caixa fecha conta, encerrar sessão
-   - Liberar mesa automaticamente
-
-5. **Ação do Botão "Pedir Conta"**
-   - Notificar caixa via realtime
-   - Ou abrir modal de pagamento se `table_payment_required` estiver ativo
+1. Notificação sonora/visual quando cliente pede conta
+2. Histórico de sessões de mesa fechadas
+3. Relatório de comandas separadas vs únicas

@@ -49,7 +49,10 @@ import {
   User,
   Phone,
   Eye,
-  Percent
+  Percent,
+  AlertTriangle,
+  Users,
+  Receipt
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -93,6 +96,36 @@ interface Product {
   stock: number | null;
 }
 
+interface TableParticipant {
+  id: string;
+  user_id: string;
+  customer_name: string | null;
+  is_host: boolean;
+  bill_requested: boolean;
+  bill_requested_at: string | null;
+}
+
+interface TableSession {
+  id: string;
+  bill_mode: 'single' | 'split';
+  status: string;
+  participants: TableParticipant[];
+}
+
+interface ParticipantOrder {
+  participant: TableParticipant;
+  items: {
+    id?: string;
+    product_name: string;
+    quantity: number;
+    unit_price: number;
+    total_price: number;
+    product_id?: string | null;
+  }[];
+  total: number;
+  order_ids: string[];
+}
+
 interface TableOrder {
   id: string;
   table_id: string;
@@ -105,6 +138,9 @@ interface TableOrder {
   status: string;
   payment_method: string | null;
   all_order_ids?: string[];
+  session?: TableSession | null;
+  participantOrders?: ParticipantOrder[];
+  hasBillRequests?: boolean;
   items: {
     id?: string;
     product_name: string;
@@ -112,6 +148,7 @@ interface TableOrder {
     unit_price: number;
     total_price: number;
     product_id?: string | null;
+    user_id?: string;
   }[];
 }
 
@@ -148,6 +185,12 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
   const [showCloseTableModal, setShowCloseTableModal] = useState(false);
   const [tablePaymentMethod, setTablePaymentMethod] = useState<string>("cash");
   const [tableCashReceived, setTableCashReceived] = useState("");
+  
+  // Individual participant closing (for split bills)
+  const [selectedParticipant, setSelectedParticipant] = useState<ParticipantOrder | null>(null);
+  const [showCloseParticipantModal, setShowCloseParticipantModal] = useState(false);
+  const [participantPaymentMethod, setParticipantPaymentMethod] = useState<string>("cash");
+  const [participantCashReceived, setParticipantCashReceived] = useState("");
 
   // Date filter state
   const [dateFilter, setDateFilter] = useState({ 
@@ -225,6 +268,8 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
       .select(`
         id,
         table_id,
+        user_id,
+        session_id,
         customer_name,
         customer_phone,
         created_at,
@@ -251,33 +296,77 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
       const tableIds = [...new Set(tableOrdersData.map(o => o.table_id).filter(Boolean))];
       const { data: tablesData } = await supabase
         .from('tables')
-        .select('id, number, name')
+        .select('id, number, name, session_id')
         .in('id', tableIds);
 
       const tableMap = new Map(tablesData?.map(t => [t.id, t]) || []);
 
+      // Fetch sessions for these tables
+      const sessionIds = [...new Set(tablesData?.map(t => t.session_id).filter(Boolean) || [])];
+      let sessionsMap = new Map<string, TableSession>();
+      
+      if (sessionIds.length > 0) {
+        const { data: sessionsData } = await supabase
+          .from('table_sessions')
+          .select('id, bill_mode, status')
+          .in('id', sessionIds)
+          .eq('status', 'active');
+
+        if (sessionsData) {
+          // Fetch participants for these sessions
+          const { data: participantsData } = await supabase
+            .from('table_participants')
+            .select('id, session_id, user_id, customer_name, is_host, bill_requested, bill_requested_at')
+            .in('session_id', sessionIds);
+
+          sessionsData.forEach(session => {
+            const participants = participantsData?.filter(p => p.session_id === session.id) || [];
+            sessionsMap.set(session.id, {
+              id: session.id,
+              bill_mode: session.bill_mode as 'single' | 'split',
+              status: session.status,
+              participants: participants.map(p => ({
+                id: p.id,
+                user_id: p.user_id,
+                customer_name: p.customer_name,
+                is_host: p.is_host,
+                bill_requested: p.bill_requested ?? false,
+                bill_requested_at: p.bill_requested_at
+              }))
+            });
+          });
+        }
+      }
+
       // Consolidar pedidos por mesa - agrupar itens de múltiplos pedidos na mesma mesa
-      // Agora armazenamos todos os order_ids para fechar todos juntos
       const ordersByTable = new Map<string, TableOrder & { all_order_ids: string[] }>();
       
       tableOrdersData.forEach(order => {
         const table = tableMap.get(order.table_id);
         const tableKey = order.table_id || order.id;
+        const session = table?.session_id ? sessionsMap.get(table.session_id) : null;
+        
+        // Add user_id to each item for participant filtering
+        const itemsWithUserId = (order.order_items || []).map(item => ({
+          ...item,
+          user_id: order.user_id
+        }));
         
         if (ordersByTable.has(tableKey)) {
           // Mesa já existe - adicionar itens e somar total
           const existingOrder = ordersByTable.get(tableKey)!;
-          existingOrder.items = [...existingOrder.items, ...(order.order_items || [])];
+          existingOrder.items = [...existingOrder.items, ...itemsWithUserId];
           existingOrder.total = Number(existingOrder.total) + Number(order.total);
           existingOrder.all_order_ids.push(order.id);
-          // Manter o status mais avançado (delivered = pronto pra fechar)
+          // Manter o status MENOS avançado para não habilitar fechamento antes de todos estarem prontos
           const statusPriority: Record<string, number> = { pending: 1, confirmed: 2, preparing: 3, delivered: 4 };
           if (statusPriority[order.status] < statusPriority[existingOrder.status]) {
-            // Manter o status MENOS avançado para não habilitar fechamento antes de todos estarem prontos
             existingOrder.status = order.status;
           }
         } else {
           // Nova mesa
+          const hasBillRequests = session?.participants.some(p => p.bill_requested) || false;
+          
           ordersByTable.set(tableKey, {
             id: order.id,
             table_id: order.table_id || '',
@@ -289,13 +378,45 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
             total: order.total,
             status: order.status,
             payment_method: order.payment_method,
-            items: order.order_items || [],
-            all_order_ids: [order.id]
+            items: itemsWithUserId,
+            all_order_ids: [order.id],
+            session: session || null,
+            hasBillRequests
           });
         }
       });
 
-      setTableOrders(Array.from(ordersByTable.values()));
+      // For split bill mode, group items by participant
+      const finalOrders = Array.from(ordersByTable.values()).map(tableOrder => {
+        if (tableOrder.session?.bill_mode === 'split') {
+          const participantOrdersMap = new Map<string, ParticipantOrder>();
+          
+          tableOrder.session.participants.forEach(participant => {
+            const participantItems = tableOrder.items.filter(item => item.user_id === participant.user_id);
+            const participantTotal = participantItems.reduce((sum, item) => sum + Number(item.total_price), 0);
+            const participantOrderIds = [...new Set(
+              tableOrdersData
+                .filter(o => o.table_id === tableOrder.table_id && o.user_id === participant.user_id)
+                .map(o => o.id)
+            )];
+            
+            if (participantItems.length > 0) {
+              participantOrdersMap.set(participant.user_id, {
+                participant,
+                items: participantItems,
+                total: participantTotal,
+                order_ids: participantOrderIds
+              });
+            }
+          });
+          
+          tableOrder.participantOrders = Array.from(participantOrdersMap.values());
+        }
+        
+        return tableOrder;
+      });
+
+      setTableOrders(finalOrders);
     } else {
       setTableOrders([]);
     }
@@ -739,6 +860,95 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
     setSelectedTableOrder(null);
     fetchData();
   };
+
+  // Close individual participant's bill (for split mode)
+  const closeParticipantOrder = async () => {
+    if (!selectedParticipant || !selectedTableOrder || !currentRegister || !user) return;
+
+    // Update the participant's orders with payment_method, status
+    for (const orderId of selectedParticipant.order_ids) {
+      await supabase
+        .from('orders')
+        .update({
+          payment_method: participantPaymentMethod,
+          status: 'delivered',
+          delivered_at: new Date().toISOString()
+        })
+        .eq('id', orderId);
+    }
+
+    // Create cash movement for this participant's total
+    await supabase
+      .from('cash_movements')
+      .insert({
+        cash_register_id: currentRegister.id,
+        commerce_id: commerceId,
+        type: 'sale',
+        amount: selectedParticipant.total,
+        payment_method: participantPaymentMethod,
+        description: `Mesa ${selectedTableOrder.table_number} - ${selectedParticipant.participant.customer_name || 'Cliente'}`,
+        created_by: user.id,
+        order_id: selectedParticipant.order_ids[0],
+      });
+
+    // Clear the bill_requested flag for this participant
+    await supabase
+      .from('table_participants')
+      .update({ bill_requested: false, bill_requested_at: null })
+      .eq('id', selectedParticipant.participant.id);
+
+    // Check if all participants have been paid (to free the table)
+    const remainingOrders = selectedTableOrder.participantOrders?.filter(
+      po => po.participant.id !== selectedParticipant.participant.id
+    );
+
+    if (!remainingOrders || remainingOrders.length === 0) {
+      // All participants paid - close the session and free the table
+      if (selectedTableOrder.session) {
+        await supabase
+          .from('table_sessions')
+          .update({ status: 'closed', closed_at: new Date().toISOString() })
+          .eq('id', selectedTableOrder.session.id);
+      }
+
+      if (selectedTableOrder.table_id) {
+        await supabase
+          .from('tables')
+          .update({
+            status: 'available',
+            session_id: null,
+            current_order_id: null,
+            closed_at: new Date().toISOString()
+          })
+          .eq('id', selectedTableOrder.table_id);
+      }
+    }
+
+    toast({ 
+      title: "Comanda fechada!", 
+      description: `Pagamento de ${selectedParticipant.participant.customer_name || 'Cliente'}: ${formatCurrency(selectedParticipant.total)}` 
+    });
+    setShowCloseParticipantModal(false);
+    setSelectedParticipant(null);
+    setSelectedTableOrder(null);
+    fetchData();
+  };
+
+  const openCloseParticipantModal = (order: TableOrder, participantOrder: ParticipantOrder) => {
+    setSelectedTableOrder(order);
+    setSelectedParticipant(participantOrder);
+    setParticipantPaymentMethod("cash");
+    setParticipantCashReceived("");
+    setShowCloseParticipantModal(true);
+  };
+
+  const calculateParticipantChange = (): number => {
+    if (!selectedParticipant) return 0;
+    const paid = parseFloat(participantCashReceived) || 0;
+    return paid - selectedParticipant.total;
+  };
+
+  const participantChange = calculateParticipantChange();
 
   const getStatusLabel = (status: string) => {
     const labels: Record<string, string> = {
@@ -1301,101 +1511,208 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {tableOrders.map((order) => (
-                  <Card key={order.id} className="border-primary/20">
-                    <CardHeader className="pb-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                            <UtensilsCrossed className="w-5 h-5 text-primary" />
+                {tableOrders.map((order) => {
+                  const isSplitBill = order.session?.bill_mode === 'split';
+                  const hasBillRequests = order.hasBillRequests;
+                  
+                  return (
+                    <Card 
+                      key={order.id} 
+                      className={`${hasBillRequests ? 'border-destructive ring-2 ring-destructive/30 animate-pulse' : 'border-primary/20'}`}
+                    >
+                      <CardHeader className="pb-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${hasBillRequests ? 'bg-destructive/20' : 'bg-primary/10'}`}>
+                              {hasBillRequests ? (
+                                <AlertTriangle className="w-5 h-5 text-destructive" />
+                              ) : (
+                                <UtensilsCrossed className="w-5 h-5 text-primary" />
+                              )}
+                            </div>
+                            <div>
+                              <CardTitle className="text-lg flex items-center gap-2">
+                                Mesa {order.table_number}
+                                {hasBillRequests && (
+                                  <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
+                                    CONTA!
+                                  </Badge>
+                                )}
+                              </CardTitle>
+                              {order.table_name && (
+                                <p className="text-xs text-muted-foreground">{order.table_name}</p>
+                              )}
+                            </div>
                           </div>
-                          <div>
-                            <CardTitle className="text-lg">Mesa {order.table_number}</CardTitle>
-                            {order.table_name && (
-                              <p className="text-xs text-muted-foreground">{order.table_name}</p>
+                          <div className="flex flex-col items-end gap-1">
+                            <Badge className={getStatusColor(order.status)}>
+                              {getStatusLabel(order.status)}
+                            </Badge>
+                            {isSplitBill && (
+                              <Badge variant="outline" className="text-xs flex items-center gap-1">
+                                <Users className="w-3 h-3" />
+                                Separada
+                              </Badge>
                             )}
                           </div>
                         </div>
-                        <Badge className={getStatusColor(order.status)}>
-                          {getStatusLabel(order.status)}
-                        </Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      {/* Customer Info */}
-                      {(order.customer_name || order.customer_phone) && (
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                          {order.customer_name && (
-                            <div className="flex items-center gap-1">
-                              <User className="w-3 h-3" />
-                              <span>{order.customer_name}</span>
-                            </div>
-                          )}
-                          {order.customer_phone && (
-                            <div className="flex items-center gap-1">
-                              <Phone className="w-3 h-3" />
-                              <span>{order.customer_phone}</span>
-                            </div>
-                          )}
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        {/* Time */}
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <Clock className="w-3 h-3" />
+                          <span>Aberta em {format(new Date(order.created_at), "HH:mm", { locale: ptBR })}</span>
                         </div>
-                      )}
 
-                      {/* Time */}
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <Clock className="w-3 h-3" />
-                        <span>Aberta em {format(new Date(order.created_at), "HH:mm", { locale: ptBR })}</span>
-                      </div>
-
-                      {/* Items Preview */}
-                      <div className="text-sm space-y-1 max-h-20 overflow-y-auto">
-                        {order.items.slice(0, 3).map((item, idx) => (
-                          <div key={idx} className="flex justify-between text-muted-foreground">
-                            <span className="truncate">{item.quantity}x {item.product_name}</span>
-                            <span className="flex-shrink-0">{formatCurrency(item.total_price)}</span>
+                        {/* Split Bill - Show participants separately */}
+                        {isSplitBill && order.participantOrders && order.participantOrders.length > 0 ? (
+                          <div className="space-y-3">
+                            {order.participantOrders.map((po) => (
+                              <div 
+                                key={po.participant.id} 
+                                className={`p-3 rounded-lg border ${po.participant.bill_requested ? 'border-destructive bg-destructive/5' : 'border-border bg-muted/30'}`}
+                              >
+                                <div className="flex items-center justify-between mb-2">
+                                  <div className="flex items-center gap-2">
+                                    <User className="w-4 h-4 text-muted-foreground" />
+                                    <span className="font-medium text-sm">
+                                      {po.participant.customer_name || 'Cliente'}
+                                    </span>
+                                    {po.participant.is_host && (
+                                      <Badge variant="secondary" className="text-[10px] px-1">Host</Badge>
+                                    )}
+                                    {po.participant.bill_requested && (
+                                      <Badge variant="destructive" className="text-[10px] px-1 animate-pulse">
+                                        Pediu Conta!
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <span className="font-bold text-primary">{formatCurrency(po.total)}</span>
+                                </div>
+                                
+                                {/* Participant's items */}
+                                <div className="text-xs space-y-0.5 mb-2 max-h-16 overflow-y-auto">
+                                  {po.items.slice(0, 2).map((item, idx) => (
+                                    <div key={idx} className="flex justify-between text-muted-foreground">
+                                      <span className="truncate">{item.quantity}x {item.product_name}</span>
+                                      <span>{formatCurrency(item.total_price)}</span>
+                                    </div>
+                                  ))}
+                                  {po.items.length > 2 && (
+                                    <p className="text-muted-foreground/70 italic">+{po.items.length - 2} itens</p>
+                                  )}
+                                </div>
+                                
+                                {/* Close this participant's bill */}
+                                <Button 
+                                  size="sm" 
+                                  className="w-full h-7 text-xs"
+                                  onClick={() => openCloseParticipantModal(order, po)}
+                                  disabled={order.status !== 'delivered'}
+                                >
+                                  <Receipt className="w-3 h-3 mr-1" />
+                                  Fechar Comanda
+                                </Button>
+                              </div>
+                            ))}
                           </div>
-                        ))}
-                        {order.items.length > 3 && (
-                          <p className="text-xs text-muted-foreground italic">
-                            +{order.items.length - 3} itens...
-                          </p>
+                        ) : (
+                          <>
+                            {/* Single Bill - Original display */}
+                            {(order.customer_name || order.customer_phone) && (
+                              <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                                {order.customer_name && (
+                                  <div className="flex items-center gap-1">
+                                    <User className="w-3 h-3" />
+                                    <span>{order.customer_name}</span>
+                                  </div>
+                                )}
+                                {order.customer_phone && (
+                                  <div className="flex items-center gap-1">
+                                    <Phone className="w-3 h-3" />
+                                    <span>{order.customer_phone}</span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Items Preview */}
+                            <div className="text-sm space-y-1 max-h-20 overflow-y-auto">
+                              {order.items.slice(0, 3).map((item, idx) => (
+                                <div key={idx} className="flex justify-between text-muted-foreground">
+                                  <span className="truncate">{item.quantity}x {item.product_name}</span>
+                                  <span className="flex-shrink-0">{formatCurrency(item.total_price)}</span>
+                                </div>
+                              ))}
+                              {order.items.length > 3 && (
+                                <p className="text-xs text-muted-foreground italic">
+                                  +{order.items.length - 3} itens...
+                                </p>
+                              )}
+                            </div>
+                          </>
                         )}
-                      </div>
 
-                      {/* Total */}
-                      <div className="border-t pt-2 flex justify-between items-center">
-                        <span className="text-sm font-medium">Total</span>
-                        <span className="text-lg font-bold text-primary">{formatCurrency(order.total)}</span>
-                      </div>
+                        {/* Total */}
+                        <div className="border-t pt-2 flex justify-between items-center">
+                          <span className="text-sm font-medium">Total Mesa</span>
+                          <span className="text-lg font-bold text-primary">{formatCurrency(order.total)}</span>
+                        </div>
 
-                      {/* Actions */}
-                      <div className="grid grid-cols-2 gap-2">
+                        {/* Actions - for single bill only */}
+                        {!isSplitBill && (
+                          <div className="grid grid-cols-2 gap-2">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => openTableOrderDetails(order)}
+                            >
+                              Ver Detalhes
+                            </Button>
+                            <Button 
+                              size="sm"
+                              onClick={() => openCloseTableModal(order)}
+                              disabled={order.status !== 'delivered'}
+                            >
+                              Fechar Mesa
+                            </Button>
+                          </div>
+                        )}
+                        
+                        {/* For split bills - view details and unify option */}
+                        {isSplitBill && (
+                          <div className="grid grid-cols-2 gap-2">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => openTableOrderDetails(order)}
+                            >
+                              Ver Detalhes
+                            </Button>
+                            <Button 
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => openCloseTableModal(order)}
+                              disabled={order.status !== 'delivered'}
+                            >
+                              Unificar Contas
+                            </Button>
+                          </div>
+                        )}
+                        
                         <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => openTableOrderDetails(order)}
+                          variant="ghost" 
+                          size="sm" 
+                          className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => cancelTableOrder(order)}
                         >
-                          Ver Detalhes
+                          <XCircle className="w-4 h-4 mr-2" />
+                          Cancelar Mesa
                         </Button>
-                        <Button 
-                          size="sm"
-                          onClick={() => openCloseTableModal(order)}
-                          disabled={order.status !== 'delivered'}
-                        >
-                          Fechar Mesa
-                        </Button>
-                      </div>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
-                        onClick={() => cancelTableOrder(order)}
-                      >
-                        <XCircle className="w-4 h-4 mr-2" />
-                        Cancelar Mesa
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -1664,6 +1981,71 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
               disabled={tablePaymentMethod === 'cash' && tableCashReceived && tableChange < 0}
             >
               <CheckCircle className="w-4 h-4 mr-2" />
+              Confirmar Pagamento
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Close Individual Participant Modal (for split bills) */}
+      <Dialog open={showCloseParticipantModal} onOpenChange={setShowCloseParticipantModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Fechar Comanda Individual</DialogTitle>
+          </DialogHeader>
+          {selectedParticipant && selectedTableOrder && (
+            <div className="space-y-4">
+              <div className="p-4 bg-muted rounded-lg">
+                <div className="flex items-center gap-2 mb-2">
+                  <User className="w-4 h-4" />
+                  <span className="font-medium">{selectedParticipant.participant.customer_name || 'Cliente'}</span>
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  Mesa {selectedTableOrder.table_number}
+                </div>
+                <div className="mt-2 text-2xl font-bold text-primary">
+                  {formatCurrency(selectedParticipant.total)}
+                </div>
+              </div>
+
+              <div>
+                <Label>Forma de Pagamento</Label>
+                <Select value={participantPaymentMethod} onValueChange={setParticipantPaymentMethod}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {paymentMethods.map((method) => (
+                      <SelectItem key={method.value} value={method.value}>
+                        {method.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {participantPaymentMethod === 'cash' && (
+                <div>
+                  <Label>Valor Recebido (R$)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={participantCashReceived}
+                    onChange={(e) => setParticipantCashReceived(e.target.value)}
+                    placeholder={selectedParticipant.total.toFixed(2)}
+                  />
+                  {participantChange > 0 && (
+                    <p className="text-sm text-green-600 mt-1">
+                      Troco: {formatCurrency(participantChange)}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCloseParticipantModal(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={closeParticipantOrder}>
               Confirmar Pagamento
             </Button>
           </DialogFooter>
