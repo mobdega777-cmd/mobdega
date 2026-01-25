@@ -64,6 +64,14 @@ interface Favorite {
   } | null;
 }
 
+interface OpeningHours {
+  [key: string]: {
+    open: string;
+    close: string;
+    enabled: boolean;
+  };
+}
+
 interface Commerce {
   id: string;
   fantasy_name: string;
@@ -72,10 +80,42 @@ interface Commerce {
   city: string | null;
   neighborhood: string | null;
   is_open: boolean | null;
+  opening_hours: OpeningHours | null;
   whatsapp: string | null;
   averageRating?: number;
   reviewCount?: number;
 }
+
+const getDayKey = (date: Date): string => {
+  const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+  return days[date.getDay()];
+};
+
+const isStoreOpen = (isOpen: boolean | null, openingHours: OpeningHours | null): boolean => {
+  if (isOpen === false) return false;
+  if (!openingHours) return true;
+  
+  const now = new Date();
+  const dayKey = getDayKey(now);
+  const todayHours = openingHours[dayKey];
+  
+  if (!todayHours || !todayHours.enabled) return false;
+  
+  const currentTime = now.getHours() * 60 + now.getMinutes();
+  const [openHour, openMinute] = todayHours.open.split(':').map(Number);
+  const [closeHour, closeMinute] = todayHours.close.split(':').map(Number);
+  const openTime = openHour * 60 + openMinute;
+  let closeTime = closeHour * 60 + closeMinute;
+  
+  // Handle overnight hours (e.g., 18:00 - 00:00 or 18:00 - 02:00)
+  if (closeTime <= openTime) {
+    closeTime += 24 * 60;
+    const adjustedCurrentTime = currentTime < openTime ? currentTime + 24 * 60 : currentTime;
+    return adjustedCurrentTime >= openTime && adjustedCurrentTime <= closeTime;
+  }
+  
+  return currentTime >= openTime && currentTime <= closeTime;
+};
 
 const UserDashboard = () => {
   const navigate = useNavigate();
@@ -218,35 +258,37 @@ const UserDashboard = () => {
   const fetchCommerces = async () => {
     const { data, error } = await supabase
       .from('commerces')
-      .select('id, fantasy_name, logo_url, cover_url, city, neighborhood, is_open, whatsapp')
+      .select('id, fantasy_name, logo_url, cover_url, city, neighborhood, is_open, opening_hours, whatsapp')
       .eq('status', 'approved')
       .eq('is_open', true)
-      .limit(20);
+      .limit(50);
     
     if (error) {
       console.error('Error fetching commerces:', error);
       return;
     }
 
-    // Fetch ratings for each commerce
+    // Filter by actual opening hours and fetch ratings
     const commercesWithRatings = await Promise.all(
-      (data || []).map(async (commerce) => {
-        const { data: reviews } = await supabase
-          .from('reviews')
-          .select('rating')
-          .eq('commerce_id', commerce.id);
-        
-        const reviewCount = reviews?.length || 0;
-        const averageRating = reviewCount > 0 
-          ? reviews!.reduce((sum, r) => sum + r.rating, 0) / reviewCount 
-          : 0;
-        
-        return {
-          ...commerce,
-          averageRating,
-          reviewCount
-        };
-      })
+      (data || [])
+        .filter(commerce => isStoreOpen(commerce.is_open, commerce.opening_hours as OpeningHours))
+        .map(async (commerce) => {
+          const { data: reviews } = await supabase
+            .from('reviews')
+            .select('rating')
+            .eq('commerce_id', commerce.id);
+          
+          const reviewCount = reviews?.length || 0;
+          const averageRating = reviewCount > 0 
+            ? reviews!.reduce((sum, r) => sum + r.rating, 0) / reviewCount 
+            : 0;
+          
+          return {
+            ...commerce,
+            averageRating,
+            reviewCount
+          };
+        })
     );
     
     setCommerces(commercesWithRatings as Commerce[]);
