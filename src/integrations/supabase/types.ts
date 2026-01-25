@@ -754,6 +754,7 @@ export type Database = {
           notes: string | null
           order_type: string | null
           payment_method: string | null
+          session_id: string | null
           status: Database["public"]["Enums"]["order_status"]
           stock_deducted: boolean
           subtotal: number
@@ -776,6 +777,7 @@ export type Database = {
           notes?: string | null
           order_type?: string | null
           payment_method?: string | null
+          session_id?: string | null
           status?: Database["public"]["Enums"]["order_status"]
           stock_deducted?: boolean
           subtotal: number
@@ -798,6 +800,7 @@ export type Database = {
           notes?: string | null
           order_type?: string | null
           payment_method?: string | null
+          session_id?: string | null
           status?: Database["public"]["Enums"]["order_status"]
           stock_deducted?: boolean
           subtotal?: number
@@ -812,6 +815,13 @@ export type Database = {
             columns: ["commerce_id"]
             isOneToOne: false
             referencedRelation: "commerces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "table_sessions"
             referencedColumns: ["id"]
           },
           {
@@ -1124,6 +1134,89 @@ export type Database = {
         }
         Relationships: []
       }
+      table_participants: {
+        Row: {
+          customer_name: string | null
+          id: string
+          is_host: boolean
+          joined_at: string
+          session_id: string
+          user_id: string
+        }
+        Insert: {
+          customer_name?: string | null
+          id?: string
+          is_host?: boolean
+          joined_at?: string
+          session_id: string
+          user_id: string
+        }
+        Update: {
+          customer_name?: string | null
+          id?: string
+          is_host?: boolean
+          joined_at?: string
+          session_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "table_participants_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "table_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      table_sessions: {
+        Row: {
+          bill_mode: string
+          closed_at: string | null
+          commerce_id: string
+          id: string
+          opened_at: string
+          opened_by_user_id: string | null
+          status: string
+          table_id: string
+        }
+        Insert: {
+          bill_mode?: string
+          closed_at?: string | null
+          commerce_id: string
+          id?: string
+          opened_at?: string
+          opened_by_user_id?: string | null
+          status?: string
+          table_id: string
+        }
+        Update: {
+          bill_mode?: string
+          closed_at?: string | null
+          commerce_id?: string
+          id?: string
+          opened_at?: string
+          opened_by_user_id?: string | null
+          status?: string
+          table_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "table_sessions_commerce_id_fkey"
+            columns: ["commerce_id"]
+            isOneToOne: false
+            referencedRelation: "commerces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "table_sessions_table_id_fkey"
+            columns: ["table_id"]
+            isOneToOne: false
+            referencedRelation: "tables"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tables: {
         Row: {
           capacity: number | null
@@ -1135,6 +1228,7 @@ export type Database = {
           name: string | null
           number: number
           opened_at: string | null
+          session_id: string | null
           status: Database["public"]["Enums"]["table_status"] | null
           updated_at: string
         }
@@ -1148,6 +1242,7 @@ export type Database = {
           name?: string | null
           number: number
           opened_at?: string | null
+          session_id?: string | null
           status?: Database["public"]["Enums"]["table_status"] | null
           updated_at?: string
         }
@@ -1161,6 +1256,7 @@ export type Database = {
           name?: string | null
           number?: number
           opened_at?: string | null
+          session_id?: string | null
           status?: Database["public"]["Enums"]["table_status"] | null
           updated_at?: string
         }
@@ -1170,6 +1266,13 @@ export type Database = {
             columns: ["commerce_id"]
             isOneToOne: false
             referencedRelation: "commerces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tables_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "table_sessions"
             referencedColumns: ["id"]
           },
         ]

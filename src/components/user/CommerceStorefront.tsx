@@ -4,7 +4,7 @@ import {
   ArrowLeft, Store, MapPin, Phone, Clock, Star, Heart,
   UtensilsCrossed, Truck, MessageCircle, ShoppingCart, ChevronRight,
   X, Plus, Minus, Send, User, CreditCard, Banknote, Smartphone, DollarSign,
-  Check, Loader2, Camera
+  Check, Loader2, Camera, Users
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,6 +19,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import BillModeModal from "./BillModeModal";
+import JoinSessionModal from "./JoinSessionModal";
 
 interface Commerce {
   id: string;
@@ -68,6 +70,27 @@ interface Table {
   name: string | null;
   capacity: number | null;
   status: string | null;
+  session_id: string | null;
+}
+
+interface TableSession {
+  id: string;
+  table_id: string;
+  commerce_id: string;
+  bill_mode: 'single' | 'split';
+  opened_at: string;
+  closed_at: string | null;
+  opened_by_user_id: string | null;
+  status: string;
+}
+
+interface TableParticipant {
+  id: string;
+  session_id: string;
+  user_id: string;
+  customer_name: string | null;
+  joined_at: string;
+  is_host: boolean;
 }
 
 interface CartItem {
@@ -132,6 +155,14 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
   const [showCartModal, setShowCartModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showOrderStatusModal, setShowOrderStatusModal] = useState(false);
+  const [showBillModeModal, setShowBillModeModal] = useState(false);
+  const [showJoinSessionModal, setShowJoinSessionModal] = useState(false);
+  
+  // Session management for split bills
+  const [pendingTable, setPendingTable] = useState<Table | null>(null);
+  const [currentSession, setCurrentSession] = useState<TableSession | null>(null);
+  const [sessionParticipants, setSessionParticipants] = useState<TableParticipant[]>([]);
+  const [sessionHostName, setSessionHostName] = useState<string | null>(null);
   
   // Review form
   const [reviewRating, setReviewRating] = useState(5);
@@ -166,12 +197,12 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
   const fetchTables = async () => {
     const { data: tablesData } = await supabase
       .from('tables')
-      .select('id, number, name, capacity, status')
+      .select('id, number, name, capacity, status, session_id')
       .eq('commerce_id', commerceId)
       .order('number');
     
     if (tablesData) {
-      setTables(tablesData);
+      setTables(tablesData as Table[]);
     }
   };
 
@@ -607,12 +638,17 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
   // Calculate change for cash payment
   const cashChange = cashReceived ? Math.max(0, parseFloat(cashReceived) - orderTotal) : 0;
 
-  // Handle table selection
+  // Handle table selection - now with session logic
   const handleSelectTable = async (table: Table) => {
-    // Double-check table is still available before proceeding
+    if (!user) {
+      toast({ variant: "destructive", title: "Faça login para selecionar uma mesa" });
+      return;
+    }
+
+    // Double-check table status and get session info
     const { data: currentTable, error: currentTableError } = await supabase
       .from('tables')
-      .select('status')
+      .select('status, session_id')
       .eq('id', table.id)
       .maybeSingle();
 
@@ -627,50 +663,186 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
 
     const normalizedStatus = (currentTable?.status ?? 'available') as string;
 
-    if (normalizedStatus !== 'available') {
-      toast({ 
-        variant: "destructive", 
-        title: "Mesa não disponível", 
-        description: "Esta mesa acabou de ser ocupada. Por favor, escolha outra." 
-      });
-      fetchTables();
+    // If table is available, show bill mode selection
+    if (normalizedStatus === 'available') {
+      setPendingTable(table);
+      setShowTableModal(false);
+      setShowBillModeModal(true);
       return;
     }
 
-    // Update table status to occupied in database immediately
-    const { error } = await supabase
+    // If table is occupied, check if there's an active session the user can join
+    if (normalizedStatus === 'occupied' && currentTable?.session_id) {
+      // Fetch session info
+      const { data: sessionData } = await supabase
+        .from('table_sessions')
+        .select('*')
+        .eq('id', currentTable.session_id)
+        .eq('status', 'active')
+        .single();
+
+      if (sessionData) {
+        // Check if user is already a participant
+        const { data: existingParticipant } = await supabase
+          .from('table_participants')
+          .select('id')
+          .eq('session_id', sessionData.id)
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (existingParticipant) {
+          // User is already part of this session
+          setSelectedTable({ ...table, status: 'occupied', session_id: sessionData.id });
+          setCurrentSession(sessionData as TableSession);
+          setOrderMode('table');
+          setShowTableModal(false);
+          toast({ title: `Você já está na Mesa ${table.number}!` });
+          return;
+        }
+
+        // Fetch participants and host name
+        const { data: participants } = await supabase
+          .from('table_participants')
+          .select('*')
+          .eq('session_id', sessionData.id);
+
+        const hostParticipant = participants?.find(p => p.is_host);
+        let hostName = null;
+        if (hostParticipant) {
+          const { data: hostProfile } = await supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('user_id', hostParticipant.user_id)
+            .maybeSingle();
+          hostName = hostProfile?.full_name || null;
+        }
+
+        setPendingTable(table);
+        setCurrentSession(sessionData as TableSession);
+        setSessionParticipants((participants as TableParticipant[]) || []);
+        setSessionHostName(hostName);
+        setShowTableModal(false);
+        setShowJoinSessionModal(true);
+        return;
+      }
+    }
+
+    // Table not available and no joinable session
+    toast({ 
+      variant: "destructive", 
+      title: "Mesa não disponível", 
+      description: "Esta mesa está ocupada ou reservada." 
+    });
+    fetchTables();
+  };
+
+  // Create new session when user selects bill mode
+  const handleBillModeSelect = async (mode: 'single' | 'split') => {
+    if (!user || !pendingTable) return;
+
+    setShowBillModeModal(false);
+
+    // Create the session
+    const { data: sessionData, error: sessionError } = await supabase
+      .from('table_sessions')
+      .insert({
+        table_id: pendingTable.id,
+        commerce_id: commerceId,
+        bill_mode: mode,
+        opened_by_user_id: user.id,
+        status: 'active'
+      })
+      .select()
+      .single();
+
+    if (sessionError) {
+      toast({ variant: "destructive", title: "Erro ao criar sessão", description: sessionError.message });
+      setPendingTable(null);
+      return;
+    }
+
+    // Add user as host participant
+    const { error: participantError } = await supabase
+      .from('table_participants')
+      .insert({
+        session_id: sessionData.id,
+        user_id: user.id,
+        customer_name: customerName || null,
+        is_host: true
+      });
+
+    if (participantError) {
+      console.error('Error adding participant:', participantError);
+    }
+
+    // Update table status and link session
+    const { error: tableError } = await supabase
       .from('tables')
       .update({ 
         status: 'occupied',
-        opened_at: new Date().toISOString()
+        opened_at: new Date().toISOString(),
+        session_id: sessionData.id
       })
-      .eq('id', table.id)
-      // Allow both explicit 'available' and NULL (some rows may not have been initialized)
-      .or('status.eq.available,status.is.null');
+      .eq('id', pendingTable.id);
 
-    // Re-check status after update attempt (avoids 406 when 0 rows are returned)
-    const { data: afterUpdateTable, error: afterUpdateError } = await supabase
-      .from('tables')
-      .select('status')
-      .eq('id', table.id)
-      .maybeSingle();
-
-    // If no row was updated, it means another user took it (or status changed) in-between.
-    const afterStatus = (afterUpdateTable?.status ?? 'available') as string;
-    if (error || afterUpdateError || afterStatus !== 'occupied') {
-      toast({
-        variant: "destructive",
-        title: "Mesa não disponível",
-        description: error?.message || afterUpdateError?.message || "Esta mesa acabou de ser ocupada. Por favor, escolha outra.",
-      });
-      fetchTables();
+    if (tableError) {
+      toast({ variant: "destructive", title: "Erro ao atualizar mesa", description: tableError.message });
       return;
     }
 
-    setSelectedTable({ ...table, status: 'occupied' });
+    setSelectedTable({ ...pendingTable, status: 'occupied', session_id: sessionData.id });
+    setCurrentSession(sessionData as TableSession);
     setOrderMode('table');
-    setShowTableModal(false);
-    toast({ title: `Mesa ${table.number} selecionada!` });
+    setPendingTable(null);
+    toast({ 
+      title: `Mesa ${pendingTable.number} selecionada!`,
+      description: mode === 'single' ? 'Comanda única ativada' : 'Comandas separadas ativadas'
+    });
+  };
+
+  // Join existing session
+  const handleJoinSession = async () => {
+    if (!user || !pendingTable || !currentSession) return;
+
+    setShowJoinSessionModal(false);
+
+    // Add user as participant
+    const { error: participantError } = await supabase
+      .from('table_participants')
+      .insert({
+        session_id: currentSession.id,
+        user_id: user.id,
+        customer_name: customerName || null,
+        is_host: false
+      });
+
+    if (participantError) {
+      toast({ variant: "destructive", title: "Erro ao juntar-se à mesa", description: participantError.message });
+      setPendingTable(null);
+      return;
+    }
+
+    setSelectedTable({ ...pendingTable, status: 'occupied', session_id: currentSession.id });
+    setOrderMode('table');
+    setPendingTable(null);
+    toast({ title: `Você entrou na Mesa ${pendingTable.number}!` });
+  };
+
+  // Cancel join session
+  const handleCancelJoinSession = () => {
+    setShowJoinSessionModal(false);
+    setPendingTable(null);
+    setCurrentSession(null);
+    setSessionParticipants([]);
+    setSessionHostName(null);
+  };
+
+  // Handle request bill (placeholder for future implementation)
+  const handleRequestBill = () => {
+    toast({ 
+      title: "Conta solicitada!", 
+      description: "O caixa foi notificado sobre sua solicitação."
+    });
   };
 
   // Handle order modes - exclusive selection (toggle behavior)
@@ -1207,9 +1379,24 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
                 <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2 text-lg">
                     <UtensilsCrossed className="w-5 h-5 text-primary" />
-                    Comanda - Mesa {selectedTable?.number}
+                    {currentSession?.bill_mode === 'split' ? 'Sua Comanda Pessoal' : 'Comanda'} - Mesa {selectedTable?.number}
                     {selectedTable?.name && <span className="text-sm font-normal text-muted-foreground">({selectedTable.name})</span>}
                   </CardTitle>
+                  {currentSession && (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                      {currentSession.bill_mode === 'single' ? (
+                        <>
+                          <Users className="w-3.5 h-3.5" />
+                          <span>Comanda Única - Todos pagam juntos</span>
+                        </>
+                      ) : (
+                        <>
+                          <User className="w-3.5 h-3.5" />
+                          <span>Comandas Separadas - Cada um paga sua conta</span>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {/* Active Order Items from Database (already sent) */}
@@ -1299,12 +1486,26 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
                   </div>
 
                   {/* Actions */}
-                  {cart.length > 0 && (
-                    <Button className="w-full h-12" onClick={openCartModal}>
-                      <Send className="w-4 h-4 mr-2" />
-                      Enviar Novos Itens
-                    </Button>
-                  )}
+                  <div className="space-y-2">
+                    {cart.length > 0 && (
+                      <Button className="w-full h-12" onClick={openCartModal}>
+                        <Send className="w-4 h-4 mr-2" />
+                        Enviar Novos Itens
+                      </Button>
+                    )}
+                    
+                    {/* Request Bill Button */}
+                    {(activeOrderItems.length > 0 || cart.length > 0) && (
+                      <Button 
+                        variant="outline" 
+                        className="w-full h-12 border-primary text-primary hover:bg-primary/10"
+                        onClick={handleRequestBill}
+                      >
+                        <CreditCard className="w-4 h-4 mr-2" />
+                        Pedir Conta
+                      </Button>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             )}
@@ -1466,38 +1667,51 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
             </div>
           ) : (
             <div className="space-y-4 py-4">
-              <div className="flex items-center gap-4 text-xs">
+              <div className="flex items-center gap-4 text-xs flex-wrap">
                 <div className="flex items-center gap-1">
                   <div className="w-3 h-3 rounded bg-green-500/20 border border-green-500" />
                   <span>Disponível</span>
                 </div>
                 <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded bg-orange-500/20 border border-orange-500" />
+                  <span>Ocupada (pode juntar-se)</span>
+                </div>
+                <div className="flex items-center gap-1">
                   <div className="w-3 h-3 rounded bg-red-500/20 border border-red-500" />
-                  <span>Ocupada</span>
+                  <span>Reservada/Fechada</span>
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-3">
                 {tables.map((table) => {
                   // Normalize status check - handle null/undefined as available
                   const tableStatus = table.status || 'available';
-                  const isOccupied = tableStatus === 'occupied' || tableStatus === 'reserved';
                   const isAvailable = tableStatus === 'available';
+                  const isOccupied = tableStatus === 'occupied';
+                  const isReservedOrClosed = tableStatus === 'reserved' || tableStatus === 'closed';
+                  const hasSession = isOccupied && table.session_id;
+                  
                   return (
                     <Button
                       key={table.id}
                       variant="outline"
-                      disabled={isOccupied}
+                      disabled={isReservedOrClosed}
                       className={`h-20 flex flex-col border-2 ${
-                        isOccupied 
+                        isReservedOrClosed 
                           ? 'bg-red-500/10 border-red-500 text-red-600 cursor-not-allowed opacity-60' 
+                          : isOccupied
+                          ? 'bg-orange-500/10 border-orange-500 text-orange-700 hover:bg-orange-500/20'
                           : 'bg-green-500/10 border-green-500 text-green-700 hover:bg-green-500/20'
                       }`}
-                      onClick={() => !isOccupied && handleSelectTable(table)}
+                      onClick={() => !isReservedOrClosed && handleSelectTable(table)}
                     >
                       <span className="text-lg font-bold">Mesa {table.number}</span>
                       {table.name && <span className="text-xs opacity-70">{table.name}</span>}
                       <span className="text-xs opacity-70">
-                        {isOccupied ? 'Ocupada' : isAvailable ? `${table.capacity} lugares` : 'Fechada'}
+                        {isReservedOrClosed 
+                          ? (tableStatus === 'reserved' ? 'Reservada' : 'Fechada')
+                          : isOccupied 
+                          ? (hasSession ? 'Juntar-se' : 'Ocupada')
+                          : `${table.capacity} lugares`}
                       </span>
                     </Button>
                   );
@@ -1906,6 +2120,32 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Bill Mode Selection Modal */}
+      <BillModeModal
+        open={showBillModeModal}
+        onOpenChange={(open) => {
+          setShowBillModeModal(open);
+          if (!open) setPendingTable(null);
+        }}
+        tableNumber={pendingTable?.number || 0}
+        onSelectMode={handleBillModeSelect}
+      />
+
+      {/* Join Session Modal */}
+      <JoinSessionModal
+        open={showJoinSessionModal}
+        onOpenChange={(open) => {
+          setShowJoinSessionModal(open);
+          if (!open) handleCancelJoinSession();
+        }}
+        tableNumber={pendingTable?.number || 0}
+        hostName={sessionHostName}
+        billMode={currentSession?.bill_mode || 'single'}
+        participantsCount={sessionParticipants.length}
+        onJoin={handleJoinSession}
+        onCancel={handleCancelJoinSession}
+      />
     </motion.div>
   );
 };
