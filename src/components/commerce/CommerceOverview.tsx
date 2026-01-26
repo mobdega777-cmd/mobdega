@@ -179,11 +179,6 @@ const CommerceOverview = ({ commerce }: CommerceOverviewProps) => {
           <p className="text-muted-foreground text-sm md:text-base">Aqui está o resumo do seu comércio</p>
         </div>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
-          <div className="flex items-center gap-2 px-3 py-2 rounded-lg border bg-card">
-            <Store className={`w-4 h-4 md:w-5 md:h-5 ${isOpen ? 'text-green-500' : 'text-red-500'}`} />
-            <span className="text-xs md:text-sm font-medium">{isOpen ? 'Aberto' : 'Fechado'}</span>
-            <Switch checked={isOpen} onCheckedChange={handleStoreStatusChange} disabled={savingStatus} />
-          </div>
           <Dialog open={hoursDialogOpen} onOpenChange={setHoursDialogOpen}>
             <DialogTrigger asChild>
               <Button variant="outline" size="sm" className="text-xs md:text-sm"><Settings className="w-4 h-4 mr-1 md:mr-2" />Horários</Button>
