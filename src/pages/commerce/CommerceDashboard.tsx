@@ -26,7 +26,8 @@ import {
   FileText,
   BookOpen,
   Trophy,
-  AlertTriangleIcon
+  AlertTriangleIcon,
+  ArrowUp
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -56,6 +57,7 @@ import CommerceContract from "@/components/commerce/CommerceContract";
 import CommerceTraining from "@/components/commerce/CommerceTraining";
 import CommerceRanking from "@/components/commerce/CommerceRanking";
 import CommerceCoupons from "@/components/commerce/CommerceCoupons";
+import UpgradeModal from "@/components/commerce/UpgradeModal";
 
 type CommerceSection = 
   | "overview" 
@@ -114,16 +116,22 @@ interface PlanMenuConfig {
   allowed_menu_items: string[];
 }
 
+interface PlanInfo {
+  type: string;
+}
+
 const CommerceDashboard = () => {
   const [activeSection, setActiveSection] = useState<CommerceSection>("overview");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [commerce, setCommerce] = useState<Commerce | null>(null);
   const [planConfig, setPlanConfig] = useState<PlanMenuConfig | null>(null);
+  const [planInfo, setPlanInfo] = useState<PlanInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [pendingInvoicesCount, setPendingInvoicesCount] = useState(0);
   const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
   const [pendingDeliveryOrdersCount, setPendingDeliveryOrdersCount] = useState(0);
   const [billRequestsCount, setBillRequestsCount] = useState(0);
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
 
@@ -157,7 +165,7 @@ const CommerceDashboard = () => {
       if (data.plan_id) {
         const { data: planData } = await supabase
           .from('plans')
-          .select('allowed_menu_items')
+          .select('allowed_menu_items, type')
           .eq('id', data.plan_id)
           .single();
         
@@ -167,6 +175,7 @@ const CommerceDashboard = () => {
               ? (planData.allowed_menu_items as string[])
               : ["overview", "settings"]
           });
+          setPlanInfo({ type: planData.type });
         }
       }
     }
@@ -536,6 +545,18 @@ const CommerceDashboard = () => {
                 <p className="text-[10px] text-primary-foreground/60">Painel</p>
               </div>
             </motion.div>
+            {/* Botão Upgrade - só aparece para planos basic e startup */}
+            {planInfo && planInfo.type !== 'business' && !isBlocked && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setUpgradeModalOpen(true)}
+                className="gap-1 text-xs border-primary/50 text-primary hover:bg-primary/10"
+              >
+                <ArrowUp className="w-3 h-3" />
+                Upgrade
+              </Button>
+            )}
           </div>
 
           {/* Mobile close button */}
@@ -648,6 +669,16 @@ const CommerceDashboard = () => {
           </motion.div>
         </div>
       </main>
+
+      {/* Upgrade Modal */}
+      {commerce && (
+        <UpgradeModal
+          isOpen={upgradeModalOpen}
+          onClose={() => setUpgradeModalOpen(false)}
+          commerceId={commerce.id}
+          currentPlanId={commerce.plan_id}
+        />
+      )}
     </div>
   );
 };
