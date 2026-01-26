@@ -391,9 +391,12 @@ export type Database = {
           phone: string
           plan_id: string | null
           rejection_reason: string | null
+          requested_plan_id: string | null
           status: Database["public"]["Enums"]["commerce_status"]
           table_payment_required: boolean
           updated_at: string
+          upgrade_request_date: string | null
+          upgrade_request_status: string | null
           whatsapp: string | null
         }
         Insert: {
@@ -424,9 +427,12 @@ export type Database = {
           phone: string
           plan_id?: string | null
           rejection_reason?: string | null
+          requested_plan_id?: string | null
           status?: Database["public"]["Enums"]["commerce_status"]
           table_payment_required?: boolean
           updated_at?: string
+          upgrade_request_date?: string | null
+          upgrade_request_status?: string | null
           whatsapp?: string | null
         }
         Update: {
@@ -457,15 +463,25 @@ export type Database = {
           phone?: string
           plan_id?: string | null
           rejection_reason?: string | null
+          requested_plan_id?: string | null
           status?: Database["public"]["Enums"]["commerce_status"]
           table_payment_required?: boolean
           updated_at?: string
+          upgrade_request_date?: string | null
+          upgrade_request_status?: string | null
           whatsapp?: string | null
         }
         Relationships: [
           {
             foreignKeyName: "commerces_plan_id_fkey"
             columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerces_requested_plan_id_fkey"
+            columns: ["requested_plan_id"]
             isOneToOne: false
             referencedRelation: "plans"
             referencedColumns: ["id"]
