@@ -292,18 +292,33 @@ const CommerceDashboard = () => {
     navigate("/");
   };
 
-  const handleMenuClick = (sectionId: CommerceSection, isDisabled: boolean) => {
+  const handleMenuClick = (sectionId: CommerceSection, isDisabled: boolean, isLocked: boolean) => {
+    if (isLocked) {
+      // Show upgrade message for locked items
+      import("sonner").then(({ toast }) => {
+        toast.info("Funcionalidade bloqueada", {
+          description: "Faça upgrade do seu plano para acessar esta funcionalidade."
+        });
+      });
+      return;
+    }
     if (!isDisabled) {
       setActiveSection(sectionId);
       setSidebarOpen(false); // Close sidebar on mobile after selection
     }
   };
 
-  // Filter menu items based on plan configuration
-  const filteredMenuItems = menuItems.filter(item => {
-    if (!planConfig) return true; // Show all if no plan config
-    return planConfig.allowed_menu_items.includes(item.id);
-  });
+  // Check if a menu item is locked by plan
+  const isMenuItemLocked = (itemId: string) => {
+    if (!planConfig) return false;
+    // Items that are always available
+    const alwaysAvailable = ["overview", "settings", "contract", "training"];
+    if (alwaysAvailable.includes(itemId)) return false;
+    return !planConfig.allowed_menu_items.includes(itemId);
+  };
+
+  // All menu items (not filtered, will show locked ones)
+  const allMenuItems = menuItems;
 
   const getBlockedStatusInfo = () => {
     if (isPending) {
@@ -550,28 +565,30 @@ const CommerceDashboard = () => {
 
           {/* Navigation */}
           <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-            {filteredMenuItems.map((item) => {
+            {allMenuItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeSection === item.id;
               const isDisabled = isBlocked && item.id !== "overview";
+              const isLocked = !isBlocked && isMenuItemLocked(item.id);
 
               return (
                 <button
                   key={item.id}
-                  onClick={() => handleMenuClick(item.id, isDisabled)}
-                  disabled={isDisabled}
+                  onClick={() => handleMenuClick(item.id, isDisabled, isLocked)}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all group ${
-                    isDisabled
-                      ? "opacity-40 cursor-not-allowed text-primary-foreground/40"
-                      : isActive
-                        ? "gradient-primary text-primary-foreground shadow-glow-primary"
-                        : "text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
+                    isLocked
+                      ? "opacity-40 cursor-pointer text-primary-foreground/40 hover:opacity-50"
+                      : isDisabled
+                        ? "opacity-40 cursor-not-allowed text-primary-foreground/40"
+                        : isActive
+                          ? "gradient-primary text-primary-foreground shadow-glow-primary"
+                          : "text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
                   }`}
                 >
-                  <Icon className="w-5 h-5 flex-shrink-0" />
-                  <span className="flex-1 text-left font-medium text-sm">{item.label}</span>
-                  {isDisabled && <Lock className="w-4 h-4 text-primary-foreground/40" />}
-                  {!isDisabled && (item as any).showBillRequestBadge && billRequestsCount > 0 && (
+                  <Icon className={`w-5 h-5 flex-shrink-0 ${isLocked ? 'opacity-50' : ''}`} />
+                  <span className={`flex-1 text-left font-medium text-sm ${isLocked ? 'opacity-60' : ''}`}>{item.label}</span>
+                  {(isDisabled || isLocked) && <Lock className="w-4 h-4 text-primary-foreground/40" />}
+                  {!isDisabled && !isLocked && (item as any).showBillRequestBadge && billRequestsCount > 0 && (
                     <motion.div
                       initial={{ scale: 0.8 }}
                       animate={{ scale: [0.8, 1.1, 1] }}
@@ -583,22 +600,22 @@ const CommerceDashboard = () => {
                       </Badge>
                     </motion.div>
                   )}
-                  {!isDisabled && item.showPendingBadge && pendingOrdersCount > 0 && (
+                  {!isDisabled && !isLocked && item.showPendingBadge && pendingOrdersCount > 0 && (
                     <Badge variant="destructive" className="text-xs px-2 py-0.5">
                       {pendingOrdersCount}
                     </Badge>
                   )}
-                  {!isDisabled && (item as any).showDeliveryBadge && pendingDeliveryOrdersCount > 0 && (
+                  {!isDisabled && !isLocked && (item as any).showDeliveryBadge && pendingDeliveryOrdersCount > 0 && (
                     <Badge variant="destructive" className="text-xs px-2 py-0.5">
                       {pendingDeliveryOrdersCount}
                     </Badge>
                   )}
-                  {!isDisabled && item.showBadge && pendingInvoicesCount > 0 && (
+                  {!isDisabled && !isLocked && item.showBadge && pendingInvoicesCount > 0 && (
                     <Badge variant="destructive" className="text-xs px-2 py-0.5">
                       {pendingInvoicesCount}
                     </Badge>
                   )}
-                  {!isDisabled && isActive && <ChevronRight className="w-4 h-4" />}
+                  {!isDisabled && !isLocked && isActive && <ChevronRight className="w-4 h-4" />}
                 </button>
               );
             })}

@@ -8,12 +8,19 @@ import {
   Store,
   Medal,
   Crown,
-  Loader2
+  Loader2,
+  ChevronDown
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 
 interface CommerceRankingData {
@@ -36,48 +43,76 @@ const DIVISIONS = {
   business: { name: "Ouro", color: "from-yellow-400 to-yellow-600", badge: "bg-yellow-500", icon: Crown },
 };
 
-const ZONES = [
-  { id: "centro", name: "Centro" },
-  { id: "norte", name: "Zona Norte" },
-  { id: "sul", name: "Zona Sul" },
-  { id: "leste", name: "Zona Leste" },
-  { id: "oeste", name: "Zona Oeste" },
-  { id: "osasco", name: "Osasco" },
-  { id: "carapicuiba", name: "Carapicuíba" },
-  { id: "barueri", name: "Barueri" },
-  { id: "santana_parnaiba", name: "Santana do Parnaíba" },
-  { id: "itapevi", name: "Itapevi" },
-  { id: "jandira", name: "Jandira" },
-  { id: "cotia", name: "Cotia" },
-  { id: "vargem_grande", name: "Vargem Grande Paulista" },
-  { id: "taboao", name: "Taboão da Serra" },
-  { id: "embu", name: "Embu" },
-  { id: "itapecirica", name: "Itapecirica da Serra" },
-  { id: "embu_guacu", name: "Embu-Guaçu" },
-  { id: "guarulhos", name: "Guarulhos" },
-  { id: "aruja", name: "Arujá" },
-  { id: "santa_isabel", name: "Santa Isabel" },
-  { id: "mairipora", name: "Mairiporã" },
-  { id: "caieiras", name: "Caieiras" },
-  { id: "cajamar", name: "Cajamar" },
-  { id: "jordanesia", name: "Jordanésia" },
-  { id: "polvilho", name: "Polvilho" },
-  { id: "franco_rocha", name: "Franco da Rocha" },
-  { id: "francisco_morato", name: "Francisco Morato" },
-  { id: "ferraz", name: "Ferraz de Vasconcelos" },
-  { id: "poa", name: "Poá" },
-  { id: "itaquaquecetuba", name: "Itaquaquecetuba" },
-  { id: "suzano", name: "Suzano" },
-  { id: "mogi", name: "Mogi das Cruzes" },
-  { id: "guararema", name: "Guararema" },
-  { id: "santo_andre", name: "Santo André" },
-  { id: "maua", name: "Mauá" },
-  { id: "ribeirao_pires", name: "Ribeirão Pires" },
-  { id: "rio_grande_serra", name: "Rio Grande da Serra" },
-  { id: "sao_caetano", name: "São Caetano do Sul" },
-  { id: "sao_bernardo", name: "São Bernardo do Campo" },
-  { id: "diadema", name: "Diadema" },
+const ZONE_GROUPS = [
+  {
+    label: "São Paulo Capital",
+    zones: [
+      { id: "centro", name: "Centro" },
+      { id: "norte", name: "Zona Norte" },
+      { id: "sul", name: "Zona Sul" },
+      { id: "leste", name: "Zona Leste" },
+      { id: "oeste", name: "Zona Oeste" },
+    ]
+  },
+  {
+    label: "Região Oeste",
+    zones: [
+      { id: "osasco", name: "Osasco" },
+      { id: "carapicuiba", name: "Carapicuíba" },
+      { id: "barueri", name: "Barueri" },
+      { id: "santana_parnaiba", name: "Santana do Parnaíba" },
+      { id: "itapevi", name: "Itapevi" },
+      { id: "jandira", name: "Jandira" },
+      { id: "cotia", name: "Cotia" },
+      { id: "vargem_grande", name: "Vargem Grande Paulista" },
+      { id: "taboao", name: "Taboão da Serra" },
+      { id: "embu", name: "Embu" },
+      { id: "itapecirica", name: "Itapecirica da Serra" },
+      { id: "embu_guacu", name: "Embu-Guaçu" },
+    ]
+  },
+  {
+    label: "Região Norte",
+    zones: [
+      { id: "guarulhos", name: "Guarulhos" },
+      { id: "aruja", name: "Arujá" },
+      { id: "santa_isabel", name: "Santa Isabel" },
+      { id: "mairipora", name: "Mairiporã" },
+      { id: "caieiras", name: "Caieiras" },
+      { id: "cajamar", name: "Cajamar" },
+      { id: "jordanesia", name: "Jordanésia" },
+      { id: "polvilho", name: "Polvilho" },
+      { id: "franco_rocha", name: "Franco da Rocha" },
+      { id: "francisco_morato", name: "Francisco Morato" },
+    ]
+  },
+  {
+    label: "Região Leste",
+    zones: [
+      { id: "ferraz", name: "Ferraz de Vasconcelos" },
+      { id: "poa", name: "Poá" },
+      { id: "itaquaquecetuba", name: "Itaquaquecetuba" },
+      { id: "suzano", name: "Suzano" },
+      { id: "mogi", name: "Mogi das Cruzes" },
+      { id: "guararema", name: "Guararema" },
+    ]
+  },
+  {
+    label: "ABC Paulista",
+    zones: [
+      { id: "santo_andre", name: "Santo André" },
+      { id: "maua", name: "Mauá" },
+      { id: "ribeirao_pires", name: "Ribeirão Pires" },
+      { id: "rio_grande_serra", name: "Rio Grande da Serra" },
+      { id: "sao_caetano", name: "São Caetano do Sul" },
+      { id: "sao_bernardo", name: "São Bernardo do Campo" },
+      { id: "diadema", name: "Diadema" },
+    ]
+  },
 ];
+
+// Flat list for lookup
+const ALL_ZONES = ZONE_GROUPS.flatMap(g => g.zones);
 
 const getZoneFromCep = (cep: string | null): string => {
   if (!cep) return "centro";
@@ -264,33 +299,47 @@ const CommerceRanking = ({ currentCommerceId }: CommerceRankingProps) => {
         })}
       </div>
 
-      {/* Zone Tabs */}
-      <Tabs value={activeZone} onValueChange={setActiveZone}>
-        <TabsList className="flex flex-wrap h-auto gap-2 bg-transparent">
-          {ZONES.map((zone) => (
-            <TabsTrigger
-              key={zone.id}
-              value={zone.id}
-              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-            >
-              {zone.name}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-
-        {ZONES.map((zone) => (
-          <TabsContent key={zone.id} value={zone.id} className="mt-6">
-            <Card className={`mb-6 bg-gradient-to-r ${divisionInfo.color} text-white border-0`}>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-4">
-                  <DivisionIcon className="w-10 h-10" />
-                  <div>
-                    <h3 className="text-lg font-bold">Ranking {zone.name}</h3>
-                    <p className="text-white/80 text-sm">Divisão {divisionInfo.name}</p>
-                  </div>
+      {/* Zone Selector Dropdown */}
+      <div className="flex items-center gap-3">
+        <span className="text-sm text-muted-foreground">Região:</span>
+        <Select value={activeZone} onValueChange={setActiveZone}>
+          <SelectTrigger className="w-[280px]">
+            <SelectValue placeholder="Selecione uma região">
+              {ALL_ZONES.find(z => z.id === activeZone)?.name || "Selecione uma região"}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent className="max-h-[400px]">
+            {ZONE_GROUPS.map((group) => (
+              <div key={group.label}>
+                <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground bg-muted/50">
+                  {group.label}
                 </div>
-              </CardContent>
-            </Card>
+                {group.zones.map((zone) => (
+                  <SelectItem key={zone.id} value={zone.id}>
+                    {zone.name}
+                  </SelectItem>
+                ))}
+              </div>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Ranking Content */}
+      <div className="mt-6">
+        <Card className={`mb-6 bg-gradient-to-r ${divisionInfo.color} text-white border-0`}>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-4">
+              <DivisionIcon className="w-10 h-10" />
+              <div>
+                <h3 className="text-lg font-bold">
+                  Ranking {ALL_ZONES.find(z => z.id === activeZone)?.name || activeZone}
+                </h3>
+                <p className="text-white/80 text-sm">Divisão {divisionInfo.name}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
             {filteredCommerces.length === 0 ? (
               <Card>
@@ -362,12 +411,10 @@ const CommerceRanking = ({ currentCommerceId }: CommerceRankingProps) => {
                       </CardContent>
                     </Card>
                   </motion.div>
-                ))}
-              </div>
-            )}
-          </TabsContent>
-        ))}
-      </Tabs>
+              ))}
+            </div>
+          )}
+      </div>
     </div>
   );
 };
