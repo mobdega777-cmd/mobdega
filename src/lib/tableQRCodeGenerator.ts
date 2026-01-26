@@ -9,20 +9,25 @@ interface TableQRData {
   commerceId: string;
 }
 
-// Gera etiqueta horizontal conforme mockup
+// Cores Mobdega
+const MOBDEGA_ORANGE = { r: 249, g: 115, b: 22 }; // #F97316
+const MOBDEGA_GREEN = { r: 34, g: 197, b: 94 }; // #22C55E
+const DARK_BG = { r: 28, g: 28, b: 28 }; // #1C1C1C
+
+// Gera etiqueta individual com design profissional Mobdega
 export const generateTableQRCodePDF = async (data: TableQRData) => {
   const doc = new jsPDF({
-    orientation: 'landscape',
+    orientation: 'portrait',
     unit: 'mm',
-    format: [100, 60], // Etiqueta horizontal
+    format: [85, 115], // Formato otimizado para etiqueta
   });
 
-  drawTableLabel(doc, data, 0, 0);
+  await drawProfessionalLabel(doc, data, 0, 0, 85, 115);
 
   doc.save(`mesa-${data.tableNumber}-qrcode.pdf`);
 };
 
-// Gera PDF A4 com todas as etiquetas
+// Gera PDF A4 com todas as etiquetas em grid profissional
 export const generateAllTablesQRCodePDF = async (tables: TableQRData[]) => {
   const doc = new jsPDF({
     orientation: 'portrait',
@@ -32,18 +37,20 @@ export const generateAllTablesQRCodePDF = async (tables: TableQRData[]) => {
 
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = 10;
-  const labelWidth = 90;
-  const labelHeight = 50;
+  const margin = 8;
+  const labelWidth = 92;
+  const labelHeight = 125;
   const cols = 2;
-  const rows = 5;
-  const gapX = (pageWidth - margin * 2 - labelWidth * cols) / (cols - 1);
-  const gapY = (pageHeight - margin * 2 - labelHeight * rows) / (rows - 1);
+  const rows = 2;
+  const gapX = (pageWidth - margin * 2 - labelWidth * cols) / (cols > 1 ? cols - 1 : 1);
+  const gapY = 8;
 
   let currentPage = 0;
-  tables.forEach((table, index) => {
-    const pageIndex = Math.floor(index / (cols * rows));
-    const positionOnPage = index % (cols * rows);
+  for (let index = 0; index < tables.length; index++) {
+    const table = tables[index];
+    const labelsPerPage = cols * rows;
+    const pageIndex = Math.floor(index / labelsPerPage);
+    const positionOnPage = index % labelsPerPage;
     const col = positionOnPage % cols;
     const row = Math.floor(positionOnPage / cols);
 
@@ -55,119 +62,173 @@ export const generateAllTablesQRCodePDF = async (tables: TableQRData[]) => {
     const x = margin + col * (labelWidth + gapX);
     const y = margin + row * (labelHeight + gapY);
 
-    drawTableLabel(doc, table, x, y, labelWidth, labelHeight);
-  });
+    await drawProfessionalLabel(doc, table, x, y, labelWidth, labelHeight);
+  }
 
   doc.save('todas-mesas-qrcode.pdf');
 };
 
-const drawTableLabel = (
+const drawProfessionalLabel = async (
   doc: jsPDF, 
   data: TableQRData, 
   x: number, 
   y: number, 
-  width: number = 100, 
-  height: number = 60
+  width: number, 
+  height: number
 ) => {
-  // Background com borda
-  doc.setFillColor(255, 255, 255);
-  doc.setDrawColor(30, 64, 175); // Azul escuro
-  doc.setLineWidth(1);
-  doc.rect(x, y, width, height, 'FD');
+  // Background escuro principal
+  doc.setFillColor(DARK_BG.r, DARK_BG.g, DARK_BG.b);
+  doc.roundedRect(x, y, width, height, 4, 4, 'F');
 
-  // Área do logo (lado esquerdo)
-  const logoAreaWidth = width * 0.25;
-  doc.setFillColor(30, 64, 175);
-  doc.rect(x, y, logoAreaWidth, height, 'F');
+  // Borda gradiente laranja
+  doc.setDrawColor(MOBDEGA_ORANGE.r, MOBDEGA_ORANGE.g, MOBDEGA_ORANGE.b);
+  doc.setLineWidth(2);
+  doc.roundedRect(x + 1, y + 1, width - 2, height - 2, 3, 3, 'S');
+
+  // Header com gradiente laranja
+  const headerHeight = 30;
+  doc.setFillColor(MOBDEGA_ORANGE.r, MOBDEGA_ORANGE.g, MOBDEGA_ORANGE.b);
+  doc.roundedRect(x + 4, y + 4, width - 8, headerHeight, 2, 2, 'F');
+
+  // Área do logo do comércio (círculo branco)
+  const logoSize = 22;
+  const logoX = x + 12;
+  const logoY = y + 8;
+  doc.setFillColor(255, 255, 255);
+  doc.circle(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2, 'F');
+
+  // Nome do comércio no header
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(255, 255, 255);
+  const commerceNameDisplay = data.commerceName.length > 18 
+    ? data.commerceName.substring(0, 18) + '...' 
+    : data.commerceName;
+  doc.text(commerceNameDisplay, logoX + logoSize + 6, y + 16);
+
+  // Subtítulo "Bem-vindo(a)!"
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Bem-vindo(a)!', logoX + logoSize + 6, y + 24);
+
+  // Número da mesa - grande e destacado
+  const mesaY = y + headerHeight + 20;
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(180, 180, 180);
+  doc.text('MESA', x + width / 2, mesaY, { align: 'center' });
+
+  doc.setFontSize(36);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(MOBDEGA_ORANGE.r, MOBDEGA_ORANGE.g, MOBDEGA_ORANGE.b);
+  doc.text(String(data.tableNumber).padStart(2, '0'), x + width / 2, mesaY + 14, { align: 'center' });
+
+  // Nome da mesa (se houver)
+  if (data.tableName) {
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(150, 150, 150);
+    doc.text(data.tableName, x + width / 2, mesaY + 22, { align: 'center' });
+  }
+
+  // Área do QR Code
+  const qrY = mesaY + 28;
+  const qrSize = 42;
+  const qrX = x + (width - qrSize) / 2;
   
-  // Texto "LOGO DO COMERCIO"
+  // Fundo branco para QR
+  doc.setFillColor(255, 255, 255);
+  doc.roundedRect(qrX - 4, qrY - 4, qrSize + 8, qrSize + 8, 3, 3, 'F');
+
+  // QR Code padrão (simulado com padrão profissional)
+  drawQRCodePattern(doc, qrX, qrY, qrSize, data);
+
+  // Texto "Escaneie para fazer seu pedido"
+  const instructionY = qrY + qrSize + 16;
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(MOBDEGA_GREEN.r, MOBDEGA_GREEN.g, MOBDEGA_GREEN.b);
+  doc.text('Escaneie para fazer seu pedido', x + width / 2, instructionY, { align: 'center' });
+
+  // Rodapé com site
   doc.setFontSize(8);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(255, 255, 255);
-  const logoText = data.commerceName.substring(0, 12).toUpperCase();
-  doc.text(logoText, x + logoAreaWidth / 2, y + height / 2 - 3, { align: 'center' });
-  doc.text('', x + logoAreaWidth / 2, y + height / 2 + 3, { align: 'center' });
-
-  // Área central (mensagem + mesa)
-  const centerStartX = x + logoAreaWidth;
-  const centerWidth = width * 0.4;
-  
-  // Header "Bem Vindo (a)"
-  doc.setFillColor(30, 64, 175);
-  doc.rect(centerStartX, y, centerWidth, height * 0.35, 'F');
-  
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(255, 255, 255);
-  doc.text('Bem Vindo (a)', centerStartX + centerWidth / 2, y + 8, { align: 'center' });
-  
-  doc.setFontSize(7);
   doc.setFont('helvetica', 'normal');
-  doc.text('Escanei o QrCod e faça seu pedido', centerStartX + centerWidth / 2, y + 14, { align: 'center' });
+  doc.setTextColor(150, 150, 150);
+  doc.text('www.mobdega.shop', x + width / 2, height + y - 6, { align: 'center' });
+};
 
-  // Mesa número
-  doc.setFillColor(30, 64, 175);
-  doc.rect(centerStartX, y + height * 0.4, centerWidth, height * 0.25, 'F');
+const drawQRCodePattern = (doc: jsPDF, x: number, y: number, size: number, data: TableQRData) => {
+  const cellSize = size / 25;
   
-  doc.setFontSize(12);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(255, 255, 255);
-  doc.text(`MESA ${String(data.tableNumber).padStart(2, '0')}`, centerStartX + centerWidth / 2, y + height * 0.55, { align: 'center' });
-
-  // Área do QR Code (lado direito)
-  const qrAreaX = centerStartX + centerWidth;
-  const qrAreaWidth = width * 0.35;
-  doc.setFillColor(30, 64, 175);
-  doc.rect(qrAreaX, y, qrAreaWidth, height, 'F');
-
-  // Texto acima do QR
-  doc.setFontSize(6);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(255, 255, 255);
-  doc.text('QRCOD QUE LEVA', qrAreaX + qrAreaWidth / 2, y + 8, { align: 'center' });
-  doc.text('PARA', qrAreaX + qrAreaWidth / 2, y + 12, { align: 'center' });
-  doc.text('www.mobdega.shop', qrAreaX + qrAreaWidth / 2, y + 16, { align: 'center' });
-
-  // QR Code placeholder
-  const qrSize = 22;
-  const qrX = qrAreaX + (qrAreaWidth - qrSize) / 2;
-  const qrY = y + 20;
-  
-  doc.setFillColor(255, 255, 255);
-  doc.rect(qrX, qrY, qrSize, qrSize, 'F');
-
-  // QR Code pattern simplificado
   doc.setFillColor(0, 0, 0);
-  const cellSize = qrSize / 21;
   
-  // Cantos do QR
+  // Position detection patterns (3 cantos)
+  const drawPositionPattern = (px: number, py: number) => {
+    // Outer 7x7
+    doc.rect(px, py, 7 * cellSize, 7 * cellSize, 'F');
+    // Inner white 5x5
+    doc.setFillColor(255, 255, 255);
+    doc.rect(px + cellSize, py + cellSize, 5 * cellSize, 5 * cellSize, 'F');
+    // Center 3x3
+    doc.setFillColor(0, 0, 0);
+    doc.rect(px + 2 * cellSize, py + 2 * cellSize, 3 * cellSize, 3 * cellSize, 'F');
+  };
+
   // Top-left
-  doc.rect(qrX + cellSize, qrY + cellSize, 5 * cellSize, 5 * cellSize, 'F');
-  doc.setFillColor(255, 255, 255);
-  doc.rect(qrX + 2 * cellSize, qrY + 2 * cellSize, 3 * cellSize, 3 * cellSize, 'F');
-  doc.setFillColor(0, 0, 0);
-  doc.rect(qrX + 3 * cellSize, qrY + 3 * cellSize, 1 * cellSize, 1 * cellSize, 'F');
-
+  drawPositionPattern(x, y);
   // Top-right
-  doc.rect(qrX + 15 * cellSize, qrY + cellSize, 5 * cellSize, 5 * cellSize, 'F');
-  doc.setFillColor(255, 255, 255);
-  doc.rect(qrX + 16 * cellSize, qrY + 2 * cellSize, 3 * cellSize, 3 * cellSize, 'F');
-  doc.setFillColor(0, 0, 0);
-  doc.rect(qrX + 17 * cellSize, qrY + 3 * cellSize, 1 * cellSize, 1 * cellSize, 'F');
-
+  drawPositionPattern(x + size - 7 * cellSize, y);
   // Bottom-left
-  doc.rect(qrX + cellSize, qrY + 15 * cellSize, 5 * cellSize, 5 * cellSize, 'F');
-  doc.setFillColor(255, 255, 255);
-  doc.rect(qrX + 2 * cellSize, qrY + 16 * cellSize, 3 * cellSize, 3 * cellSize, 'F');
-  doc.setFillColor(0, 0, 0);
-  doc.rect(qrX + 3 * cellSize, qrY + 17 * cellSize, 1 * cellSize, 1 * cellSize, 'F');
+  drawPositionPattern(x, y + size - 7 * cellSize);
 
-  // Padrão de dados
+  // Alignment pattern (centro-direita inferior)
+  doc.setFillColor(0, 0, 0);
+  const alignX = x + 16 * cellSize;
+  const alignY = y + 16 * cellSize;
+  doc.rect(alignX, alignY, 5 * cellSize, 5 * cellSize, 'F');
+  doc.setFillColor(255, 255, 255);
+  doc.rect(alignX + cellSize, alignY + cellSize, 3 * cellSize, 3 * cellSize, 'F');
+  doc.setFillColor(0, 0, 0);
+  doc.rect(alignX + 2 * cellSize, alignY + 2 * cellSize, cellSize, cellSize, 'F');
+
+  // Timing patterns
+  for (let i = 8; i < 17; i++) {
+    if (i % 2 === 0) {
+      doc.rect(x + i * cellSize, y + 6 * cellSize, cellSize * 0.9, cellSize * 0.9, 'F');
+      doc.rect(x + 6 * cellSize, y + i * cellSize, cellSize * 0.9, cellSize * 0.9, 'F');
+    }
+  }
+
+  // Data pattern (baseado no número da mesa e ID)
   const seed = data.tableNumber + data.commerceId.charCodeAt(0);
-  for (let i = 8; i < 14; i++) {
-    for (let j = 1; j < 20; j++) {
-      if ((i * j + seed) % 3 === 0) {
-        doc.rect(qrX + j * cellSize, qrY + i * cellSize, cellSize * 0.9, cellSize * 0.9, 'F');
+  for (let row = 9; row < 24; row++) {
+    for (let col = 9; col < 24; col++) {
+      // Skip alignment pattern area
+      if (col >= 15 && col <= 20 && row >= 15 && row <= 20) continue;
+      
+      // Create a more realistic QR pattern
+      const hash = (row * 31 + col * 17 + seed) % 7;
+      if (hash < 3) {
+        doc.rect(x + col * cellSize, y + row * cellSize, cellSize * 0.85, cellSize * 0.85, 'F');
+      }
+    }
+  }
+
+  // Área de dados adicional (canto superior direito e inferior esquerdo)
+  for (let row = 1; row < 6; row++) {
+    for (let col = 9; col < 16; col++) {
+      const hash = (row * 23 + col * 13 + seed) % 5;
+      if (hash < 2) {
+        doc.rect(x + col * cellSize, y + row * cellSize, cellSize * 0.85, cellSize * 0.85, 'F');
+      }
+    }
+  }
+
+  for (let row = 9; row < 16; row++) {
+    for (let col = 1; col < 6; col++) {
+      const hash = (row * 19 + col * 29 + seed) % 5;
+      if (hash < 2) {
+        doc.rect(x + col * cellSize, y + row * cellSize, cellSize * 0.85, cellSize * 0.85, 'F');
       }
     }
   }

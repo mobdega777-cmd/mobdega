@@ -46,7 +46,12 @@ const menuItemsConfig = [
   { id: "tables", label: "Mesas/Comandas", icon: Utensils, required: false },
   { id: "products", label: "Produtos", icon: Package, required: false },
   { id: "categories", label: "Categorias", icon: FolderOpen, required: false },
+  { id: "stockcontrol", label: "Controle Estoque", icon: Package, required: false },
   { id: "financial", label: "Financeiro", icon: DollarSign, required: false },
+  { id: "coupons", label: "Cupom para Clientes", icon: DollarSign, required: false },
+  { id: "customers", label: "Clientes", icon: DollarSign, required: false },
+  { id: "photos", label: "Fotos", icon: DollarSign, required: false },
+  { id: "ranking", label: "Ranking", icon: DollarSign, required: false },
   { id: "settings", label: "Configurações", icon: Settings, required: true },
 ];
 
