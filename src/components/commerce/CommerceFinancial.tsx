@@ -882,7 +882,11 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
                       <TableCell>
                         <div className="flex items-center gap-2 text-sm">
                           <Calendar className="w-4 h-4 text-muted-foreground" />
-                          {new Date(invoice.due_date).toLocaleDateString('pt-BR')}
+                          {/* Parse date correctly to avoid timezone issues with DATE fields */}
+                          {invoice.due_date.includes('T') 
+                            ? new Date(invoice.due_date).toLocaleDateString('pt-BR')
+                            : new Date(invoice.due_date + 'T12:00:00').toLocaleDateString('pt-BR')
+                          }
                         </div>
                       </TableCell>
                       <TableCell>

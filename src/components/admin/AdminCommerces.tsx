@@ -97,7 +97,7 @@ const AdminCommerces = () => {
     setIsLoading(true);
     const { data, error } = await supabase
       .from('commerces')
-      .select('*, plans(name, price)')
+      .select('*, plans!commerces_plan_id_fkey(name, price)')
       .order('created_at', { ascending: false });
 
     if (error) {

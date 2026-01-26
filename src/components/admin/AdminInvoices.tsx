@@ -117,7 +117,7 @@ const AdminInvoices = () => {
   const fetchCommerces = async () => {
     const { data } = await supabase
       .from('commerces')
-      .select('id, fantasy_name, auto_invoice_enabled, auto_invoice_day, plans(price)')
+      .select('id, fantasy_name, auto_invoice_enabled, auto_invoice_day, plans!commerces_plan_id_fkey(price)')
       .eq('status', 'approved');
     
     setCommerces((data as Commerce[]) || []);
@@ -450,7 +450,11 @@ const AdminInvoices = () => {
                         R$ {Number(invoice.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                       </TableCell>
                       <TableCell>
-                        {new Date(invoice.due_date).toLocaleDateString('pt-BR')}
+                        {/* Parse date correctly to avoid timezone issues with DATE fields */}
+                        {invoice.due_date.includes('T') 
+                          ? new Date(invoice.due_date).toLocaleDateString('pt-BR')
+                          : new Date(invoice.due_date + 'T12:00:00').toLocaleDateString('pt-BR')
+                        }
                       </TableCell>
                       <TableCell>{getStatusBadge(invoice.status)}</TableCell>
                       <TableCell className="text-right">
