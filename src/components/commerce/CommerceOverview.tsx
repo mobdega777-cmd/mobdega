@@ -123,7 +123,7 @@ const CommerceOverview = ({ commerce }: CommerceOverviewProps) => {
     fetchStats();
   }, [commerce.id, dateFilter]);
 
-  const shareUrl = `${window.location.origin}/loja/${commerce.id}`;
+  const shareUrl = `www.mobdega.shop`;
   const shareMessage = `🎉 Conheça ${commerce.fantasy_name} no nosso novo sistema!\n\n✨ Novidades:\n📱 Cardápio digital\n🛵 Pedidos delivery pelo app\n💳 Pagamento online\n\nAcesse agora: ${shareUrl}`;
 
   const handleShare = (platform: 'whatsapp' | 'facebook' | 'twitter' | 'instagram') => {

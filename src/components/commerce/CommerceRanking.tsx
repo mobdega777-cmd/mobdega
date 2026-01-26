@@ -42,29 +42,100 @@ const ZONES = [
   { id: "sul", name: "Zona Sul" },
   { id: "leste", name: "Zona Leste" },
   { id: "oeste", name: "Zona Oeste" },
-  { id: "abc", name: "ABC Paulista" },
-  { id: "alto_tiete", name: "Alto Tietê" },
+  { id: "osasco", name: "Osasco" },
+  { id: "carapicuiba", name: "Carapicuíba" },
+  { id: "barueri", name: "Barueri" },
+  { id: "santana_parnaiba", name: "Santana do Parnaíba" },
+  { id: "itapevi", name: "Itapevi" },
+  { id: "jandira", name: "Jandira" },
+  { id: "cotia", name: "Cotia" },
+  { id: "vargem_grande", name: "Vargem Grande Paulista" },
+  { id: "taboao", name: "Taboão da Serra" },
+  { id: "embu", name: "Embu" },
+  { id: "itapecirica", name: "Itapecirica da Serra" },
+  { id: "embu_guacu", name: "Embu-Guaçu" },
   { id: "guarulhos", name: "Guarulhos" },
-  { id: "osasco", name: "Osasco e Região" },
-  { id: "outros", name: "Outras Regiões" },
+  { id: "aruja", name: "Arujá" },
+  { id: "santa_isabel", name: "Santa Isabel" },
+  { id: "mairipora", name: "Mairiporã" },
+  { id: "caieiras", name: "Caieiras" },
+  { id: "cajamar", name: "Cajamar" },
+  { id: "jordanesia", name: "Jordanésia" },
+  { id: "polvilho", name: "Polvilho" },
+  { id: "franco_rocha", name: "Franco da Rocha" },
+  { id: "francisco_morato", name: "Francisco Morato" },
+  { id: "ferraz", name: "Ferraz de Vasconcelos" },
+  { id: "poa", name: "Poá" },
+  { id: "itaquaquecetuba", name: "Itaquaquecetuba" },
+  { id: "suzano", name: "Suzano" },
+  { id: "mogi", name: "Mogi das Cruzes" },
+  { id: "guararema", name: "Guararema" },
+  { id: "santo_andre", name: "Santo André" },
+  { id: "maua", name: "Mauá" },
+  { id: "ribeirao_pires", name: "Ribeirão Pires" },
+  { id: "rio_grande_serra", name: "Rio Grande da Serra" },
+  { id: "sao_caetano", name: "São Caetano do Sul" },
+  { id: "sao_bernardo", name: "São Bernardo do Campo" },
+  { id: "diadema", name: "Diadema" },
 ];
 
 const getZoneFromCep = (cep: string | null): string => {
-  if (!cep) return "outros";
+  if (!cep) return "centro";
   
   const numCep = parseInt(cep.replace(/\D/g, ''));
   
+  // São Paulo Capital
   if (numCep >= 1000000 && numCep <= 1599999) return "centro";
   if (numCep >= 2000000 && numCep <= 2999999) return "norte";
-  if ((numCep >= 3000000 && numCep <= 3999999) || (numCep >= 8000000 && numCep <= 8499999)) return "leste";
+  if (numCep >= 3000000 && numCep <= 3999999) return "leste";
+  if (numCep >= 8000000 && numCep <= 8499999) return "leste";
   if (numCep >= 4000000 && numCep <= 4999999) return "sul";
   if (numCep >= 5000000 && numCep <= 5899999) return "oeste";
-  if (numCep >= 9000000 && numCep <= 9999999) return "abc";
-  if (numCep >= 7000000 && numCep <= 7199999) return "guarulhos";
-  if (numCep >= 8500000 && numCep <= 8799999) return "alto_tiete";
-  if (numCep >= 6000000 && numCep <= 6999999) return "osasco";
   
-  return "outros";
+  // Grande São Paulo - Oeste
+  if (numCep >= 6000000 && numCep <= 6299999) return "osasco";
+  if (numCep >= 6300000 && numCep <= 6399999) return "carapicuiba";
+  if (numCep >= 6400000 && numCep <= 6499999) return "barueri";
+  if (numCep >= 6500000 && numCep <= 6549999) return "santana_parnaiba";
+  if (numCep >= 6650000 && numCep <= 6699999) return "itapevi";
+  if (numCep >= 6600000 && numCep <= 6649999) return "jandira";
+  if (numCep >= 6700000 && numCep <= 6729999) return "cotia";
+  if (numCep >= 6730000 && numCep <= 6749999) return "vargem_grande";
+  if (numCep >= 6750000 && numCep <= 6799999) return "taboao";
+  if (numCep >= 6800000 && numCep <= 6849999) return "embu";
+  if (numCep >= 6850000 && numCep <= 6899999) return "itapecirica";
+  if (numCep >= 6900000 && numCep <= 6999999) return "embu_guacu";
+  
+  // Grande São Paulo - Norte
+  if (numCep >= 7000000 && numCep <= 7399999) return "guarulhos";
+  if (numCep >= 7400000 && numCep <= 7499999) return "aruja";
+  if (numCep >= 7500000 && numCep <= 7599999) return "santa_isabel";
+  if (numCep >= 7600000 && numCep <= 7699999) return "mairipora";
+  if (numCep >= 7700000 && numCep <= 7749999) return "caieiras";
+  if (numCep >= 7750000 && numCep <= 7759999) return "cajamar";
+  if (numCep >= 7760000 && numCep <= 7769999) return "jordanesia";
+  if (numCep >= 7770000 && numCep <= 7799999) return "polvilho";
+  if (numCep >= 7800000 && numCep <= 7870999) return "franco_rocha";
+  if (numCep >= 7900000 && numCep <= 7999999) return "francisco_morato";
+  
+  // Grande São Paulo - Leste
+  if (numCep >= 8500000 && numCep <= 8549999) return "ferraz";
+  if (numCep >= 8550000 && numCep <= 8569999) return "poa";
+  if (numCep >= 8570000 && numCep <= 8599999) return "itaquaquecetuba";
+  if (numCep >= 8600000 && numCep <= 8699999) return "suzano";
+  if (numCep >= 8700000 && numCep <= 8899999) return "mogi";
+  if (numCep >= 8900000 && numCep <= 8999999) return "guararema";
+  
+  // ABC Paulista
+  if (numCep >= 9000000 && numCep <= 9299999) return "santo_andre";
+  if (numCep >= 9300000 && numCep <= 9399999) return "maua";
+  if (numCep >= 9400000 && numCep <= 9449999) return "ribeirao_pires";
+  if (numCep >= 9450000 && numCep <= 9499999) return "rio_grande_serra";
+  if (numCep >= 9500000 && numCep <= 9599999) return "sao_caetano";
+  if (numCep >= 9600000 && numCep <= 9899999) return "sao_bernardo";
+  if (numCep >= 9900000 && numCep <= 9999999) return "diadema";
+  
+  return "centro";
 };
 
 interface CommerceRankingProps {
