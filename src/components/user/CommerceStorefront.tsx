@@ -369,16 +369,18 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
     
     setPhotos(photosData || []);
 
-    // Fetch billing config for PIX
-    const { data: billingData } = await supabase
-      .from('billing_config')
-      .select('pix_key, qr_code_url')
-      .limit(1)
+    // Fetch commerce payment methods for PIX
+    const { data: paymentMethodsData } = await supabase
+      .from('payment_methods')
+      .select('pix_key, pix_qr_code_url')
+      .eq('commerce_id', commerceId)
+      .eq('type', 'pix')
+      .eq('is_active', true)
       .maybeSingle();
     
-    if (billingData) {
-      setCommercePixKey(billingData.pix_key);
-      setCommercePixQrCode(billingData.qr_code_url);
+    if (paymentMethodsData) {
+      setCommercePixKey(paymentMethodsData.pix_key);
+      setCommercePixQrCode(paymentMethodsData.pix_qr_code_url);
     }
 
     // Check if favorite and fetch user profile
