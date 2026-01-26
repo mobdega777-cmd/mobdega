@@ -12,8 +12,36 @@ serve(async (req) => {
   }
 
   try {
+    // Validate authorization header
+    const authHeader = req.headers.get("authorization");
+    const setupSecret = Deno.env.get("ADMIN_SETUP_SECRET");
+    
+    if (!setupSecret) {
+      console.error("ADMIN_SETUP_SECRET not configured");
+      return new Response(
+        JSON.stringify({ error: "Server configuration error" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+      );
+    }
+
+    if (!authHeader || authHeader !== `Bearer ${setupSecret}`) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
+      );
+    }
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const adminPassword = Deno.env.get("ADMIN_DEFAULT_PASSWORD");
+
+    if (!adminPassword) {
+      console.error("ADMIN_DEFAULT_PASSWORD not configured");
+      return new Response(
+        JSON.stringify({ error: "Server configuration error" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+      );
+    }
 
     const supabase = createClient(supabaseUrl, serviceRoleKey, {
       auth: {
@@ -38,7 +66,7 @@ serve(async (req) => {
     // Create admin user using Supabase Auth Admin API
     const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
       email: "admin@mobdega.com",
-      password: "623501Ab.",
+      password: adminPassword,
       email_confirm: true,
       user_metadata: {
         full_name: "Master Admin",
