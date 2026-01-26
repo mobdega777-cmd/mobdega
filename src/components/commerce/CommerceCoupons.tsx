@@ -79,20 +79,22 @@ const CommerceCoupons = ({ commerceId }: CommerceCouponsProps) => {
   });
 
   const fetchCoupons = async () => {
-    const { data, error } = await supabase
-      .from('commerce_coupons')
-      .select('*')
-      .eq('commerce_id', commerceId)
-      .order('created_at', { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from('commerce_coupons' as any)
+        .select('*')
+        .eq('commerce_id', commerceId)
+        .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('Error fetching coupons:', error);
-      // Se a tabela não existir, apenas mostra vazio
-      if (error.code === '42P01') {
+      if (error) {
+        console.error('Error fetching coupons:', error);
         setCoupons([]);
+      } else {
+        setCoupons((data as unknown as Coupon[]) || []);
       }
-    } else {
-      setCoupons(data || []);
+    } catch (err) {
+      console.error('Error:', err);
+      setCoupons([]);
     }
     setLoading(false);
   };
@@ -120,7 +122,7 @@ const CommerceCoupons = ({ commerceId }: CommerceCouponsProps) => {
 
     if (editingCoupon) {
       const { error } = await supabase
-        .from('commerce_coupons')
+        .from('commerce_coupons' as any)
         .update(couponData)
         .eq('id', editingCoupon.id);
 
@@ -133,7 +135,7 @@ const CommerceCoupons = ({ commerceId }: CommerceCouponsProps) => {
       }
     } else {
       const { error } = await supabase
-        .from('commerce_coupons')
+        .from('commerce_coupons' as any)
         .insert(couponData);
 
       if (error) {
@@ -155,7 +157,7 @@ const CommerceCoupons = ({ commerceId }: CommerceCouponsProps) => {
     if (!confirm('Tem certeza que deseja excluir este cupom?')) return;
 
     const { error } = await supabase
-      .from('commerce_coupons')
+      .from('commerce_coupons' as any)
       .delete()
       .eq('id', id);
 

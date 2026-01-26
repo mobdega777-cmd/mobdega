@@ -259,6 +259,71 @@ export type Database = {
           },
         ]
       }
+      commerce_coupons: {
+        Row: {
+          code: string
+          commerce_id: string
+          created_at: string
+          description: string | null
+          discount_type: string
+          discount_value: number
+          first_order_only: boolean | null
+          id: string
+          is_active: boolean | null
+          max_discount: number | null
+          max_uses: number | null
+          min_order_value: number | null
+          updated_at: string
+          used_count: number | null
+          valid_from: string | null
+          valid_until: string | null
+        }
+        Insert: {
+          code: string
+          commerce_id: string
+          created_at?: string
+          description?: string | null
+          discount_type?: string
+          discount_value?: number
+          first_order_only?: boolean | null
+          id?: string
+          is_active?: boolean | null
+          max_discount?: number | null
+          max_uses?: number | null
+          min_order_value?: number | null
+          updated_at?: string
+          used_count?: number | null
+          valid_from?: string | null
+          valid_until?: string | null
+        }
+        Update: {
+          code?: string
+          commerce_id?: string
+          created_at?: string
+          description?: string | null
+          discount_type?: string
+          discount_value?: number
+          first_order_only?: boolean | null
+          id?: string
+          is_active?: boolean | null
+          max_discount?: number | null
+          max_uses?: number | null
+          min_order_value?: number | null
+          updated_at?: string
+          used_count?: number | null
+          valid_from?: string | null
+          valid_until?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commerce_coupons_commerce_id_fkey"
+            columns: ["commerce_id"]
+            isOneToOne: false
+            referencedRelation: "commerces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       commerce_photos: {
         Row: {
           caption: string | null
