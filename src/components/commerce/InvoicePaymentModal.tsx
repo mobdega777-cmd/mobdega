@@ -182,7 +182,10 @@ const InvoicePaymentModal = ({ isOpen, onClose, invoice, commerceStats }: Invoic
               {formatCurrency(Number(invoice.amount))}
             </p>
             <p className="text-xs text-muted-foreground mt-1">
-              Vencimento: {new Date(invoice.due_date).toLocaleDateString('pt-BR')}
+              Vencimento: {invoice.due_date.includes('T') 
+                ? new Date(invoice.due_date).toLocaleDateString('pt-BR')
+                : new Date(invoice.due_date + 'T12:00:00').toLocaleDateString('pt-BR')
+              }
             </p>
           </div>
 
