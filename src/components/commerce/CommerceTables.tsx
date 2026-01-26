@@ -19,10 +19,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Pencil, Trash2, Utensils, Users, Clock, DollarSign, CreditCard, QrCode, Loader2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Utensils, Users, Clock, DollarSign, CreditCard, QrCode, Loader2, Printer } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { generateTableQRCodePDF } from "@/lib/tableQRCodeGenerator";
+import { generateTableQRCodePDF, generateAllTablesQRCodePDF } from "@/lib/tableQRCodeGenerator";
 
 interface CommerceTablesProps {
   commerceId: string;
@@ -52,6 +52,7 @@ const CommerceTables = ({ commerceId }: CommerceTablesProps) => {
   const [editingTable, setEditingTable] = useState<Table | null>(null);
   const [tablePaymentRequired, setTablePaymentRequired] = useState(true);
   const [generatingQR, setGeneratingQR] = useState<string | null>(null);
+  const [generatingAllQR, setGeneratingAllQR] = useState(false);
   const [commerceName, setCommerceName] = useState<string>('');
   const [commerceLogoUrl, setCommerceLogoUrl] = useState<string | null>(null);
   const { toast } = useToast();
@@ -236,6 +237,29 @@ const CommerceTables = ({ commerceId }: CommerceTablesProps) => {
     setGeneratingQR(null);
   };
 
+  const handleGenerateAllQRCodes = async () => {
+    if (tables.length === 0) {
+      toast({ variant: "destructive", title: "Nenhuma mesa cadastrada" });
+      return;
+    }
+    setGeneratingAllQR(true);
+    try {
+      const allTablesData = tables.map(table => ({
+        tableNumber: table.number,
+        tableName: table.name,
+        tableCapacity: table.capacity,
+        commerceName,
+        commerceLogoUrl,
+        commerceId,
+      }));
+      await generateAllTablesQRCodePDF(allTablesData);
+      toast({ title: "PDF gerado com sucesso!", description: `${tables.length} etiquetas prontas para impressão.` });
+    } catch (error) {
+      toast({ variant: "destructive", title: "Erro ao gerar PDF" });
+    }
+    setGeneratingAllQR(false);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -267,6 +291,21 @@ const CommerceTables = ({ commerceId }: CommerceTablesProps) => {
               onCheckedChange={togglePaymentSetting}
             />
           </div>
+          
+          {/* Botão para imprimir todas as etiquetas */}
+          <Button 
+            variant="outline" 
+            className="gap-2"
+            onClick={handleGenerateAllQRCodes}
+            disabled={generatingAllQR || tables.length === 0}
+          >
+            {generatingAllQR ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Printer className="w-4 h-4" />
+            )}
+            Imprimir Todas
+          </Button>
           
           <Dialog open={isDialogOpen} onOpenChange={(open) => {
             setIsDialogOpen(open);

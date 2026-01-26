@@ -55,6 +55,7 @@ import CommercePhotos from "@/components/commerce/CommercePhotos";
 import CommerceContract from "@/components/commerce/CommerceContract";
 import CommerceTraining from "@/components/commerce/CommerceTraining";
 import CommerceRanking from "@/components/commerce/CommerceRanking";
+import CommerceCoupons from "@/components/commerce/CommerceCoupons";
 
 type CommerceSection = 
   | "overview" 
@@ -64,7 +65,8 @@ type CommerceSection =
   | "orders" 
   | "tables"
   | "photos"
-  | "financial" 
+  | "financial"
+  | "coupons"
   | "customers"
   | "cashregister"
   | "delivery"
@@ -75,7 +77,9 @@ type CommerceSection =
   | "ranking"
   | "settings";
 
-// Ordem atualizada com Fotos, Contrato, Treinamento e Ranking
+// Ordem atualizada com Cupons entre Financeiro e Clientes
+import { Ticket } from "lucide-react";
+
 const menuItems = [
   { id: "overview" as CommerceSection, label: "Visão Geral", icon: LayoutDashboard },
   { id: "cashregister" as CommerceSection, label: "Caixa/PDV", icon: Calculator, showBillRequestBadge: true },
@@ -89,6 +93,7 @@ const menuItems = [
   { id: "categories" as CommerceSection, label: "Categorias", icon: FolderOpen },
   { id: "stockcontrol" as CommerceSection, label: "Controle Estoque", icon: Package },
   { id: "financial" as CommerceSection, label: "Financeiro", icon: DollarSign, showBadge: true },
+  { id: "coupons" as CommerceSection, label: "Cupom para Clientes", icon: Ticket },
   { id: "customers" as CommerceSection, label: "Clientes", icon: Store },
   { id: "contract" as CommerceSection, label: "Contrato", icon: FileText },
   { id: "training" as CommerceSection, label: "Treinamento", icon: BookOpen },
@@ -403,6 +408,8 @@ const CommerceDashboard = () => {
         return <CommercePhotos commerceId={commerce.id} />;
       case "financial":
         return <CommerceFinancial commerceId={commerce.id} />;
+      case "coupons":
+        return <CommerceCoupons commerceId={commerce.id} />;
       case "customers":
         return <CommerceCustomers commerceId={commerce.id} />;
       case "cashregister":
