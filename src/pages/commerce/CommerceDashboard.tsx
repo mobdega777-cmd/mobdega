@@ -86,7 +86,7 @@ const menuItems = [
   { id: "overview" as CommerceSection, label: "Visão Geral", icon: LayoutDashboard },
   { id: "cashregister" as CommerceSection, label: "Caixa/PDV", icon: Calculator, showBillRequestBadge: true },
   { id: "paymentconfig" as CommerceSection, label: "Configurar Pagamentos", icon: Wallet },
-  { id: "orders" as CommerceSection, label: "Pedidos", icon: ShoppingCart, showPendingBadge: true },
+  { id: "orders" as CommerceSection, label: "Gestão Pedidos", icon: ShoppingCart, showPendingBadge: true },
   { id: "delivery" as CommerceSection, label: "Delivery", icon: Truck, showDeliveryBadge: true },
   { id: "deliveryzones" as CommerceSection, label: "Áreas de Entrega", icon: MapPin },
   { id: "tables" as CommerceSection, label: "Mesas/Comandas", icon: Utensils },
@@ -549,12 +549,12 @@ const CommerceDashboard = () => {
             {planInfo && planInfo.type !== 'business' && !isBlocked && (
               <Button
                 size="sm"
-                variant="outline"
+                variant="ghost"
                 onClick={() => setUpgradeModalOpen(true)}
-                className="gap-1 text-xs border-primary/50 text-primary hover:bg-primary/10"
+                className="gap-0.5 text-[10px] px-2 py-1 h-6 text-primary/70 hover:text-primary hover:bg-primary/10"
               >
-                <ArrowUp className="w-3 h-3" />
-                Upgrade
+                <ArrowUp className="w-2.5 h-2.5" />
+                Up
               </Button>
             )}
           </div>

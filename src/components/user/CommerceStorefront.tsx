@@ -54,6 +54,7 @@ interface Product {
   image_url: string | null;
   category_id: string | null;
   is_featured: boolean | null;
+  stock: number | null;
 }
 
 interface Review {
@@ -329,10 +330,10 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
     
     setCategories(categoriesData || []);
 
-    // Fetch products
+    // Fetch products (including stock for out-of-stock logic)
     const { data: productsData } = await supabase
       .from('products')
-      .select('id, name, description, price, promotional_price, image_url, category_id, is_featured')
+      .select('id, name, description, price, promotional_price, image_url, category_id, is_featured, stock')
       .eq('commerce_id', commerceId)
       .eq('is_active', true)
       .order('name');
@@ -631,6 +632,16 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
 
   // Cart functions
   const addToCart = (product: Product) => {
+    // Check if product is out of stock
+    if (product.stock !== null && product.stock <= 0) {
+      toast({ 
+        title: "Produto esgotado", 
+        description: "Este produto está indisponível no momento",
+        variant: "destructive" 
+      });
+      return;
+    }
+
     if (orderMode === 'none') {
       toast({ 
         title: "Escolha um modo de pedido", 
@@ -1416,61 +1427,87 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
                 Destaques
               </h3>
               <div className="grid grid-cols-2 gap-3">
-                {featuredProducts.map((product) => (
-                  <Card key={product.id} className="overflow-hidden">
-                    {product.image_url && (
-                      <div className="h-24 bg-muted">
-                        <img src={product.image_url} alt="" className="w-full h-full object-cover" />
-                      </div>
-                    )}
-                    <CardContent className="p-3">
-                      <h4 className="font-medium text-sm text-foreground truncate">{product.name}</h4>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="font-bold text-primary">
-                          {formatCurrency(product.promotional_price || product.price)}
-                        </span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                {featuredProducts.map((product) => {
+                  const isOutOfStock = product.stock !== null && product.stock <= 0;
+                  return (
+                    <Card key={product.id} className={`overflow-hidden ${isOutOfStock ? 'opacity-60' : ''}`}>
+                      {product.image_url && (
+                        <div className="h-24 bg-muted relative">
+                          <img src={product.image_url} alt="" className="w-full h-full object-cover" />
+                          {isOutOfStock && (
+                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                              <span className="text-white font-bold text-sm">Esgotado!</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      <CardContent className="p-3">
+                        <h4 className="font-medium text-sm text-foreground truncate">{product.name}</h4>
+                        <div className="flex items-center gap-2 mt-1">
+                          {isOutOfStock ? (
+                            <span className="font-bold text-destructive text-sm">Esgotado!</span>
+                          ) : (
+                            <span className="font-bold text-primary">
+                              {formatCurrency(product.promotional_price || product.price)}
+                            </span>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             </div>
           )}
 
           {/* Products List */}
           <div className="space-y-3">
-            {filteredProducts.map((product) => (
-              <Card key={product.id} className="overflow-hidden">
-                <div className="flex">
-                  {product.image_url && (
-                    <div className="w-24 h-24 flex-shrink-0 bg-muted">
-                      <img src={product.image_url} alt="" className="w-full h-full object-cover" />
-                    </div>
-                  )}
-                  <CardContent className="flex-1 p-3">
-                    <h4 className="font-medium text-foreground">{product.name}</h4>
-                    {product.description && (
-                      <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
-                        {product.description}
-                      </p>
+            {filteredProducts.map((product) => {
+              const isOutOfStock = product.stock !== null && product.stock <= 0;
+              return (
+                <Card key={product.id} className={`overflow-hidden ${isOutOfStock ? 'opacity-60' : ''}`}>
+                  <div className="flex">
+                    {product.image_url && (
+                      <div className="w-24 h-24 flex-shrink-0 bg-muted relative">
+                        <img src={product.image_url} alt="" className="w-full h-full object-cover" />
+                        {isOutOfStock && (
+                          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                            <span className="text-white font-bold text-xs">Esgotado!</span>
+                          </div>
+                        )}
+                      </div>
                     )}
-                    <div className="flex items-center justify-between mt-2">
-                      <span className="font-bold text-primary">
-                        {formatCurrency(product.promotional_price || product.price)}
-                      </span>
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
-                        className="h-8"
-                        onClick={() => addToCart(product)}
-                      >
-                        Adicionar
-                      </Button>
-                    </div>
-                  </CardContent>
-                </div>
-              </Card>
-            ))}
+                    <CardContent className="flex-1 p-3">
+                      <h4 className="font-medium text-foreground">{product.name}</h4>
+                      {product.description && (
+                        <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
+                          {product.description}
+                        </p>
+                      )}
+                      <div className="flex items-center justify-between mt-2">
+                        {isOutOfStock ? (
+                          <span className="font-bold text-destructive">Esgotado!</span>
+                        ) : (
+                          <>
+                            <span className="font-bold text-primary">
+                              {formatCurrency(product.promotional_price || product.price)}
+                            </span>
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              className="h-8"
+                              onClick={() => addToCart(product)}
+                            >
+                              Adicionar
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </CardContent>
+                  </div>
+                </Card>
+              );
+            })}
 
             {filteredProducts.length === 0 && (
               <div className="text-center py-8 text-muted-foreground">
