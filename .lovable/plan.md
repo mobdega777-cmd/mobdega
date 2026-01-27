@@ -1,167 +1,93 @@
 
-# Plano de Correção de Segurança - Fase 2
 
-## Resumo dos Erros Restantes
+# Plano de Correção - Vitrine e Login de Comércio
 
-Após análise detalhada do banco de dados e código, identifiquei os seguintes problemas ativos:
+## Diagnóstico Completo
 
-| Nível | Problema | Status Real |
-|-------|----------|-------------|
-| ❌ Error | Customer Personal Data Could Be Stolen | **FALSO POSITIVO** - RLS já correta |
-| ❌ Error | Business Owner Personal Information Exposed | **REQUER CORREÇÃO** - Campos sensíveis expostos |
-| ❌ Error | Admin Creation Endpoint Publicly Accessible | **OUTDATED** - Já corrigido com ADMIN_SETUP_SECRET |
-| ❌ Error | Admin Password Hardcoded | **OUTDATED** - Já usa environment variable |
-| ❌ Error | Commerce Assets Modifiable By Any User | **OUTDATED** - Já corrigido com ownership check |
-| ⚠️ Warning | Business Promotional Codes Exposed | **REQUER CORREÇÃO** |
-| ⚠️ Warning | Leaked Password Protection Disabled | **REQUER CORREÇÃO** via configure-auth |
-| ⚠️ Warning | Table Claiming Allows Cross-Commerce DoS | **OUTDATED** - Já existe verificação |
-| ⚠️ Warning | Weak Password Requirements | **OUTDATED** - Já implementado 8 chars + complexidade |
+Identifiquei **3 problemas** causados pelas correções de segurança anteriores:
+
+| Problema | Causa | Impacto |
+|----------|-------|---------|
+| Vitrine vazia | View usa `security_invoker=on`, herda RLS restritivo | Visitantes não veem comércios |
+| Login falha | RLS bloqueia busca de documento | Comerciantes não conseguem logar |
+| Erro no banco | Política recursiva em `table_participants` | Funcionalidades de mesas quebradas |
 
 ---
 
-## Análise Detalhada
+## O Que Será Corrigido
 
-### 1. Customer Personal Data (profiles) - FALSO POSITIVO
+### 1. View `commerces_public` 
+Recriar a view **sem** `security_invoker`, usando comportamento padrão que permite leitura dos campos públicos selecionados.
 
-A política atual já está **CORRETA**:
-```sql
--- Política existente (já segura):
-"Users can view their own profile or admin can view all"
-USING: ((auth.uid() = user_id) OR is_master_admin())
+### 2. Login por CPF/CNPJ
+Criar função segura `get_commerce_email_by_document()` que:
+- Recebe o documento (CPF/CNPJ)
+- Retorna apenas o email (sem expor outros dados)
+- Usa `SECURITY DEFINER` para bypass do RLS
+
+### 3. Política de `table_participants`
+Corrigir a recursão infinita usando subquery segura.
+
+---
+
+## Mudanças Detalhadas
+
+### Banco de Dados
+
+```text
+┌─────────────────────────────────────────────────────────────────────┐
+│                    MIGRATIONS A CRIAR                                │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  1. DROP e RECRIA view commerces_public (sem security_invoker)      │
+│                                                                      │
+│  2. CRIAR função RPC get_commerce_email_by_document()               │
+│     - Input: document (text)                                         │
+│     - Output: email (text) ou NULL                                   │
+│     - SECURITY DEFINER para bypass RLS                              │
+│                                                                      │
+│  3. CORRIGIR política de table_participants                          │
+│     - Usar subquery que não causa recursão                          │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
-**Usuários só veem seu próprio perfil.** O scanner está desatualizado.
+### Código Frontend
 
----
-
-### 2. Business Owner Personal Information (commerces) - REQUER CORREÇÃO
-
-**Problema real:** A tabela `commerces` expõe campos sensíveis publicamente:
-- `document` (CPF/CNPJ do dono)
-- `email` (email pessoal)  
-- `owner_name` (nome completo)
-- `phone` e `whatsapp` (contatos pessoais)
-
-**Análise do código frontend:**
-
-| Componente | Campos usados | Precisa expor? |
-|------------|---------------|----------------|
-| CommerceStorefront | fantasy_name, logo_url, cover_url, city, neighborhood, address, phone, whatsapp, is_open, delivery_enabled, opening_hours, table_payment_required | phone/whatsapp para contato |
-| FeaturedStores | id, fantasy_name, city, cep, logo_url, cover_url, neighborhood, is_open, opening_hours, whatsapp, phone | Sim, para listagem |
-| UserDashboard | id, fantasy_name, logo_url, cover_url, city, neighborhood, is_open, opening_hours, whatsapp | Sim |
-
-**Solução:** Criar uma **view pública** que exponha apenas campos seguros, e restringir SELECT direto na tabela `commerces`.
-
----
-
-### 3. Business Promotional Codes (commerce_coupons) - REQUER CORREÇÃO
-
-**Problema:** Qualquer pessoa (mesmo anônimo) pode ver todos os cupons ativos de qualquer comércio.
-
-**Solução:** Restringir para usuários autenticados apenas, sem expor códigos em listagem pública.
-
----
-
-### 4. Leaked Password Protection - REQUER CONFIGURAÇÃO
-
-O linter do Supabase continua indicando que está desabilitado. Vou tentar habilitar via configure-auth novamente.
-
----
-
-## Mudanças Planejadas
-
-### 1. Criar View Pública para Commerces
-
-Uma view que expõe apenas dados seguros para vitrine pública:
-
-```sql
-CREATE VIEW public.commerces_public
-WITH (security_invoker=on) AS
-SELECT 
-  id,
-  fantasy_name,
-  logo_url,
-  cover_url,
-  city,
-  neighborhood,
-  address,
-  address_number,
-  cep,
-  phone,           -- Para contato (necessário para delivery)
-  whatsapp,        -- Para contato WhatsApp
-  is_open,
-  opening_hours,
-  delivery_enabled,
-  table_payment_required,
-  status
-FROM public.commerces
-WHERE status = 'approved';
--- Exclui: document, document_type, email, owner_name, owner_id,
---         rejection_reason, plan_id, requested_plan_id, etc.
-```
-
-### 2. Atualizar RLS de commerces
-
-```sql
--- Restringir SELECT direto na tabela base
-DROP POLICY IF EXISTS "Public can view approved commerces" ON public.commerces;
-
--- Donos e admins podem ver todos os dados
-CREATE POLICY "Owners and admins can view commerces"
-ON public.commerces FOR SELECT
-USING (
-  (owner_id = auth.uid()) 
-  OR is_master_admin()
-);
-
--- Visitantes usam a view commerces_public
-```
-
-### 3. Atualizar Código Frontend
-
-Alterar os componentes para usar a view `commerces_public` em vez da tabela direta:
-
-- `src/components/landing/FeaturedStores.tsx`
-- `src/pages/user/UserDashboard.tsx`
-- `src/components/user/CommerceStorefront.tsx`
-
-### 4. Restringir commerce_coupons
-
-```sql
-DROP POLICY IF EXISTS "Anyone can view active coupons for ordering" ON public.commerce_coupons;
-
-CREATE POLICY "Authenticated users can view active coupons"
-ON public.commerce_coupons FOR SELECT
-TO authenticated
-USING (is_active = true);
-```
-
-### 5. Atualizar Findings do Scanner
-
-Marcar findings outdated como resolvidos.
+| Arquivo | Mudança |
+|---------|---------|
+| `AuthModal.tsx` | Usar `supabase.rpc('get_commerce_email_by_document')` em vez de query direta |
 
 ---
 
 ## Impacto nas Funcionalidades
 
-| Funcionalidade | Impacto |
-|----------------|---------|
-| Landing page/vitrine | Nenhum - usa view com mesmos campos necessários |
-| Busca de lojas | Nenhum - view expõe todos campos de listagem |
-| Contato WhatsApp | Nenhum - phone/whatsapp incluídos na view |
-| Admin/Dono | Nenhum - acesso total via RLS |
-| Cupons | Apenas usuários logados podem aplicar (já era o fluxo) |
+| Funcionalidade | Status Atual | Após Correção |
+|----------------|--------------|---------------|
+| Vitrine (landing page) | ❌ Não mostra comércios | ✅ Mostra todos aprovados |
+| Login por documento | ❌ "Comércio não encontrado" | ✅ Funciona normalmente |
+| Mesas compartilhadas | ❌ Erro de recursão | ✅ Funciona normalmente |
+| Segurança PII | ✅ Protegido | ✅ Mantém proteção |
+
+---
+
+## Segurança Mantida
+
+Essas correções **NÃO** comprometem a segurança porque:
+
+1. **View pública** expõe apenas campos seguros (nome fantasia, logo, telefone comercial, endereço) - sem CPF/CNPJ, email pessoal, ou dados do dono
+
+2. **Função de login** retorna apenas o email necessário para autenticação - não expõe documento, nome do dono, ou outros dados
+
+3. **Dados sensíveis** continuam protegidos na tabela base `commerces`
 
 ---
 
 ## Ordem de Execução
 
-1. Criar view `commerces_public` via migration
-2. Atualizar política RLS de `commerces`
-3. Restringir `commerce_coupons` para authenticated
-4. Atualizar queries no frontend para usar view
-5. Configurar leaked password protection
-6. Marcar findings outdated como resolvidos
+1. Aplicar migration SQL com as 3 correções
+2. Atualizar `AuthModal.tsx` para usar a nova função RPC
+3. Testar vitrine e login
 
 ---
 
@@ -170,9 +96,10 @@ Marcar findings outdated como resolvidos.
 ### Migration SQL
 
 ```sql
--- 1. Criar view pública para commerces (sem dados sensíveis)
-CREATE OR REPLACE VIEW public.commerces_public
-WITH (security_invoker=on) AS
+-- 1. Recriar view sem security_invoker (permite acesso público aos campos selecionados)
+DROP VIEW IF EXISTS public.commerces_public;
+
+CREATE VIEW public.commerces_public AS
 SELECT 
   id,
   fantasy_name,
@@ -194,40 +121,67 @@ SELECT
 FROM public.commerces
 WHERE status = 'approved';
 
--- 2. Atualizar política de SELECT em commerces
--- Remover política pública
-DROP POLICY IF EXISTS "Public can view approved commerces" ON public.commerces;
-
--- Criar política restrita para donos/admin
-CREATE POLICY "Owners and admins can view full commerce data"
-ON public.commerces FOR SELECT
-USING (
-  (owner_id = auth.uid()) 
-  OR is_master_admin()
-);
-
--- 3. Restringir cupons para autenticados
-DROP POLICY IF EXISTS "Anyone can view active coupons for ordering" ON public.commerce_coupons;
-
-CREATE POLICY "Authenticated users can view active coupons"
-ON public.commerce_coupons FOR SELECT
-TO authenticated
-USING (is_active = true);
-
--- 4. Permitir SELECT na view para role public/anon
+-- Permitir acesso à view
 GRANT SELECT ON public.commerces_public TO anon;
 GRANT SELECT ON public.commerces_public TO authenticated;
+
+-- 2. Criar função segura para lookup de email por documento (para login)
+CREATE OR REPLACE FUNCTION public.get_commerce_email_by_document(p_document text)
+RETURNS text
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT email 
+  FROM public.commerces 
+  WHERE REGEXP_REPLACE(document, '\D', '', 'g') = REGEXP_REPLACE(p_document, '\D', '', 'g')
+  LIMIT 1;
+$$;
+
+-- Permitir chamada da função
+GRANT EXECUTE ON FUNCTION public.get_commerce_email_by_document(text) TO anon;
+GRANT EXECUTE ON FUNCTION public.get_commerce_email_by_document(text) TO authenticated;
+
+-- 3. Corrigir política recursiva de table_participants
+DROP POLICY IF EXISTS "Participants and commerce owners can view table participants" ON public.table_participants;
+
+CREATE POLICY "Participants and commerce owners can view table participants"
+ON public.table_participants FOR SELECT
+USING (
+  -- User is a participant in this session (check by user_id directly, not subquery on same table)
+  user_id = auth.uid()
+  OR
+  -- User is commerce owner via session
+  EXISTS (
+    SELECT 1 FROM public.table_sessions ts
+    WHERE ts.id = table_participants.session_id
+    AND is_commerce_owner_or_admin(ts.commerce_id)
+  )
+  OR is_master_admin()
+);
 ```
 
-### Arquivos Frontend a Atualizar
+### AuthModal.tsx - Login Atualizado
 
-| Arquivo | Mudança |
-|---------|---------|
-| `src/components/landing/FeaturedStores.tsx` | `.from('commerces')` → `.from('commerces_public')` |
-| `src/pages/user/UserDashboard.tsx` | `.from('commerces')` → `.from('commerces_public')` |
-| `src/components/user/CommerceStorefront.tsx` | Condicional: usar view para vitrine, tabela para dono |
-| `src/pages/Ranking.tsx` | `.from('commerces')` → `.from('commerces_public')` |
+```typescript
+// Trocar isso:
+const { data: allCommerces } = await supabase
+  .from('commerces')
+  .select('email, document');
 
-### Tipos TypeScript
+commerce = allCommerces?.find(c => 
+  c.document?.replace(/\D/g, '') === cleanInput
+) || null;
 
-Atualizar `src/integrations/supabase/types.ts` será automático após migration.
+// Por isso:
+const { data: email } = await supabase
+  .rpc('get_commerce_email_by_document', { p_document: cleanInput });
+
+if (email) {
+  emailToUse = email;
+} else {
+  // Comércio não encontrado...
+}
+```
+
