@@ -1567,6 +1567,7 @@ export type Database = {
           neighborhood: string | null
           opening_hours: Json | null
           phone: string | null
+          plan_id: string | null
           status: Database["public"]["Enums"]["commerce_status"] | null
           table_payment_required: boolean | null
           whatsapp: string | null
@@ -1586,6 +1587,7 @@ export type Database = {
           neighborhood?: string | null
           opening_hours?: Json | null
           phone?: string | null
+          plan_id?: string | null
           status?: Database["public"]["Enums"]["commerce_status"] | null
           table_payment_required?: boolean | null
           whatsapp?: string | null
@@ -1605,11 +1607,20 @@ export type Database = {
           neighborhood?: string | null
           opening_hours?: Json | null
           phone?: string | null
+          plan_id?: string | null
           status?: Database["public"]["Enums"]["commerce_status"] | null
           table_payment_required?: boolean | null
           whatsapp?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "commerces_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Functions: {
