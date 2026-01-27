@@ -199,7 +199,9 @@ const CommerceRanking = ({ currentCommerceId }: CommerceRankingProps) => {
     // Fetch ALL approved commerces (not just open ones) for ranking
     const { data: commercesData, error: commercesError } = await supabase
       .from('commerces')
-      .select('id, fantasy_name, logo_url, city, neighborhood, cep, plan_id, plans(type)')
+      // NOTE: commerces has two FKs to plans (plan_id and requested_plan_id).
+      // We must disambiguate which relationship to embed, otherwise PostgREST errors and returns no data.
+      .select('id, fantasy_name, logo_url, city, neighborhood, cep, plan_id, plans!commerces_plan_id_fkey(type)')
       .eq('status', 'approved');
 
     if (commercesError) {
