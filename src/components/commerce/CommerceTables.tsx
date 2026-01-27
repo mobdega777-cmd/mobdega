@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Pencil, Trash2, Utensils, Users, Clock, DollarSign, CreditCard, QrCode, Loader2, Printer } from "lucide-react";
+import { Plus, Pencil, Trash2, Utensils, Users, DollarSign, CreditCard, QrCode, Loader2, Printer } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { generateTableQRCodePDF, generateAllTablesQRCodePDF } from "@/lib/tableQRCodeGenerator";
@@ -429,12 +429,6 @@ const CommerceTables = ({ commerceId }: CommerceTablesProps) => {
                       <Users className="w-3 h-3" />
                       <span>{table.capacity}</span>
                     </div>
-                    {timeOpened && (
-                      <div className="flex items-center gap-1 text-orange-500">
-                        <Clock className="w-3 h-3" />
-                        <span>{timeOpened}</span>
-                      </div>
-                    )}
                   </div>
 
                   <div className="flex flex-wrap gap-1.5 items-center">

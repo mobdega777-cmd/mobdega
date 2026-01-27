@@ -1690,7 +1690,7 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
             onClick={openCartModal}
           >
             <ShoppingCart className="w-5 h-5" />
-            Ver Carrinho ({cartItemsCount})
+            Enviar Pedido ({cartItemsCount})
             <span className="ml-auto">{formatCurrency(cartTotal)}</span>
           </Button>
         </motion.div>

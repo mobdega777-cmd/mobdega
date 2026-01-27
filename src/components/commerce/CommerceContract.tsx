@@ -83,11 +83,7 @@ const CommerceContract = ({ commerceId }: CommerceContractProps) => {
         approved_at,
         payment_due_day,
         coupon_code,
-        plans (
-          name,
-          type,
-          price
-        )
+        plan_id
       `)
       .eq('id', commerceId)
       .single();
@@ -95,10 +91,34 @@ const CommerceContract = ({ commerceId }: CommerceContractProps) => {
     if (error) {
       console.error('Error fetching contract data:', error);
     } else if (data) {
+      // Fetch plan data separately if plan_id exists
+      let planData = null;
+      if (data.plan_id) {
+        const { data: plan } = await supabase
+          .from('plans')
+          .select('name, type, price')
+          .eq('id', data.plan_id)
+          .single();
+        planData = plan;
+      }
+
       setCommerce({
-        ...data,
-        plan: data.plans as any,
-        payment_due_day: data.payment_due_day || 10
+        fantasy_name: data.fantasy_name,
+        owner_name: data.owner_name,
+        document: data.document,
+        document_type: data.document_type,
+        email: data.email,
+        phone: data.phone,
+        address: data.address,
+        address_number: data.address_number,
+        neighborhood: data.neighborhood,
+        city: data.city,
+        cep: data.cep,
+        created_at: data.created_at,
+        approved_at: data.approved_at,
+        payment_due_day: data.payment_due_day || 10,
+        coupon_code: data.coupon_code,
+        plan: planData
       });
 
       // Fetch coupon if exists
