@@ -154,15 +154,26 @@ const drawProfessionalLabel = async (
     }
   }
 
-  // Nome do comércio no header - maior e em negrito
+  // Nome do comércio no header - tamanho dinâmico para caber completo
   const textStartX = logoX + logoSize + 4;
-  doc.setFontSize(14);
+  const availableWidth = headerWidth - logoSize - 12; // Espaço disponível para o nome
+  
+  // Calcula tamanho da fonte baseado no comprimento do nome
+  let fontSize = 14;
+  if (data.commerceName.length > 20) {
+    fontSize = 8;
+  } else if (data.commerceName.length > 16) {
+    fontSize = 9;
+  } else if (data.commerceName.length > 12) {
+    fontSize = 10;
+  } else if (data.commerceName.length > 10) {
+    fontSize = 12;
+  }
+  
+  doc.setFontSize(fontSize);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(255, 255, 255);
-  const commerceNameDisplay = data.commerceName.length > 12 
-    ? data.commerceName.substring(0, 12) + '...' 
-    : data.commerceName;
-  doc.text(commerceNameDisplay, textStartX, headerY + 12);
+  doc.text(data.commerceName, textStartX, headerY + 12);
 
   // Texto de boas-vindas - uma linha só
   doc.setFontSize(6);
