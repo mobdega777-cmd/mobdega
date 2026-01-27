@@ -1026,19 +1026,19 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">Caixa/PDV</h1>
-          <p className="text-muted-foreground">Controle de caixa e movimentações</p>
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+        <div className="min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-bold">Caixa/PDV</h1>
+          <p className="text-muted-foreground text-sm sm:text-base">Controle de caixa e movimentações</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           
           {!currentRegister ? (
             <Dialog open={isOpenDialogOpen} onOpenChange={setIsOpenDialogOpen}>
               <DialogTrigger asChild>
-                <Button className="gap-2 bg-green-600 hover:bg-green-700">
+                <Button className="gap-2 bg-green-600 hover:bg-green-700 text-sm">
                   <Calculator className="w-4 h-4" />
-                  Abrir Caixa
+                  <span className="hidden xs:inline">Abrir</span> Caixa
                 </Button>
               </DialogTrigger>
               <DialogContent>
@@ -1074,9 +1074,9 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
                 if (!open) resetSaleForm();
               }}>
                 <DialogTrigger asChild>
-                  <Button variant="outline" className="gap-2">
+                  <Button variant="outline" className="gap-2 text-sm" size="sm">
                     <ShoppingCart className="w-4 h-4" />
-                    Lançar Venda
+                    <span className="hidden xs:inline">Lançar</span> Venda
                   </Button>
                 </DialogTrigger>
                 <DialogContent>

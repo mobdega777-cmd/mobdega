@@ -152,11 +152,11 @@ const AdminOverview = () => {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-display font-bold text-foreground">
+      <div className="min-w-0">
+        <h1 className="text-2xl sm:text-3xl font-display font-bold text-foreground">
           Visão Geral
         </h1>
-        <p className="text-muted-foreground mt-1">
+        <p className="text-muted-foreground mt-1 text-sm sm:text-base">
           Bem-vindo ao painel administrativo do Mobdega
         </p>
       </div>

@@ -251,16 +251,17 @@ const CommercePaymentConfig = ({ commerceId }: CommercePaymentConfigProps) => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-display font-bold">Configurar Pagamentos</h1>
-          <p className="text-muted-foreground mt-1">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-display font-bold">Configurar Pagamentos</h1>
+          <p className="text-muted-foreground mt-1 text-sm sm:text-base">
             Configure as formas de pagamento e taxas do seu estabelecimento
           </p>
         </div>
-        <Button onClick={openAddModal} className="gap-2">
+        <Button onClick={openAddModal} className="gap-2 shrink-0 w-full sm:w-auto text-sm">
           <Plus className="w-4 h-4" />
-          Nova Forma de Pagamento
+          <span className="sm:hidden">Nova Forma</span>
+          <span className="hidden sm:inline">Nova Forma de Pagamento</span>
         </Button>
       </div>
 

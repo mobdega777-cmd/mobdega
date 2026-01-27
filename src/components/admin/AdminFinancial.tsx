@@ -272,27 +272,28 @@ const AdminFinancial = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-display font-bold text-foreground">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-display font-bold text-foreground">
             Financeiro
           </h1>
-          <p className="text-muted-foreground mt-1">
+          <p className="text-muted-foreground mt-1 text-sm sm:text-base">
             Controle financeiro completo do sistema
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button
             variant="outline"
-            className="gap-2"
+            size="sm"
+            className="gap-2 text-sm"
             onClick={() => setFilterDialogOpen(true)}
           >
             <Filter className="w-4 h-4" />
             Filtrar
           </Button>
-          <Button className="gap-2" onClick={() => setAddDialogOpen(true)}>
+          <Button size="sm" className="gap-2 text-sm" onClick={() => setAddDialogOpen(true)}>
             <Plus className="w-4 h-4" />
-            Nova Transação
+            <span className="hidden xs:inline">Nova</span> Transação
           </Button>
         </div>
       </div>

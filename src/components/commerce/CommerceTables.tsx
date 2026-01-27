@@ -270,99 +270,102 @@ const CommerceTables = ({ commerceId }: CommerceTablesProps) => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold">Mesas/Comandas</h1>
-          <p className="text-muted-foreground">Gerencie as mesas do seu estabelecimento</p>
-        </div>
-        
-        <div className="flex items-center gap-4">
-          {/* Toggle de pagamento na mesa */}
-          <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg border">
-            <CreditCard className="w-4 h-4 text-muted-foreground" />
-            <div className="flex flex-col">
-              <span className="text-sm font-medium">Pagamento na mesa</span>
-              <span className="text-xs text-muted-foreground">
-                {tablePaymentRequired ? "Cliente escolhe forma de pagamento" : "Pagamento no caixa"}
-              </span>
-            </div>
-            <Switch
-              checked={tablePaymentRequired}
-              onCheckedChange={togglePaymentSetting}
-            />
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+          <div className="min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-bold">Mesas/Comandas</h1>
+            <p className="text-muted-foreground text-sm sm:text-base">Gerencie as mesas do seu estabelecimento</p>
           </div>
           
-          {/* Botão para imprimir todas as etiquetas */}
-          <Button 
-            variant="outline" 
-            className="gap-2"
-            onClick={handleGenerateAllQRCodes}
-            disabled={generatingAllQR || tables.length === 0}
-          >
-            {generatingAllQR ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Printer className="w-4 h-4" />
-            )}
-            Imprimir Todas
-          </Button>
-          
-          <Dialog open={isDialogOpen} onOpenChange={(open) => {
-            setIsDialogOpen(open);
-            if (!open) resetForm();
-          }}>
-            <DialogTrigger asChild>
-              <Button className="gap-2">
-                <Plus className="w-4 h-4" />
-                Nova Mesa
-              </Button>
-            </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>
-                {editingTable ? "Editar Mesa" : "Nova Mesa"}
-              </DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="number">Número da Mesa *</Label>
-                <Input
-                  id="number"
-                  type="number"
-                  value={formData.number}
-                  onChange={(e) => setFormData({ ...formData, number: e.target.value })}
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="name">Nome/Identificação</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Ex: Área externa, VIP..."
-                />
-              </div>
-              <div>
-                <Label htmlFor="capacity">Capacidade (pessoas)</Label>
-                <Input
-                  id="capacity"
-                  type="number"
-                  value={formData.capacity}
-                  onChange={(e) => setFormData({ ...formData, capacity: e.target.value })}
-                />
-              </div>
-              <div className="flex justify-end gap-2 pt-4">
-                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  Cancelar
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            {/* Botão para imprimir todas as etiquetas */}
+            <Button 
+              variant="outline" 
+              size="sm"
+              className="gap-2 text-xs sm:text-sm"
+              onClick={handleGenerateAllQRCodes}
+              disabled={generatingAllQR || tables.length === 0}
+            >
+              {generatingAllQR ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Printer className="w-4 h-4" />
+              )}
+              <span className="hidden xs:inline">Imprimir</span> Todas
+            </Button>
+            
+            <Dialog open={isDialogOpen} onOpenChange={(open) => {
+              setIsDialogOpen(open);
+              if (!open) resetForm();
+            }}>
+              <DialogTrigger asChild>
+                <Button className="gap-2 text-xs sm:text-sm" size="sm">
+                  <Plus className="w-4 h-4" />
+                  Nova Mesa
                 </Button>
-                <Button type="submit">
-                  {editingTable ? "Salvar" : "Criar Mesa"}
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-          </Dialog>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>
+                    {editingTable ? "Editar Mesa" : "Nova Mesa"}
+                  </DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div>
+                    <Label htmlFor="number">Número da Mesa *</Label>
+                    <Input
+                      id="number"
+                      type="number"
+                      value={formData.number}
+                      onChange={(e) => setFormData({ ...formData, number: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="name">Nome/Identificação</Label>
+                    <Input
+                      id="name"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      placeholder="Ex: Área externa, VIP..."
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="capacity">Capacidade (pessoas)</Label>
+                    <Input
+                      id="capacity"
+                      type="number"
+                      value={formData.capacity}
+                      onChange={(e) => setFormData({ ...formData, capacity: e.target.value })}
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2 pt-4">
+                    <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                      Cancelar
+                    </Button>
+                    <Button type="submit">
+                      {editingTable ? "Salvar" : "Criar Mesa"}
+                    </Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </div>
+        
+        {/* Toggle de pagamento na mesa */}
+        <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg border w-full sm:w-fit">
+          <CreditCard className="w-4 h-4 text-muted-foreground shrink-0" />
+          <div className="flex flex-col min-w-0 flex-1">
+            <span className="text-sm font-medium">Pagamento na mesa</span>
+            <span className="text-xs text-muted-foreground">
+              {tablePaymentRequired ? "Cliente escolhe forma de pagamento" : "Pagamento no caixa"}
+            </span>
+          </div>
+          <Switch
+            checked={tablePaymentRequired}
+            onCheckedChange={togglePaymentSetting}
+          />
         </div>
       </div>
       {/* Summary Cards */}
