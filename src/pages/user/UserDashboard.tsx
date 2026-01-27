@@ -587,7 +587,7 @@ const UserDashboard = () => {
                               </div>
                             )}
                             {/* Rating badge on logo */}
-                            {commerce.averageRating && commerce.averageRating > 0 && (
+                            {commerce.averageRating !== undefined && commerce.averageRating > 0 && (
                               <div className="absolute bottom-1 right-1 bg-yellow-500 text-black text-xs font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
                                 <Star className="w-3 h-3 fill-current" />
                                 {commerce.averageRating.toFixed(1)}
