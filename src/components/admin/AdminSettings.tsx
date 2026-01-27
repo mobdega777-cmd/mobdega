@@ -26,6 +26,22 @@ const AdminSettings = () => {
   const { toast } = useToast();
   const { user } = useAuth();
 
+  const validatePassword = (password: string): string | null => {
+    if (password.length < 8) {
+      return 'A senha deve ter pelo menos 8 caracteres';
+    }
+    if (!/[A-Z]/.test(password)) {
+      return 'A senha deve conter pelo menos uma letra maiúscula';
+    }
+    if (!/[a-z]/.test(password)) {
+      return 'A senha deve conter pelo menos uma letra minúscula';
+    }
+    if (!/[0-9]/.test(password)) {
+      return 'A senha deve conter pelo menos um número';
+    }
+    return null;
+  };
+
   const handleChangePassword = async () => {
     if (!newPassword || !confirmPassword) {
       toast({
@@ -43,10 +59,11 @@ const AdminSettings = () => {
       return;
     }
 
-    if (newPassword.length < 6) {
+    const passwordError = validatePassword(newPassword);
+    if (passwordError) {
       toast({
         variant: 'destructive',
-        title: 'A senha deve ter pelo menos 6 caracteres',
+        title: passwordError,
       });
       return;
     }
@@ -144,12 +161,13 @@ const AdminSettings = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-yellow-500 mt-0.5" />
+          <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-lg flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-destructive mt-0.5" />
             <div>
-              <p className="text-sm font-medium text-yellow-500">Atenção</p>
+              <p className="text-sm font-medium text-destructive">Atenção</p>
               <p className="text-sm text-muted-foreground">
                 Após alterar a senha, você precisará usar a nova senha no próximo login.
+                A senha deve ter no mínimo 8 caracteres, incluindo letra maiúscula, minúscula e número.
               </p>
             </div>
           </div>
@@ -219,7 +237,7 @@ const AdminSettings = () => {
             </div>
             <div className="p-4 bg-muted/30 rounded-lg">
               <p className="text-sm text-muted-foreground">Status</p>
-              <p className="text-lg font-semibold text-green-500">Online</p>
+              <p className="text-lg font-semibold text-primary">Online</p>
             </div>
           </div>
         </CardContent>
