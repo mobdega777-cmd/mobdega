@@ -1,4 +1,5 @@
 import jsPDF from 'jspdf';
+import QRCode from 'qrcode';
 
 interface TableQRData {
   tableNumber: number;
@@ -14,8 +15,17 @@ const MOBDEGA_ORANGE = { r: 249, g: 115, b: 22 }; // #F97316
 const MOBDEGA_GREEN = { r: 34, g: 197, b: 94 }; // #22C55E
 const DARK_BG = { r: 28, g: 28, b: 28 }; // #1C1C1C
 
-// URL do QR Code padrão
-const STANDARD_QR_CODE_PATH = '/images/qrcode-mobdega.png';
+// URL de destino do QR Code
+const MOBDEGA_URL = 'https://mobdega.shop';
+
+// Gera QR Code como Data URL (base64)
+const generateQRCodeDataURL = async (url: string): Promise<string> => {
+  return await QRCode.toDataURL(url, {
+    width: 200,
+    margin: 0,
+    color: { dark: '#000000', light: '#FFFFFF' }
+  });
+};
 
 // Carrega a imagem como base64
 const loadImageAsBase64 = (url: string): Promise<string | null> => {
@@ -47,8 +57,8 @@ export const generateTableQRCodePDF = async (data: TableQRData) => {
     format: [90, 130], // Formato otimizado para etiqueta
   });
 
-  // Carregar imagens
-  const qrCodeBase64 = await loadImageAsBase64(STANDARD_QR_CODE_PATH);
+  // Gerar QR Code dinâmico
+  const qrCodeBase64 = await generateQRCodeDataURL(MOBDEGA_URL);
   const logoBase64 = data.commerceLogoUrl ? await loadImageAsBase64(data.commerceLogoUrl) : null;
 
   await drawProfessionalLabel(doc, data, 0, 0, 90, 130, qrCodeBase64, logoBase64);
@@ -74,8 +84,8 @@ export const generateAllTablesQRCodePDF = async (tables: TableQRData[]) => {
   const gapX = (pageWidth - margin * 2 - labelWidth * cols) / (cols > 1 ? cols - 1 : 1);
   const gapY = (pageHeight - margin * 2 - labelHeight * rows) / (rows > 1 ? rows - 1 : 1);
 
-  // Pré-carregar as imagens uma vez
-  const qrCodeBase64 = await loadImageAsBase64(STANDARD_QR_CODE_PATH);
+  // Gerar QR Code dinâmico uma vez e reutilizar
+  const qrCodeBase64 = await generateQRCodeDataURL(MOBDEGA_URL);
   const logoBase64 = tables.length > 0 && tables[0].commerceLogoUrl 
     ? await loadImageAsBase64(tables[0].commerceLogoUrl) 
     : null;
@@ -110,7 +120,7 @@ const drawProfessionalLabel = async (
   y: number, 
   width: number, 
   height: number,
-  qrCodeBase64: string | null,
+  qrCodeBase64: string,
   logoBase64: string | null
 ) => {
   // Background escuro principal com borda arredondada
@@ -194,14 +204,12 @@ const drawProfessionalLabel = async (
   doc.setFillColor(255, 255, 255);
   doc.roundedRect(qrX - 2, qrY - 2, qrSize + 4, qrSize + 4, 2, 2, 'F');
 
-  // Adicionar QR Code padrão
-  if (qrCodeBase64) {
-    try {
-      doc.addImage(qrCodeBase64, 'PNG', qrX, qrY, qrSize, qrSize);
-    } catch {
-      doc.setFillColor(200, 200, 200);
-      doc.rect(qrX, qrY, qrSize, qrSize, 'F');
-    }
+  // Adicionar QR Code dinâmico
+  try {
+    doc.addImage(qrCodeBase64, 'PNG', qrX, qrY, qrSize, qrSize);
+  } catch {
+    doc.setFillColor(200, 200, 200);
+    doc.rect(qrX, qrY, qrSize, qrSize, 'F');
   }
 
   // Texto instrução
