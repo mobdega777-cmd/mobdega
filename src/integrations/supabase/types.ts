@@ -1617,6 +1617,10 @@ export type Database = {
         Args: { _order_id: string }
         Returns: undefined
       }
+      get_commerce_email_by_document: {
+        Args: { p_document: string }
+        Returns: string
+      }
       get_public_stats: { Args: never; Returns: Json }
       has_role: {
         Args: {

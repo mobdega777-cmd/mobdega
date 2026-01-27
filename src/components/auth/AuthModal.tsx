@@ -419,29 +419,28 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
       let emailToUse = formData.email;
       let isCommerceLogin = userType === 'commerce';
 
-      // If commerce login with document, lookup email from commerces table
+      // If commerce login with document, lookup email using secure RPC function
       if (userType === 'commerce' && formData.email) {
         // Check if input looks like a document (numbers only or formatted)
         const cleanInput = formData.email.replace(/\D/g, '');
         if (cleanInput.length >= 11) {
-          // Lookup email by document - search with cleaned format
-          // First try exact match with cleaned input
-          let { data: commerce } = await supabase
-            .from('commerces')
-            .select('email, document')
-            .maybeSingle();
+          // Lookup email by document using secure RPC function
+          const { data: email, error } = await supabase
+            .rpc('get_commerce_email_by_document', { p_document: cleanInput });
           
-          // Query all commerces and find by cleaned document
-          const { data: allCommerces } = await supabase
-            .from('commerces')
-            .select('email, document');
+          if (error) {
+            console.error('Error looking up commerce email:', error);
+            toast({
+              variant: "destructive",
+              title: "Erro ao buscar comércio",
+              description: "Ocorreu um erro ao buscar o comércio.",
+            });
+            setIsSubmitting(false);
+            return;
+          }
           
-          commerce = allCommerces?.find(c => 
-            c.document?.replace(/\D/g, '') === cleanInput
-          ) || null;
-          
-          if (commerce?.email) {
-            emailToUse = commerce.email;
+          if (email) {
+            emailToUse = email;
           } else {
             toast({
               variant: "destructive",
