@@ -1,248 +1,233 @@
 
-# Plano de Correção de Segurança
+# Plano de Correção de Segurança - Fase 2
 
-## Resumo dos Erros Identificados
+## Resumo dos Erros Restantes
 
-O scan de segurança identificou **6 erros críticos** e **6 avisos**. Vou detalhar cada um e a solução proposta:
+Após análise detalhada do banco de dados e código, identifiquei os seguintes problemas ativos:
 
----
-
-## ERROS CRÍTICOS
-
-### 1. ❌ Admin Creation Endpoint Publicly Accessible (CORRIGIDO - Outdated)
-**Status:** Já corrigido anteriormente.  
-A edge function `create-admin-user` já valida o header `Authorization` com `ADMIN_SETUP_SECRET` e usa `ADMIN_DEFAULT_PASSWORD` via environment variable (não hardcoded).
-
-**Ação:** Nenhuma - apenas atualizar o scan para remover este finding.
-
----
-
-### 2. ❌ Admin Password Hardcoded in Source Code (CORRIGIDO - Outdated)
-**Status:** Já corrigido anteriormente.  
-O código atual usa `Deno.env.get("ADMIN_DEFAULT_PASSWORD")`.
-
-**Ação:** Nenhuma - apenas atualizar o scan para remover este finding.
+| Nível | Problema | Status Real |
+|-------|----------|-------------|
+| ❌ Error | Customer Personal Data Could Be Stolen | **FALSO POSITIVO** - RLS já correta |
+| ❌ Error | Business Owner Personal Information Exposed | **REQUER CORREÇÃO** - Campos sensíveis expostos |
+| ❌ Error | Admin Creation Endpoint Publicly Accessible | **OUTDATED** - Já corrigido com ADMIN_SETUP_SECRET |
+| ❌ Error | Admin Password Hardcoded | **OUTDATED** - Já usa environment variable |
+| ❌ Error | Commerce Assets Modifiable By Any User | **OUTDATED** - Já corrigido com ownership check |
+| ⚠️ Warning | Business Promotional Codes Exposed | **REQUER CORREÇÃO** |
+| ⚠️ Warning | Leaked Password Protection Disabled | **REQUER CORREÇÃO** via configure-auth |
+| ⚠️ Warning | Table Claiming Allows Cross-Commerce DoS | **OUTDATED** - Já existe verificação |
+| ⚠️ Warning | Weak Password Requirements | **OUTDATED** - Já implementado 8 chars + complexidade |
 
 ---
 
-### 3. ❌ Commerce Assets Modifiable By Any User
-**Problema:** Existem **duas políticas conflitantes** no storage:
-- `Users can update/delete their own commerce assets` - verifica apenas `bucket_id` (PERMISSIVO)
-- `Only owners can update/delete commerce assets` - verifica ownership (RESTRITIVO)
+## Análise Detalhada
 
-A política permissiva anula a restritiva, permitindo que qualquer usuário autenticado modifique arquivos de outros.
+### 1. Customer Personal Data (profiles) - FALSO POSITIVO
 
-**Solução:** Remover as políticas antigas permissivas, mantendo apenas as restritivas que verificam ownership por commerce_id.
-
----
-
-### 4. ❌ Customer Personal Data Could Be Stolen by Hackers
-**Problema:** A política `Commerce owners can view customer profiles` permite que donos de comércio vejam dados pessoais (email, telefone, CPF, endereço) de qualquer cliente que já fez pedido.
-
-**Solução:** Remover esta política. Comerciantes devem ver apenas os dados necessários para entrega (nome, telefone, endereço) diretamente da tabela `orders`, não do perfil completo.
-
----
-
-### 5. ❌ Payment Keys and Banking Information Publicly Accessible
-**Problema:** A política `Anyone can view active payment methods` expõe chaves PIX, tipos de chave e QR codes publicamente.
-
-**Análise do código:** O `CommerceStorefront.tsx` busca `pix_key` e `pix_qr_code_url` para exibir na finalização do pedido - isso é NECESSÁRIO para o fluxo de pagamento.
-
-**Solução:** Manter a política, mas restringir para usuários autenticados que estão fazendo pedido. Alternativamente, criar uma view que exponha apenas dados necessários para checkout, sem revelar chaves completas a visitantes anônimos.
-
----
-
-### 6. ❌ Master Banking Configuration Could Leak if Policy Fails
-**Problema:** A tabela `billing_config` depende apenas de `is_master_admin()`. Se a função falhar, os dados ficam expostos.
-
-**Solução:** Adicionar política de "deny by default" como camada extra de segurança.
-
----
-
-## AVISOS (Warnings)
-
-### 7. ⚠️ Restaurant Customer Names Visible to Everyone
-**Problema:** `table_participants` é público com `Anyone can view table participants`.
-
-**Análise:** Necessário para o fluxo de mesas compartilhadas - participantes precisam ver quem está na mesa.
-
-**Solução:** Restringir SELECT apenas para participantes da sessão e donos do comércio.
-
----
-
-### 8. ⚠️ Competitor Intelligence via Table Sessions
-**Problema:** `table_sessions` é público.
-
-**Solução:** Restringir SELECT para participantes e donos do comércio.
-
----
-
-### 9. ⚠️ Leaked Password Protection Disabled
-**Problema:** Proteção de senhas vazadas desabilitada no Supabase Auth.
-
-**Solução:** Habilitar via configuração de autenticação.
-
----
-
-### 10. ⚠️ Weak Password Requirements
-**Problema:** Senha mínima de 6 caracteres em `AdminSettings.tsx`.
-
-**Solução:** O sistema já implementa validação de complexidade em `AuthModal.tsx` (8 chars, maiúscula, minúscula, número). Alinhar `AdminSettings.tsx` com o mesmo padrão.
-
----
-
-## Mudanças no Banco de Dados
-
-```text
-┌─────────────────────────────────────────────────────────────────────┐
-│                    MIGRATIONS A CRIAR                                │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                      │
-│  1. STORAGE - Remover políticas conflitantes:                       │
-│     DROP POLICY "Users can update their own commerce assets"        │
-│     DROP POLICY "Users can delete their own commerce assets"        │
-│                                                                      │
-│  2. PROFILES - Remover acesso de commerce owners:                   │
-│     DROP POLICY "Commerce owners can view customer profiles"        │
-│                                                                      │
-│  3. PAYMENT_METHODS - Restringir a autenticados:                    │
-│     DROP POLICY "Anyone can view active payment methods"            │
-│     CREATE POLICY - Authenticated users viewing active methods      │
-│                                                                      │
-│  4. TABLE_PARTICIPANTS - Restringir visibilidade:                   │
-│     DROP POLICY "Anyone can view table participants"                │
-│     CREATE POLICY - Session participants OR commerce owner          │
-│                                                                      │
-│  5. TABLE_SESSIONS - Restringir visibilidade:                       │
-│     DROP POLICY "Anyone can view table sessions for a commerce"     │
-│     CREATE POLICY - Session participants OR commerce owner          │
-│                                                                      │
-│  6. BILLING_CONFIG - Defense in depth:                              │
-│     CREATE POLICY - Deny all for anon role                          │
-│                                                                      │
-└─────────────────────────────────────────────────────────────────────┘
+A política atual já está **CORRETA**:
+```sql
+-- Política existente (já segura):
+"Users can view their own profile or admin can view all"
+USING: ((auth.uid() = user_id) OR is_master_admin())
 ```
 
----
-
-## Mudanças no Código Frontend
-
-### AdminSettings.tsx
-- Atualizar validação de senha para 8 caracteres mínimo + complexidade (maiúscula, minúscula, número)
-
-### CommerceStorefront.tsx  
-- Nenhuma mudança necessária - a busca de payment_methods já é autenticada pelo contexto do usuário logado
+**Usuários só veem seu próprio perfil.** O scanner está desatualizado.
 
 ---
 
-## Configurações de Autenticação
+### 2. Business Owner Personal Information (commerces) - REQUER CORREÇÃO
 
-- Habilitar "Leaked Password Protection" no Supabase Auth via configure-auth tool
+**Problema real:** A tabela `commerces` expõe campos sensíveis publicamente:
+- `document` (CPF/CNPJ do dono)
+- `email` (email pessoal)  
+- `owner_name` (nome completo)
+- `phone` e `whatsapp` (contatos pessoais)
+
+**Análise do código frontend:**
+
+| Componente | Campos usados | Precisa expor? |
+|------------|---------------|----------------|
+| CommerceStorefront | fantasy_name, logo_url, cover_url, city, neighborhood, address, phone, whatsapp, is_open, delivery_enabled, opening_hours, table_payment_required | phone/whatsapp para contato |
+| FeaturedStores | id, fantasy_name, city, cep, logo_url, cover_url, neighborhood, is_open, opening_hours, whatsapp, phone | Sim, para listagem |
+| UserDashboard | id, fantasy_name, logo_url, cover_url, city, neighborhood, is_open, opening_hours, whatsapp | Sim |
+
+**Solução:** Criar uma **view pública** que exponha apenas campos seguros, e restringir SELECT direto na tabela `commerces`.
 
 ---
 
-## Impacto nas Funcionalidades Existentes
+### 3. Business Promotional Codes (commerce_coupons) - REQUER CORREÇÃO
 
-| Funcionalidade | Impacto | Mitigação |
-|----------------|---------|-----------|
-| Upload de fotos/produtos | Nenhum | Já usa commerce_id na pasta |
-| Checkout com PIX | Nenhum | Usuário está autenticado |
-| Mesas compartilhadas | Nenhum | Participantes têm acesso via session |
-| Perfil de cliente | Nenhum | Dados de entrega vêm do pedido |
-| Admin master | Nenhum | Mantém acesso total |
+**Problema:** Qualquer pessoa (mesmo anônimo) pode ver todos os cupons ativos de qualquer comércio.
+
+**Solução:** Restringir para usuários autenticados apenas, sem expor códigos em listagem pública.
+
+---
+
+### 4. Leaked Password Protection - REQUER CONFIGURAÇÃO
+
+O linter do Supabase continua indicando que está desabilitado. Vou tentar habilitar via configure-auth novamente.
+
+---
+
+## Mudanças Planejadas
+
+### 1. Criar View Pública para Commerces
+
+Uma view que expõe apenas dados seguros para vitrine pública:
+
+```sql
+CREATE VIEW public.commerces_public
+WITH (security_invoker=on) AS
+SELECT 
+  id,
+  fantasy_name,
+  logo_url,
+  cover_url,
+  city,
+  neighborhood,
+  address,
+  address_number,
+  cep,
+  phone,           -- Para contato (necessário para delivery)
+  whatsapp,        -- Para contato WhatsApp
+  is_open,
+  opening_hours,
+  delivery_enabled,
+  table_payment_required,
+  status
+FROM public.commerces
+WHERE status = 'approved';
+-- Exclui: document, document_type, email, owner_name, owner_id,
+--         rejection_reason, plan_id, requested_plan_id, etc.
+```
+
+### 2. Atualizar RLS de commerces
+
+```sql
+-- Restringir SELECT direto na tabela base
+DROP POLICY IF EXISTS "Public can view approved commerces" ON public.commerces;
+
+-- Donos e admins podem ver todos os dados
+CREATE POLICY "Owners and admins can view commerces"
+ON public.commerces FOR SELECT
+USING (
+  (owner_id = auth.uid()) 
+  OR is_master_admin()
+);
+
+-- Visitantes usam a view commerces_public
+```
+
+### 3. Atualizar Código Frontend
+
+Alterar os componentes para usar a view `commerces_public` em vez da tabela direta:
+
+- `src/components/landing/FeaturedStores.tsx`
+- `src/pages/user/UserDashboard.tsx`
+- `src/components/user/CommerceStorefront.tsx`
+
+### 4. Restringir commerce_coupons
+
+```sql
+DROP POLICY IF EXISTS "Anyone can view active coupons for ordering" ON public.commerce_coupons;
+
+CREATE POLICY "Authenticated users can view active coupons"
+ON public.commerce_coupons FOR SELECT
+TO authenticated
+USING (is_active = true);
+```
+
+### 5. Atualizar Findings do Scanner
+
+Marcar findings outdated como resolvidos.
+
+---
+
+## Impacto nas Funcionalidades
+
+| Funcionalidade | Impacto |
+|----------------|---------|
+| Landing page/vitrine | Nenhum - usa view com mesmos campos necessários |
+| Busca de lojas | Nenhum - view expõe todos campos de listagem |
+| Contato WhatsApp | Nenhum - phone/whatsapp incluídos na view |
+| Admin/Dono | Nenhum - acesso total via RLS |
+| Cupons | Apenas usuários logados podem aplicar (já era o fluxo) |
 
 ---
 
 ## Ordem de Execução
 
-1. **Criar migration SQL** com todas as correções de RLS
-2. **Atualizar AdminSettings.tsx** com validação de senha forte
-3. **Habilitar Leaked Password Protection** via configure-auth
-4. **Marcar findings antigos como resolvidos** no security scanner
+1. Criar view `commerces_public` via migration
+2. Atualizar política RLS de `commerces`
+3. Restringir `commerce_coupons` para authenticated
+4. Atualizar queries no frontend para usar view
+5. Configurar leaked password protection
+6. Marcar findings outdated como resolvidos
 
 ---
 
 ## Seção Técnica
 
-### SQL Migration Detalhada
+### Migration SQL
 
 ```sql
--- 1. STORAGE: Remover políticas permissivas conflitantes
-DROP POLICY IF EXISTS "Users can update their own commerce assets" ON storage.objects;
-DROP POLICY IF EXISTS "Users can delete their own commerce assets" ON storage.objects;
+-- 1. Criar view pública para commerces (sem dados sensíveis)
+CREATE OR REPLACE VIEW public.commerces_public
+WITH (security_invoker=on) AS
+SELECT 
+  id,
+  fantasy_name,
+  logo_url,
+  cover_url,
+  city,
+  neighborhood,
+  address,
+  address_number,
+  cep,
+  phone,
+  whatsapp,
+  is_open,
+  opening_hours,
+  delivery_enabled,
+  table_payment_required,
+  status,
+  created_at
+FROM public.commerces
+WHERE status = 'approved';
 
--- 2. PROFILES: Remover acesso de commerce owners
-DROP POLICY IF EXISTS "Commerce owners can view customer profiles" ON public.profiles;
+-- 2. Atualizar política de SELECT em commerces
+-- Remover política pública
+DROP POLICY IF EXISTS "Public can view approved commerces" ON public.commerces;
 
--- 3. PAYMENT_METHODS: Restringir para autenticados
-DROP POLICY IF EXISTS "Anyone can view active payment methods" ON public.payment_methods;
+-- Criar política restrita para donos/admin
+CREATE POLICY "Owners and admins can view full commerce data"
+ON public.commerces FOR SELECT
+USING (
+  (owner_id = auth.uid()) 
+  OR is_master_admin()
+);
 
-CREATE POLICY "Authenticated users can view active payment methods"
-ON public.payment_methods FOR SELECT
+-- 3. Restringir cupons para autenticados
+DROP POLICY IF EXISTS "Anyone can view active coupons for ordering" ON public.commerce_coupons;
+
+CREATE POLICY "Authenticated users can view active coupons"
+ON public.commerce_coupons FOR SELECT
 TO authenticated
-USING ((is_active = true) OR is_commerce_owner_or_admin(commerce_id));
+USING (is_active = true);
 
--- 4. TABLE_PARTICIPANTS: Restringir para participantes e donos
-DROP POLICY IF EXISTS "Anyone can view table participants" ON public.table_participants;
-
-CREATE POLICY "Participants and commerce owners can view table participants"
-ON public.table_participants FOR SELECT
-USING (
-  -- User is a participant in this session
-  EXISTS (
-    SELECT 1 FROM public.table_participants tp2
-    WHERE tp2.session_id = table_participants.session_id
-    AND tp2.user_id = auth.uid()
-  )
-  OR
-  -- User is commerce owner
-  EXISTS (
-    SELECT 1 FROM public.table_sessions ts
-    WHERE ts.id = table_participants.session_id
-    AND is_commerce_owner_or_admin(ts.commerce_id)
-  )
-  OR is_master_admin()
-);
-
--- 5. TABLE_SESSIONS: Restringir para participantes e donos
-DROP POLICY IF EXISTS "Anyone can view table sessions for a commerce" ON public.table_sessions;
-
-CREATE POLICY "Participants and commerce owners can view table sessions"
-ON public.table_sessions FOR SELECT
-USING (
-  -- User is a participant in this session
-  EXISTS (
-    SELECT 1 FROM public.table_participants tp
-    WHERE tp.session_id = table_sessions.id
-    AND tp.user_id = auth.uid()
-  )
-  OR is_commerce_owner_or_admin(commerce_id)
-  OR is_master_admin()
-);
-
--- 6. BILLING_CONFIG: Defense in depth - deny anon
-CREATE POLICY "Deny anonymous access to billing config"
-ON public.billing_config FOR ALL
-TO anon
-USING (false);
+-- 4. Permitir SELECT na view para role public/anon
+GRANT SELECT ON public.commerces_public TO anon;
+GRANT SELECT ON public.commerces_public TO authenticated;
 ```
 
-### AdminSettings.tsx - Validação de Senha
+### Arquivos Frontend a Atualizar
 
-```typescript
-const validatePassword = (password: string): string | null => {
-  if (password.length < 8) {
-    return 'A senha deve ter pelo menos 8 caracteres';
-  }
-  if (!/[A-Z]/.test(password)) {
-    return 'A senha deve conter pelo menos uma letra maiúscula';
-  }
-  if (!/[a-z]/.test(password)) {
-    return 'A senha deve conter pelo menos uma letra minúscula';
-  }
-  if (!/[0-9]/.test(password)) {
-    return 'A senha deve conter pelo menos um número';
-  }
-  return null;
-};
-```
+| Arquivo | Mudança |
+|---------|---------|
+| `src/components/landing/FeaturedStores.tsx` | `.from('commerces')` → `.from('commerces_public')` |
+| `src/pages/user/UserDashboard.tsx` | `.from('commerces')` → `.from('commerces_public')` |
+| `src/components/user/CommerceStorefront.tsx` | Condicional: usar view para vitrine, tabela para dono |
+| `src/pages/Ranking.tsx` | `.from('commerces')` → `.from('commerces_public')` |
+
+### Tipos TypeScript
+
+Atualizar `src/integrations/supabase/types.ts` será automático após migration.
