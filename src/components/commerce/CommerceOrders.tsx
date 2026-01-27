@@ -59,6 +59,12 @@ interface OrderItem {
   notes: string | null;
 }
 
+interface PaymentMethodConfig {
+  type: string;
+  fee_percentage: number;
+  fee_fixed: number;
+}
+
 interface Order {
   id: string;
   status: string;
@@ -116,6 +122,7 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [paymentMethodsConfig, setPaymentMethodsConfig] = useState<PaymentMethodConfig[]>([]);
   const [dateFilter, setDateFilter] = useState({ 
     start: startOfDay(subDays(new Date(), 29)), 
     end: endOfDay(new Date()) 
@@ -164,6 +171,25 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
     setLoading(false);
   };
 
+  // Fetch payment methods config
+  useEffect(() => {
+    const fetchPaymentMethodsConfig = async () => {
+      const { data: paymentMethods } = await supabase
+        .from('payment_methods')
+        .select('type, fee_percentage, fee_fixed')
+        .eq('commerce_id', commerceId);
+      
+      setPaymentMethodsConfig(
+        (paymentMethods || []).map(pm => ({
+          type: pm.type,
+          fee_percentage: pm.fee_percentage || 0,
+          fee_fixed: pm.fee_fixed || 0
+        }))
+      );
+    };
+    fetchPaymentMethodsConfig();
+  }, [commerceId]);
+
   useEffect(() => {
     fetchOrders();
 
@@ -188,6 +214,15 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
       supabase.removeChannel(channel);
     };
   }, [commerceId, statusFilter, dateFilter]);
+
+  // Helper function to calculate fee based on configured payment methods
+  const calculateFee = (paymentMethod: string | null, total: number): number => {
+    if (!paymentMethod) return 0;
+    const config = paymentMethodsConfig.find(pm => pm.type === paymentMethod);
+    if (!config) return 0;
+    // Calculate: percentage fee + fixed fee
+    return (total * (config.fee_percentage / 100)) + config.fee_fixed;
+  };
 
   const fetchOrderDetails = async (orderId: string) => {
     const { data: items, error } = await supabase
@@ -616,44 +651,36 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
                   </div>
                 )}
                 {selectedOrder.discount && Number(selectedOrder.discount) > 0 && (
-                  <div className="flex justify-between text-sm text-green-500">
+                  <div className="flex justify-between text-sm text-primary">
                     <span>Desconto</span>
-                    <span>-{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(selectedOrder.discount))}</span>
+                    <span>-{formatCurrency(Number(selectedOrder.discount))}</span>
                   </div>
                 )}
-                {/* Payment Fee Calculation */}
-                {selectedOrder.payment_method && (
-                  <div className="flex justify-between text-sm text-orange-500">
-                    <span>Taxa de {paymentMethodLabels[selectedOrder.payment_method] || selectedOrder.payment_method} (estimada)</span>
-                    <span>-{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
-                      selectedOrder.payment_method === 'credit' ? Number(selectedOrder.total) * 0.035 :
-                      selectedOrder.payment_method === 'debit' ? Number(selectedOrder.total) * 0.02 :
-                      selectedOrder.payment_method === 'pix' ? Number(selectedOrder.total) * 0.01 : 0
-                    )}</span>
+                {/* Payment Fee Calculation - using configured rates */}
+                {selectedOrder.payment_method && calculateFee(selectedOrder.payment_method, Number(selectedOrder.total)) > 0 && (
+                  <div className="flex justify-between text-sm text-destructive">
+                    <span>Taxa de {paymentMethodLabels[selectedOrder.payment_method] || selectedOrder.payment_method}</span>
+                    <span>-{formatCurrency(calculateFee(selectedOrder.payment_method, Number(selectedOrder.total)))}</span>
                   </div>
                 )}
                 <div className="flex justify-between font-bold text-lg pt-2 border-t">
                   <span>Total Recebido</span>
-                  <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(selectedOrder.total))}</span>
+                  <span>{formatCurrency(Number(selectedOrder.total))}</span>
                 </div>
-                {/* Lucro Líquido */}
+                {/* Lucro Líquido - using configured rates */}
                 {selectedOrder.payment_method && (
-                  <div className="flex justify-between font-bold text-lg text-green-600">
+                  <div className="flex justify-between font-bold text-lg text-primary">
                     <span>Lucro Líquido (após taxas)</span>
-                    <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
-                      Number(selectedOrder.total) - (
-                        selectedOrder.payment_method === 'credit' ? Number(selectedOrder.total) * 0.035 :
-                        selectedOrder.payment_method === 'debit' ? Number(selectedOrder.total) * 0.02 :
-                        selectedOrder.payment_method === 'pix' ? Number(selectedOrder.total) * 0.01 : 0
-                      )
+                    <span>{formatCurrency(
+                      Number(selectedOrder.total) - calculateFee(selectedOrder.payment_method, Number(selectedOrder.total))
                     )}</span>
                   </div>
                 )}
               </div>
 
               {selectedOrder.notes && (
-                <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-                  <p className="text-sm font-medium text-yellow-500">Observações</p>
+                <div className="p-3 rounded-lg bg-muted border border-muted-foreground/20">
+                  <p className="text-sm font-medium text-muted-foreground">Observações</p>
                   <p className="text-sm mt-1">{selectedOrder.notes}</p>
                 </div>
               )}
