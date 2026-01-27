@@ -196,18 +196,28 @@ const CommerceRanking = ({ currentCommerceId }: CommerceRankingProps) => {
   const fetchRankingData = async () => {
     setLoading(true);
 
-    // Fetch ALL approved commerces (not just open ones) for ranking
+    // Fetch ALL approved commerces using the public view (accessible to all)
     const { data: commercesData, error: commercesError } = await supabase
-      .from('commerces')
-      // NOTE: commerces has two FKs to plans (plan_id and requested_plan_id).
-      // We must disambiguate which relationship to embed, otherwise PostgREST errors and returns no data.
-      .select('id, fantasy_name, logo_url, city, neighborhood, cep, plan_id, plans!commerces_plan_id_fkey(type)')
-      .eq('status', 'approved');
+      .from('commerces_public')
+      .select('id, fantasy_name, logo_url, city, neighborhood, cep, plan_id');
 
     if (commercesError) {
       console.error('Error fetching commerces:', commercesError);
       setLoading(false);
       return;
+    }
+
+    // Fetch plan types for the commerces
+    const planIds = [...new Set((commercesData || []).map(c => c.plan_id).filter(Boolean))];
+    const planTypesMap = new Map<string, string>();
+    
+    if (planIds.length > 0) {
+      const { data: plansData } = await supabase
+        .from('plans')
+        .select('id, type')
+        .in('id', planIds);
+      
+      plansData?.forEach(p => planTypesMap.set(p.id, p.type));
     }
 
     const { data: reviewsData } = await supabase
@@ -243,7 +253,7 @@ const CommerceRanking = ({ currentCommerceId }: CommerceRankingProps) => {
         city: commerce.city,
         neighborhood: commerce.neighborhood,
         cep: commerce.cep,
-        plan_type: (commerce.plans as any)?.type || 'basic',
+        plan_type: commerce.plan_id ? (planTypesMap.get(commerce.plan_id) || 'basic') : 'basic',
         avg_rating: avgRating,
         review_count: reviews.length,
         favorites_count: favoritesByCommerce.get(commerce.id) || 0,
