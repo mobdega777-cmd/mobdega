@@ -1032,7 +1032,6 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
           <p className="text-muted-foreground">Controle de caixa e movimentações</p>
         </div>
         <div className="flex items-center gap-2">
-          <DateFilter onDateChange={handleDateChange} defaultValue="today" />
           
           {!currentRegister ? (
             <Dialog open={isOpenDialogOpen} onOpenChange={setIsOpenDialogOpen}>
