@@ -289,16 +289,106 @@ const CommerceRanking = ({ currentCommerceId }: CommerceRankingProps) => {
   const divisionInfo = getDivisionInfo(activeDivision);
   const DivisionIcon = divisionInfo.icon;
 
+  // Find current commerce data for the summary card
+  const currentCommerce = currentCommerceId 
+    ? commerces.find(c => c.id === currentCommerceId) 
+    : null;
+  
+  const currentCommercePosition = currentCommerce
+    ? commerces.filter(c => c.zone === currentCommerce.zone && c.plan_type === currentCommerce.plan_type)
+        .findIndex(c => c.id === currentCommerceId) + 1
+    : null;
+
+  const currentCommerceTotal = currentCommerce
+    ? commerces.filter(c => c.zone === currentCommerce.zone && c.plan_type === currentCommerce.plan_type).length
+    : 0;
+
+  const currentDivisionInfo = currentCommerce ? getDivisionInfo(currentCommerce.plan_type) : null;
+  const CurrentDivIcon = currentDivisionInfo?.icon;
+
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
-          <Trophy className="w-6 h-6 text-primary" />
-          Ranking Adegas & Tabacarias
-        </h2>
-        <p className="text-muted-foreground mt-1">
-          Veja a classificação dos melhores estabelecimentos
-        </p>
+      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
+            <Trophy className="w-6 h-6 text-primary" />
+            Ranking Adegas & Tabacarias
+          </h2>
+          <p className="text-muted-foreground mt-1">
+            Veja a classificação dos melhores estabelecimentos
+          </p>
+        </div>
+
+        {/* Current Commerce Summary Card */}
+        {currentCommerce && currentCommercePosition && currentDivisionInfo && CurrentDivIcon && (
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ type: "spring", stiffness: 300, damping: 25 }}
+          >
+            <Card className="w-full lg:w-[320px] border-2 border-primary/30 bg-gradient-to-br from-primary/5 to-primary/10">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-xl bg-gradient-to-r ${currentDivisionInfo.color} text-white shadow-lg`}>
+                    {currentCommercePosition <= 3 ? (
+                      currentCommercePosition === 1 ? <Crown className="w-6 h-6" /> :
+                      currentCommercePosition === 2 ? <Trophy className="w-6 h-6" /> :
+                      <Medal className="w-6 h-6" />
+                    ) : (
+                      currentCommercePosition
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-muted-foreground">Sua Posição</p>
+                    <p className="font-bold text-lg text-foreground">
+                      {currentCommercePosition}º de {currentCommerceTotal}
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                  <div className="bg-background/60 rounded-lg p-2 text-center">
+                    <div className="flex items-center justify-center gap-1 mb-1">
+                      <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                      <span className="font-bold text-lg">
+                        {currentCommerce.avg_rating > 0 ? currentCommerce.avg_rating.toFixed(1) : '-'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {currentCommerce.review_count} avaliações
+                    </p>
+                  </div>
+                  <div className="bg-background/60 rounded-lg p-2 text-center">
+                    <div className="flex items-center justify-center gap-1 mb-1">
+                      <Heart className="w-4 h-4 fill-red-400 text-red-400" />
+                      <span className="font-bold text-lg">{currentCommerce.favorites_count}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">favoritos</p>
+                  </div>
+                </div>
+
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground flex items-center gap-1">
+                      <MapPin className="w-3 h-3" /> Região
+                    </span>
+                    <Badge variant="outline" className="text-xs">
+                      {ALL_ZONES.find(z => z.id === currentCommerce.zone)?.name || currentCommerce.zone}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground flex items-center gap-1">
+                      <CurrentDivIcon className="w-3 h-3" /> Divisão
+                    </span>
+                    <Badge className={`text-xs ${currentDivisionInfo.badge} text-white`}>
+                      {currentDivisionInfo.name}
+                    </Badge>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
       </div>
 
       {/* Division Selector */}
