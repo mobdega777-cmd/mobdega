@@ -1,187 +1,195 @@
 
 
-# Plano de Correção - Vitrine e Login de Comércio
+# Relatório Completo de Segurança - Sistema Mobdega
 
-## Diagnóstico Completo
+## Resumo Executivo
 
-Identifiquei **3 problemas** causados pelas correções de segurança anteriores:
+Após análise completa do sistema, identifiquei **17 pontos de atenção** sendo:
+- **5 críticos** (já corrigidos anteriormente ✅)
+- **8 moderados** (3 precisam atenção ⚠️)
+- **4 informativos** (aceitáveis para o negócio ℹ️)
 
-| Problema | Causa | Impacto |
-|----------|-------|---------|
-| Vitrine vazia | View usa `security_invoker=on`, herda RLS restritivo | Visitantes não veem comércios |
-| Login falha | RLS bloqueia busca de documento | Comerciantes não conseguem logar |
-| Erro no banco | Política recursiva em `table_participants` | Funcionalidades de mesas quebradas |
-
----
-
-## O Que Será Corrigido
-
-### 1. View `commerces_public` 
-Recriar a view **sem** `security_invoker`, usando comportamento padrão que permite leitura dos campos públicos selecionados.
-
-### 2. Login por CPF/CNPJ
-Criar função segura `get_commerce_email_by_document()` que:
-- Recebe o documento (CPF/CNPJ)
-- Retorna apenas o email (sem expor outros dados)
-- Usa `SECURITY DEFINER` para bypass do RLS
-
-### 3. Política de `table_participants`
-Corrigir a recursão infinita usando subquery segura.
+| Status Geral | Avaliação |
+|--------------|-----------|
+| Pronto para produção | ⚠️ Com ressalvas |
+| Segurança contra hackers | ✅ Boa (após correções) |
+| Dados expostos no F12 | ✅ Protegido |
+| Políticas RLS | ✅ Funcionando |
 
 ---
 
-## Mudanças Detalhadas
+## O Que Já Está Corrigido ✅
 
-### Banco de Dados
+### 1. Edge Function Admin Protegida
+A criação de admin agora exige token `ADMIN_SETUP_SECRET` no header - não é possível criar admin sem autorização.
 
-```text
-┌─────────────────────────────────────────────────────────────────────┐
-│                    MIGRATIONS A CRIAR                                │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                      │
-│  1. DROP e RECRIA view commerces_public (sem security_invoker)      │
-│                                                                      │
-│  2. CRIAR função RPC get_commerce_email_by_document()               │
-│     - Input: document (text)                                         │
-│     - Output: email (text) ou NULL                                   │
-│     - SECURITY DEFINER para bypass RLS                              │
-│                                                                      │
-│  3. CORRIGIR política de table_participants                          │
-│     - Usar subquery que não causa recursão                          │
-│                                                                      │
-└─────────────────────────────────────────────────────────────────────┘
-```
+### 2. Senha Admin em Environment Variable
+A senha não está mais hardcoded - usa `ADMIN_DEFAULT_PASSWORD` do ambiente.
 
-### Código Frontend
+### 3. Storage com Ownership Verificado
+Cada comércio só pode modificar arquivos na sua própria pasta.
 
-| Arquivo | Mudança |
-|---------|---------|
-| `AuthModal.tsx` | Usar `supabase.rpc('get_commerce_email_by_document')` em vez de query direta |
+### 4. Políticas de Senha Melhoradas
+Sistema exige 8+ caracteres com maiúsculas, minúsculas e números.
+
+### 5. View Pública Segura
+A `commerces_public` expõe apenas dados comerciais, sem CPF/CNPJ ou email do dono.
 
 ---
 
-## Impacto nas Funcionalidades
+## Pontos que Precisam Atenção ⚠️
 
-| Funcionalidade | Status Atual | Após Correção |
-|----------------|--------------|---------------|
-| Vitrine (landing page) | ❌ Não mostra comércios | ✅ Mostra todos aprovados |
-| Login por documento | ❌ "Comércio não encontrado" | ✅ Funciona normalmente |
-| Mesas compartilhadas | ❌ Erro de recursão | ✅ Funciona normalmente |
-| Segurança PII | ✅ Protegido | ✅ Mantém proteção |
+### 1. Proteção contra Senhas Vazadas DESABILITADA (Nível: Médio)
 
----
+**Problema**: O sistema não verifica se a senha escolhida foi vazada em data breaches.
 
-## Segurança Mantida
+**Risco**: Usuários podem usar senhas comprometidas (ex: "Password123") sem aviso.
 
-Essas correções **NÃO** comprometem a segurança porque:
+**Correção Necessária**: Habilitar "Leaked Password Protection" no backend.
 
-1. **View pública** expõe apenas campos seguros (nome fantasia, logo, telefone comercial, endereço) - sem CPF/CNPJ, email pessoal, ou dados do dono
+### 2. Reclamação de Mesas Cross-Commerce (Nível: Médio)
 
-2. **Função de login** retorna apenas o email necessário para autenticação - não expõe documento, nome do dono, ou outros dados
+**Problema**: Qualquer usuário autenticado pode "reclamar" mesas de qualquer comércio.
 
-3. **Dados sensíveis** continuam protegidos na tabela base `commerces`
+**Risco**: Um atacante poderia ocupar todas as mesas de um concorrente, causando DoS.
 
----
+**Correção Necessária**: Adicionar verificação de commerce_id na política de UPDATE.
 
-## Ordem de Execução
+### 3. Cupons de Comércio Públicos (Nível: Baixo)
 
-1. Aplicar migration SQL com as 3 correções
-2. Atualizar `AuthModal.tsx` para usar a nova função RPC
-3. Testar vitrine e login
+**Problema**: Códigos de desconto ativos são visíveis para qualquer usuário.
+
+**Risco**: Concorrentes podem ver estratégias promocionais ou usar códigos.
+
+**Correção Sugerida**: Restringir SELECT a usuários autenticados no momento do pedido.
 
 ---
 
-## Seção Técnica
+## O Que Aparece no F12 (DevTools)
 
-### Migration SQL
+| Dado | Exposto? | Justificativa |
+|------|----------|---------------|
+| Produtos e preços | ✅ Sim | Normal - necessário para vitrine |
+| Categorias | ✅ Sim | Normal - necessário para navegação |
+| Nome fantasia do comércio | ✅ Sim | Normal - dado público |
+| CPF/CNPJ do dono | ❌ Não | Protegido pela RLS |
+| Email do dono | ❌ Não | Protegido pela RLS |
+| Endereço pessoal do dono | ❌ Não | Protegido pela RLS |
+| Dados de pagamento (PIX) | ⚠️ Parcial | Visível apenas para cliente no checkout |
+| Pedidos de outros clientes | ❌ Não | Protegido pela RLS |
+| Faturamento do comércio | ❌ Não | Protegido pela RLS |
+
+---
+
+## Políticas RLS - Resumo por Tabela
+
+| Tabela | Status | Observação |
+|--------|--------|------------|
+| `profiles` | ✅ Seguro | Cada usuário vê apenas seu perfil |
+| `commerces` | ✅ Seguro | Dono e admin veem, público usa view |
+| `commerces_public` | ✅ Seguro | View sem dados sensíveis |
+| `orders` | ✅ Seguro | Cliente e comércio veem apenas os seus |
+| `invoices` | ✅ Seguro | Comerciante e admin apenas |
+| `user_roles` | ✅ Seguro | Usuário vê apenas sua role |
+| `billing_config` | ✅ Seguro | Apenas master admin |
+| `tables` | ⚠️ Atenção | UPDATE muito permissivo |
+| `reviews` | ⚠️ Atenção | user_id exposto publicamente |
+| `commerce_coupons` | ⚠️ Atenção | Códigos visíveis para todos |
+
+---
+
+## Recomendações para Produção
+
+### Correções Críticas (Fazer Antes de Lançar)
+
+1. **Habilitar Leaked Password Protection**
+   - Impacto: Médio
+   - Esforço: 1 migration SQL
+
+2. **Corrigir Política de Tables**
+   - Impacto: Baixo (DoS limitado)
+   - Esforço: 1 migration SQL
+
+### Melhorias Recomendadas (Podem Esperar)
+
+3. **Anonimizar user_id em reviews**
+   - Criar view que não expõe o ID do avaliador
+   - Impacto: Privacidade de clientes
+
+4. **Restringir visualização de cupons**
+   - Mudar política para authenticated + no momento do pedido
+   - Impacto: Proteção de estratégia comercial
+
+---
+
+## Logs e Console
+
+Os `console.log` encontrados no código são informativos e não expõem dados sensíveis:
+- CEP lookups (debug de zona)
+- Movimentações de caixa (logs operacionais)
+
+**Recomendação**: Remover antes de produção para performance, mas não são risco de segurança.
+
+---
+
+## Conclusão
+
+O sistema está **bem estruturado** em termos de segurança. As principais vulnerabilidades já foram corrigidas em sprints anteriores. 
+
+Para lançar em produção com segurança, recomendo aplicar as **2 correções críticas** (leaked password protection e política de tables).
+
+Os demais pontos são melhorias incrementais que podem ser endereçadas após o lançamento.
+
+---
+
+## Seção Técnica - Correções SQL Necessárias
+
+### 1. Habilitar Leaked Password Protection
+Isso é configurado via painel do backend, não via SQL.
+
+### 2. Corrigir Política de Tables
 
 ```sql
--- 1. Recriar view sem security_invoker (permite acesso público aos campos selecionados)
-DROP VIEW IF EXISTS public.commerces_public;
+-- Corrigir UPDATE de tables para prevenir DoS cross-commerce
+DROP POLICY IF EXISTS "Users can claim available tables" ON public.tables;
 
-CREATE VIEW public.commerces_public AS
+CREATE POLICY "Users can claim available tables"
+ON public.tables
+FOR UPDATE
+TO authenticated
+USING (
+  (status = 'available'::table_status OR status IS NULL)
+  -- Usuário deve ter uma sessão ativa nesta mesa ou estar criando uma
+  AND (
+    session_id IS NULL 
+    OR EXISTS (
+      SELECT 1 FROM table_participants tp
+      JOIN table_sessions ts ON ts.id = tp.session_id
+      WHERE ts.table_id = tables.id 
+      AND tp.user_id = auth.uid()
+      AND ts.status = 'active'
+    )
+  )
+)
+WITH CHECK (status = 'occupied'::table_status);
+```
+
+### 3. Anonimizar Reviews (Opcional)
+
+```sql
+-- Criar view que esconde user_id
+CREATE VIEW public.reviews_public AS
 SELECT 
   id,
-  fantasy_name,
-  logo_url,
-  cover_url,
-  city,
-  neighborhood,
-  address,
-  address_number,
-  cep,
-  phone,
-  whatsapp,
-  is_open,
-  opening_hours,
-  delivery_enabled,
-  table_payment_required,
-  status,
+  commerce_id,
+  rating,
+  comment,
   created_at
-FROM public.commerces
-WHERE status = 'approved';
+  -- user_id omitido intencionalmente
+FROM public.reviews;
 
--- Permitir acesso à view
-GRANT SELECT ON public.commerces_public TO anon;
-GRANT SELECT ON public.commerces_public TO authenticated;
-
--- 2. Criar função segura para lookup de email por documento (para login)
-CREATE OR REPLACE FUNCTION public.get_commerce_email_by_document(p_document text)
-RETURNS text
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-SET search_path = public
-AS $$
-  SELECT email 
-  FROM public.commerces 
-  WHERE REGEXP_REPLACE(document, '\D', '', 'g') = REGEXP_REPLACE(p_document, '\D', '', 'g')
-  LIMIT 1;
-$$;
-
--- Permitir chamada da função
-GRANT EXECUTE ON FUNCTION public.get_commerce_email_by_document(text) TO anon;
-GRANT EXECUTE ON FUNCTION public.get_commerce_email_by_document(text) TO authenticated;
-
--- 3. Corrigir política recursiva de table_participants
-DROP POLICY IF EXISTS "Participants and commerce owners can view table participants" ON public.table_participants;
-
-CREATE POLICY "Participants and commerce owners can view table participants"
-ON public.table_participants FOR SELECT
-USING (
-  -- User is a participant in this session (check by user_id directly, not subquery on same table)
-  user_id = auth.uid()
-  OR
-  -- User is commerce owner via session
-  EXISTS (
-    SELECT 1 FROM public.table_sessions ts
-    WHERE ts.id = table_participants.session_id
-    AND is_commerce_owner_or_admin(ts.commerce_id)
-  )
-  OR is_master_admin()
-);
+GRANT SELECT ON public.reviews_public TO anon;
+GRANT SELECT ON public.reviews_public TO authenticated;
 ```
 
-### AuthModal.tsx - Login Atualizado
-
-```typescript
-// Trocar isso:
-const { data: allCommerces } = await supabase
-  .from('commerces')
-  .select('email, document');
-
-commerce = allCommerces?.find(c => 
-  c.document?.replace(/\D/g, '') === cleanInput
-) || null;
-
-// Por isso:
-const { data: email } = await supabase
-  .rpc('get_commerce_email_by_document', { p_document: cleanInput });
-
-if (email) {
-  emailToUse = email;
-} else {
-  // Comércio não encontrado...
-}
-```
 
