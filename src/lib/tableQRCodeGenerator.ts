@@ -122,8 +122,8 @@ const drawProfessionalLabel = async (
   doc.setLineWidth(2.5);
   doc.roundedRect(x + 2, y + 2, width - 4, height - 4, 4, 4, 'S');
 
-  // Header com fundo laranja
-  const headerHeight = 38;
+  // Header com fundo laranja - altura aumentada para caber todo o texto
+  const headerHeight = 32;
   const headerX = x + 6;
   const headerY = y + 6;
   const headerWidth = width - 12;
@@ -132,11 +132,10 @@ const drawProfessionalLabel = async (
   doc.roundedRect(headerX, headerY, headerWidth, headerHeight, 3, 3, 'F');
 
   // Logo do comércio (sem círculo branco)
-  const logoSize = 28;
-  const logoX = headerX + 5;
+  const logoSize = 24;
+  const logoX = headerX + 4;
   const logoY = headerY + (headerHeight - logoSize) / 2;
   
-  // Adicionar o logo do comércio diretamente se disponível
   if (logoBase64) {
     try {
       doc.addImage(logoBase64, 'PNG', logoX, logoY, logoSize, logoSize);
@@ -146,78 +145,74 @@ const drawProfessionalLabel = async (
   }
 
   // Nome do comércio no header - maior e em negrito
-  doc.setFontSize(16);
+  const textStartX = logoX + logoSize + 4;
+  doc.setFontSize(14);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(255, 255, 255);
-  const commerceNameDisplay = data.commerceName.length > 14 
-    ? data.commerceName.substring(0, 14) + '...' 
+  const commerceNameDisplay = data.commerceName.length > 12 
+    ? data.commerceName.substring(0, 12) + '...' 
     : data.commerceName;
-  doc.text(commerceNameDisplay, logoX + logoSize + 5, headerY + 14);
+  doc.text(commerceNameDisplay, textStartX, headerY + 12);
 
-  // Texto de boas-vindas expandido
-  doc.setFontSize(7);
+  // Texto de boas-vindas - uma linha só
+  doc.setFontSize(6);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(255, 255, 255);
-  doc.text('Bem-vindo(a)! Para pedir, escaneie o', logoX + logoSize + 5, headerY + 23);
-  doc.text('QRCODE abaixo e peça no conforto da sua mesa.', logoX + logoSize + 5, headerY + 30);
+  doc.text('Bem-vindo(a)! Escaneie o QR Code abaixo.', textStartX, headerY + 20);
 
-  // Seção do número da mesa
-  const mesaY = y + headerHeight + 20;
+  // Seção do número da mesa - centralizada
+  const mesaY = y + headerHeight + 22;
   
   // Label "MESA"
-  doc.setFontSize(12);
+  doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(180, 180, 180);
   doc.text('MESA', x + width / 2, mesaY, { align: 'center' });
 
   // Número da mesa - grande e destacado
-  doc.setFontSize(42);
+  doc.setFontSize(38);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(MOBDEGA_ORANGE.r, MOBDEGA_ORANGE.g, MOBDEGA_ORANGE.b);
-  doc.text(String(data.tableNumber).padStart(2, '0'), x + width / 2, mesaY + 16, { align: 'center' });
+  doc.text(String(data.tableNumber).padStart(2, '0'), x + width / 2, mesaY + 14, { align: 'center' });
 
   // Nome da mesa (se houver)
   let extraOffset = 0;
   if (data.tableName) {
-    doc.setFontSize(10);
+    doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(150, 150, 150);
-    doc.text(data.tableName, x + width / 2, mesaY + 25, { align: 'center' });
-    extraOffset = 6;
+    doc.text(data.tableName, x + width / 2, mesaY + 22, { align: 'center' });
+    extraOffset = 4;
   }
 
-  // Área do QR Code - tamanho reduzido
-  const qrSize = 32;
-  const qrY = mesaY + 32 + extraOffset;
+  // Área do QR Code - 20mm e centralizado
+  const qrSize = 20;
+  const qrY = mesaY + 28 + extraOffset;
   const qrX = x + (width - qrSize) / 2;
   
   // Fundo branco para QR com padding
   doc.setFillColor(255, 255, 255);
-  doc.roundedRect(qrX - 3, qrY - 3, qrSize + 6, qrSize + 6, 2, 2, 'F');
+  doc.roundedRect(qrX - 2, qrY - 2, qrSize + 4, qrSize + 4, 2, 2, 'F');
 
   // Adicionar QR Code padrão
   if (qrCodeBase64) {
     try {
       doc.addImage(qrCodeBase64, 'PNG', qrX, qrY, qrSize, qrSize);
     } catch {
-      // Fallback: desenhar placeholder
       doc.setFillColor(200, 200, 200);
       doc.rect(qrX, qrY, qrSize, qrSize, 'F');
-      doc.setFontSize(6);
-      doc.setTextColor(100, 100, 100);
-      doc.text('QR Code', qrX + qrSize / 2, qrY + qrSize / 2, { align: 'center' });
     }
   }
 
-  // Texto "Escaneie para fazer seu pedido"
-  const instructionY = qrY + qrSize + 10;
-  doc.setFontSize(9);
+  // Texto instrução
+  const instructionY = qrY + qrSize + 8;
+  doc.setFontSize(8);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(MOBDEGA_GREEN.r, MOBDEGA_GREEN.g, MOBDEGA_GREEN.b);
   doc.text('Escaneie e faça seu pedido!', x + width / 2, instructionY, { align: 'center' });
 
   // Rodapé com site
-  doc.setFontSize(8);
+  doc.setFontSize(7);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(120, 120, 120);
   doc.text('www.mobdega.shop', x + width / 2, height + y - 6, { align: 'center' });
