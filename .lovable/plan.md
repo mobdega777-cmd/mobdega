@@ -1,41 +1,98 @@
 
+# Plano: Correção dos QR Codes das Etiquetas de Mesa
 
-# Plano de Implementação - Fase de Secrets
+## Problema Identificado
+O QR Code nas etiquetas de mesa não está funcionando corretamente. Ao escanear, ele mostra uma "nota" (texto) ao invés de redirecionar para o site **mobdega.shop**. Isso acontece porque o sistema está usando uma **imagem estática** (`/images/qrcode-mobdega.png`) que foi gerada manualmente e não contém uma URL funcional codificada.
 
-## Objetivo
-Iniciar a correção dos 5 erros de segurança, começando pela configuração dos secrets necessários.
+## Solução Proposta
+Implementar **geração dinâmica de QR Codes** usando a biblioteca `qrcode` do NPM, que irá:
+1. Gerar QR Codes únicos com a URL correta do Mobdega
+2. Cada QR Code será gerado como uma imagem base64 no momento da criação do PDF
+3. O QR Code irá apontar para `https://mobdega.shop` (ou a URL publicada do projeto)
 
-## Passo 1: Adicionar Secrets
+## Etapas de Implementação
 
-Ao aprovar este plano, você verá a interface para adicionar dois secrets:
+### 1. Instalar Biblioteca de QR Code
+Adicionar a biblioteca `qrcode` ao projeto para geração dinâmica de QR Codes.
 
-### Secret 1: ADMIN_SETUP_SECRET
-- **Propósito**: Token de autorização para a edge function de criação de admin
-- **Valor sugerido**: Uma string aleatória forte (ex: `Mobdega@2024SecretKey#Admin`)
-- **Uso**: Será exigido no header Authorization quando chamar a função
+```text
+npm install qrcode
+npm install @types/qrcode --save-dev
+```
 
-### Secret 2: ADMIN_DEFAULT_PASSWORD  
-- **Propósito**: Senha do admin (removida do código fonte)
-- **Valor sugerido**: Usar a senha atual `623501Ab.` ou criar uma nova mais forte
-- **Uso**: Será usada pela edge function ao criar novos admins
+### 2. Atualizar o Gerador de Etiquetas
+Modificar o arquivo `src/lib/tableQRCodeGenerator.ts`:
 
-## Passo 2: Atualizar Edge Function
+**Mudanças principais:**
+- Importar a biblioteca `qrcode`
+- Criar função `generateQRCodeDataURL()` que gera QR Code como base64
+- Definir a URL de destino como `https://mobdega.shop` (URL padrão para todas as etiquetas)
+- Remover referência à imagem estática `/images/qrcode-mobdega.png`
+- Manter todo o layout atual das etiquetas (tamanho 20mm, centralizado, etc.)
 
-Após adicionar os secrets, atualizarei a edge function `create-admin-user/index.ts` para:
-1. Validar o `ADMIN_SETUP_SECRET` no header
-2. Usar `ADMIN_DEFAULT_PASSWORD` em vez de senha hardcoded
+```text
+// Exemplo da nova função de geração
+import QRCode from 'qrcode';
 
-## Passo 3: Corrigir Políticas RLS
+const generateQRCodeDataURL = async (url: string): Promise<string> => {
+  return await QRCode.toDataURL(url, {
+    width: 200,
+    margin: 0,
+    color: { dark: '#000000', light: '#FFFFFF' }
+  });
+};
+```
 
-Aplicar migrations SQL para:
-1. Restringir UPDATE/DELETE no bucket `commerce-assets`
-2. Restringir acesso ao `billing_config`
+### 3. Atualizar Funções de Geração de PDF
+- `generateTableQRCodePDF()`: Usar QR Code dinâmico
+- `generateAllTablesQRCodePDF()`: Usar QR Code dinâmico (gera uma vez e reutiliza)
+- `drawProfessionalLabel()`: Receber o QR Code base64 gerado dinamicamente
 
-## Passo 4: Corrigir Lógica do Frontend
-
-Atualizar `CommerceStorefront.tsx` para usar `payment_methods` do comércio em vez de `billing_config` da plataforma.
+### 4. URL de Destino
+O QR Code irá redirecionar para: **https://mobdega.shop**
+- Esta é a URL padrão para todos os comércios
+- Quando o cliente escanear, será direcionado ao site principal do Mobdega
 
 ---
 
-**Clique em "Approve" para continuar e ver a interface de adicionar secrets.**
+## Detalhes Técnicos
 
+### Biblioteca Escolhida: `qrcode`
+- Pacote NPM mais popular para geração de QR Codes
+- Suporta geração direta para Data URL (base64)
+- Compatível com browsers e Node.js
+- Tamanho pequeno (~12KB gzipped)
+
+### Formato de Saída
+```text
+QRCode.toDataURL('https://mobdega.shop', options)
+// Retorna: "data:image/png;base64,iVBORw0KGgoAAAAN..."
+```
+
+### Código Atualizado (Resumo)
+```text
+// Antes (imagem estática)
+const STANDARD_QR_CODE_PATH = '/images/qrcode-mobdega.png';
+const qrCodeBase64 = await loadImageAsBase64(STANDARD_QR_CODE_PATH);
+
+// Depois (geração dinâmica)
+import QRCode from 'qrcode';
+const MOBDEGA_URL = 'https://mobdega.shop';
+const qrCodeBase64 = await QRCode.toDataURL(MOBDEGA_URL, { width: 200, margin: 0 });
+```
+
+---
+
+## Resultado Esperado
+- Ao escanear o QR Code, o celular reconhecerá como URL
+- O usuário será redirecionado automaticamente para **mobdega.shop**
+- Layout das etiquetas permanece inalterado (20mm, centralizado, design profissional)
+- Funciona tanto para etiqueta individual quanto para impressão de todas as mesas
+
+## Arquivos Afetados
+1. `package.json` - Adicionar dependência `qrcode`
+2. `src/lib/tableQRCodeGenerator.ts` - Implementar geração dinâmica
+
+## Estimativa
+- Complexidade: Baixa
+- Tempo estimado: ~15 minutos
