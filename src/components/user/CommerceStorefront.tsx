@@ -267,10 +267,35 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
       )
       .subscribe();
 
+    // Also listen for session updates to detect when sessions are closed
+    const sessionsChannel = supabase
+      .channel(`storefront-sessions-realtime-${commerceId}-${Date.now()}`)
+      .on(
+        'postgres_changes',
+        { 
+          event: 'UPDATE', 
+          schema: 'public', 
+          table: 'table_sessions',
+          filter: `commerce_id=eq.${commerceId}` 
+        },
+        (payload) => {
+          // When a session is closed, refresh tables to update availability
+          if (payload.new.status === 'closed') {
+            fetchTables();
+            // Also check if the user's active order was closed
+            if (user) {
+              checkActiveTableOrder();
+            }
+          }
+        }
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(channel);
+      supabase.removeChannel(sessionsChannel);
     };
-  }, [commerceId]);
+  }, [commerceId, user]);
 
   const fetchCommerceData = async () => {
     setLoading(true);
