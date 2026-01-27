@@ -845,12 +845,28 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
         order_id: allOrderIds[0], // Usar o primeiro order_id como referência
       });
 
+    // Close the session if exists and reset bill_requested for all participants
+    if (selectedTableOrder.session) {
+      // Reset bill_requested for all participants
+      await supabase
+        .from('table_participants')
+        .update({ bill_requested: false, bill_requested_at: null, selected_payment_method: null })
+        .eq('session_id', selectedTableOrder.session.id);
+      
+      // Close the session
+      await supabase
+        .from('table_sessions')
+        .update({ status: 'closed', closed_at: new Date().toISOString() })
+        .eq('id', selectedTableOrder.session.id);
+    }
+
     // Liberar a mesa
     if (selectedTableOrder.table_id) {
       await supabase
         .from('tables')
         .update({
           status: 'available',
+          session_id: null,
           current_order_id: null,
           closed_at: new Date().toISOString()
         })
