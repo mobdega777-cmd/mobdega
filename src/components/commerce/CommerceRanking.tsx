@@ -121,11 +121,15 @@ const getZoneFromCep = (cep: string | null): string => {
   const cleanCep = cep.replace(/\D/g, '').padStart(8, '0');
   const numCep = parseInt(cleanCep);
   
+  console.log(`CEP: ${cep} -> Clean: ${cleanCep} -> Num: ${numCep}`);
+  
+  // São Paulo Capital - Zona Leste (08xxxxxx) - CHECK FIRST before other 08xxx ranges
+  if (numCep >= 8000000 && numCep <= 8499999) return "leste";
+  
   // São Paulo Capital
   if (numCep >= 1000000 && numCep <= 1599999) return "centro";
   if (numCep >= 2000000 && numCep <= 2999999) return "norte";
   if (numCep >= 3000000 && numCep <= 3999999) return "leste";
-  if (numCep >= 8000000 && numCep <= 8499999) return "leste";
   if (numCep >= 4000000 && numCep <= 4999999) return "sul";
   if (numCep >= 5000000 && numCep <= 5899999) return "oeste";
   
@@ -155,7 +159,7 @@ const getZoneFromCep = (cep: string | null): string => {
   if (numCep >= 7800000 && numCep <= 7870999) return "franco_rocha";
   if (numCep >= 7900000 && numCep <= 7999999) return "francisco_morato";
   
-  // Grande São Paulo - Leste
+  // Grande São Paulo - Leste (cidades fora de SP Capital)
   if (numCep >= 8500000 && numCep <= 8549999) return "ferraz";
   if (numCep >= 8550000 && numCep <= 8569999) return "poa";
   if (numCep >= 8570000 && numCep <= 8599999) return "itaquaquecetuba";
@@ -172,7 +176,7 @@ const getZoneFromCep = (cep: string | null): string => {
   if (numCep >= 9600000 && numCep <= 9899999) return "sao_bernardo";
   if (numCep >= 9900000 && numCep <= 9999999) return "diadema";
   
-  return "leste"; // Default to leste for unmatched São Paulo CEPs (08xxxxxx range)
+  return "centro"; // Default fallback
 };
 
 interface CommerceRankingProps {
