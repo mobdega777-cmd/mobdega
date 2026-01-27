@@ -1622,6 +1622,45 @@ export type Database = {
           },
         ]
       }
+      reviews_public: {
+        Row: {
+          comment: string | null
+          commerce_id: string | null
+          created_at: string | null
+          id: string | null
+          rating: number | null
+        }
+        Insert: {
+          comment?: string | null
+          commerce_id?: string | null
+          created_at?: string | null
+          id?: string | null
+          rating?: number | null
+        }
+        Update: {
+          comment?: string | null
+          commerce_id?: string | null
+          created_at?: string | null
+          id?: string | null
+          rating?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reviews_commerce_id_fkey"
+            columns: ["commerce_id"]
+            isOneToOne: false
+            referencedRelation: "commerces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_commerce_id_fkey"
+            columns: ["commerce_id"]
+            isOneToOne: false
+            referencedRelation: "commerces_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       apply_stock_deduction_for_order: {
