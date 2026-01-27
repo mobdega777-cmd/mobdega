@@ -552,38 +552,42 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-start">
-        <div>
-          <h1 className="text-3xl font-bold">Financeiro</h1>
-          <p className="text-muted-foreground">Dashboard financeiro e insights do seu comércio</p>
-        </div>
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-bold">Financeiro</h1>
+            <p className="text-muted-foreground text-sm sm:text-base">Dashboard financeiro e insights do seu comércio</p>
+          </div>
           <DateFilter onDateChange={handleDateChange} defaultValue="30days" />
+        </div>
+        <div className="flex flex-wrap gap-2">
           <Button 
             variant="outline" 
             size="sm" 
             onClick={handleGenerateSalesReport}
             disabled={!!generatingPdf}
+            className="text-xs sm:text-sm"
           >
             {generatingPdf === 'vendas' ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              <Loader2 className="w-4 h-4 mr-1 sm:mr-2 animate-spin" />
             ) : (
-              <Download className="w-4 h-4 mr-2" />
+              <Download className="w-4 h-4 mr-1 sm:mr-2" />
             )}
-            Relatório de Vendas
+            <span className="hidden xs:inline">Relatório de</span> Vendas
           </Button>
           <Button 
             variant="outline" 
             size="sm" 
             onClick={handleGenerateStockReport}
             disabled={!!generatingPdf}
+            className="text-xs sm:text-sm"
           >
             {generatingPdf === 'estoque' ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              <Loader2 className="w-4 h-4 mr-1 sm:mr-2 animate-spin" />
             ) : (
-              <Download className="w-4 h-4 mr-2" />
+              <Download className="w-4 h-4 mr-1 sm:mr-2" />
             )}
-            Relatório de Estoque
+            <span className="hidden xs:inline">Relatório de</span> Estoque
           </Button>
         </div>
       </div>

@@ -407,14 +407,14 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Pedidos</h1>
-        <p className="text-muted-foreground">Gerencie todos os pedidos do seu comércio (Delivery, PDV, Mesas)</p>
+      <div className="min-w-0">
+        <h1 className="text-2xl sm:text-3xl font-bold">Pedidos</h1>
+        <p className="text-muted-foreground text-sm sm:text-base">Gerencie todos os pedidos do seu comércio (Delivery, PDV, Mesas)</p>
       </div>
 
       <Card>
         <CardHeader>
-          <div className="flex flex-col md:flex-row gap-4">
+          <div className="flex flex-col gap-3">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
@@ -424,10 +424,10 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
                 className="pl-10"
               />
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-col xs:flex-row gap-2">
               <DateFilter onDateChange={handleDateChange} defaultValue="30days" />
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-full md:w-48">
+                <SelectTrigger className="w-full xs:w-auto xs:min-w-[150px]">
                   <SelectValue placeholder="Filtrar por status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -545,21 +545,22 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
 
               {/* Pagination */}
               {totalPages > 1 && (
-                <div className="flex items-center justify-between mt-4 pt-4 border-t">
-                  <p className="text-sm text-muted-foreground">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mt-4 pt-4 border-t">
+                  <p className="text-xs sm:text-sm text-muted-foreground">
                     Mostrando {((currentPage - 1) * ITEMS_PER_PAGE) + 1} a {Math.min(currentPage * ITEMS_PER_PAGE, filteredOrders.length)} de {filteredOrders.length} pedidos
                   </p>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-between sm:justify-end gap-2">
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                       disabled={currentPage === 1}
+                      className="text-xs sm:text-sm px-2 sm:px-3"
                     >
                       <ChevronLeft className="w-4 h-4" />
-                      Anterior
+                      <span className="hidden xs:inline">Anterior</span>
                     </Button>
-                    <span className="text-sm px-3">
+                    <span className="text-xs sm:text-sm px-2 sm:px-3">
                       {currentPage} de {totalPages}
                     </span>
                     <Button
@@ -567,8 +568,9 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
                       size="sm"
                       onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                       disabled={currentPage === totalPages}
+                      className="text-xs sm:text-sm px-2 sm:px-3"
                     >
-                      Próxima
+                      <span className="hidden xs:inline">Próxima</span>
                       <ChevronRight className="w-4 h-4" />
                     </Button>
                   </div>

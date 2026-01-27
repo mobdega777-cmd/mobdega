@@ -250,18 +250,20 @@ const CommerceSettings = ({ commerce }: CommerceSettingsProps) => {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-start">
-        <div>
-          <h1 className="text-3xl font-bold">Configurações</h1>
-          <p className="text-muted-foreground">Gerencie as informações do seu comércio</p>
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
+        <div className="min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-bold">Configurações</h1>
+          <p className="text-muted-foreground text-sm sm:text-base">Gerencie as informações do seu comércio</p>
         </div>
         <Button 
           variant="outline" 
           onClick={handleWhatsAppSupport}
-          className="gap-2 text-green-600 border-green-600 hover:bg-green-50"
+          className="gap-2 text-green-600 border-green-600 hover:bg-green-50 shrink-0 w-full sm:w-auto text-sm"
+          size="sm"
         >
           <MessageCircle className="w-4 h-4" />
-          Contato Suporte
+          <span className="sm:hidden">Suporte</span>
+          <span className="hidden sm:inline">Contato Suporte</span>
         </Button>
       </div>
 

@@ -314,18 +314,20 @@ const CommerceExpenses = ({ commerceId, monthlyRevenue, operatorFees = 0, produc
 
       {/* Expenses Management */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <Receipt className="w-5 h-5" />
-              Gastos Fixos e Variáveis
-            </CardTitle>
-            <CardDescription>Gerencie seus custos operacionais mensais</CardDescription>
+        <CardHeader className="space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="min-w-0">
+              <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+                <Receipt className="w-5 h-5 shrink-0" />
+                <span>Gastos Fixos e Variáveis</span>
+              </CardTitle>
+              <CardDescription className="text-sm">Gerencie seus custos operacionais mensais</CardDescription>
+            </div>
+            <Button onClick={() => setIsDialogOpen(true)} size="sm" className="shrink-0 w-full sm:w-auto">
+              <Plus className="w-4 h-4 mr-2" />
+              Adicionar Gasto
+            </Button>
           </div>
-          <Button onClick={() => setIsDialogOpen(true)} size="sm">
-            <Plus className="w-4 h-4 mr-2" />
-            Adicionar Gasto
-          </Button>
         </CardHeader>
         <CardContent>
           {expenses.length === 0 ? (

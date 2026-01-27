@@ -164,31 +164,33 @@ const SalesEvolutionChart = ({ commerceId, dateFilter }: SalesEvolutionChartProp
 
   return (
     <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="w-5 h-5" />
-              Evolução de Vendas
+      <CardHeader className="pb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="min-w-0">
+            <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+              <TrendingUp className="w-5 h-5 shrink-0" />
+              <span>Evolução de Vendas</span>
             </CardTitle>
-            <CardDescription>Faturamento e pedidos ao longo do período</CardDescription>
+            <CardDescription className="text-sm">Faturamento e pedidos ao longo do período</CardDescription>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 shrink-0">
             <Button
               variant={viewMode === 'daily' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setViewMode('daily')}
+              className="text-xs sm:text-sm px-2 sm:px-3"
             >
-              <Calendar className="w-4 h-4 mr-1" />
-              Diário
+              <Calendar className="w-4 h-4 sm:mr-1" />
+              <span className="hidden sm:inline">Diário</span>
             </Button>
             <Button
               variant={viewMode === 'weekly' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setViewMode('weekly')}
+              className="text-xs sm:text-sm px-2 sm:px-3"
             >
-              <BarChart3 className="w-4 h-4 mr-1" />
-              Semanal
+              <BarChart3 className="w-4 h-4 sm:mr-1" />
+              <span className="hidden sm:inline">Semanal</span>
             </Button>
           </div>
         </div>

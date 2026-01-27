@@ -253,11 +253,11 @@ const AdminCommerces = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-display font-bold text-foreground">
+      <div className="min-w-0">
+        <h1 className="text-2xl sm:text-3xl font-display font-bold text-foreground">
           Adegas / Tabacarias
         </h1>
-        <p className="text-muted-foreground mt-1">
+        <p className="text-muted-foreground mt-1 text-sm sm:text-base">
           Gerencie todos os comércios cadastrados
         </p>
       </div>
