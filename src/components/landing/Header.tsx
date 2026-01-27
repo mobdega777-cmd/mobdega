@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, Trophy } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useNavigate } from "react-router-dom";
 import logoMobdega from "@/assets/logo-mobdega.png";
 
 interface HeaderProps {
@@ -12,7 +11,6 @@ interface HeaderProps {
 }
 
 const Header = ({ onLoginClick, onRegisterClick, onLogoClick }: HeaderProps) => {
-  const navigate = useNavigate();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -74,13 +72,6 @@ const Header = ({ onLoginClick, onRegisterClick, onLogoClick }: HeaderProps) => 
             >
               Comércios
             </a>
-            <button
-              onClick={() => navigate('/ranking')}
-              className="text-foreground/80 hover:text-primary transition-colors font-medium flex items-center gap-1"
-            >
-              <Trophy className="w-4 h-4" />
-              Ranking
-            </button>
             <a
               href="#contato"
               className="text-foreground/80 hover:text-primary transition-colors font-medium"
@@ -139,16 +130,6 @@ const Header = ({ onLoginClick, onRegisterClick, onLogoClick }: HeaderProps) => 
                 className="text-left py-3 px-4 rounded-lg text-foreground/80 hover:text-primary hover:bg-muted transition-colors font-medium"
               >
                 Comércios
-              </button>
-              <button
-                onClick={() => {
-                  setIsMobileMenuOpen(false);
-                  navigate('/ranking');
-                }}
-                className="text-left py-3 px-4 rounded-lg text-foreground/80 hover:text-primary hover:bg-muted transition-colors font-medium flex items-center gap-2"
-              >
-                <Trophy className="w-4 h-4" />
-                Ranking
               </button>
               <button
                 onClick={() => handleMobileNavClick("#contato")}
