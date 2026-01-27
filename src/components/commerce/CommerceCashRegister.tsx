@@ -790,11 +790,36 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
   const cancelTableOrder = async (order: TableOrder) => {
     if (!confirm(`Tem certeza que deseja cancelar o pedido da Mesa ${order.table_number}? Esta ação não pode ser desfeita.`)) return;
 
-    // Cancel the order
-    await supabase
-      .from('orders')
-      .update({ status: 'cancelled' })
-      .eq('id', order.id);
+    // Get all order_ids for this table
+    const allOrderIds = (order as TableOrder & { all_order_ids?: string[] }).all_order_ids || [order.id];
+
+    // Cancel ALL orders for this table
+    for (const orderId of allOrderIds) {
+      await supabase
+        .from('orders')
+        .update({ status: 'cancelled' })
+        .eq('id', orderId);
+    }
+
+    // Close the session if exists and reset bill_requested for all participants
+    if (order.session) {
+      // Reset bill_requested for all participants
+      await supabase
+        .from('table_participants')
+        .update({ 
+          bill_requested: false, 
+          bill_requested_at: null, 
+          selected_payment_method: null,
+          change_for: null
+        })
+        .eq('session_id', order.session.id);
+      
+      // Close the session
+      await supabase
+        .from('table_sessions')
+        .update({ status: 'closed', closed_at: new Date().toISOString() })
+        .eq('id', order.session.id);
+    }
 
     // Free up the table
     if (order.table_id) {
@@ -802,13 +827,14 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
         .from('tables')
         .update({
           status: 'available',
+          session_id: null,
           current_order_id: null,
           closed_at: new Date().toISOString()
         })
         .eq('id', order.table_id);
     }
 
-    toast({ title: "Pedido cancelado", description: `Mesa ${order.table_number} liberada` });
+    toast({ title: "Mesa cancelada", description: `Mesa ${order.table_number} liberada e todos os pedidos foram cancelados.` });
     fetchData();
   };
 
@@ -1998,6 +2024,39 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
                 </div>
               </div>
 
+              {/* Show customer's selected payment info if they requested the bill (for single bills) */}
+              {selectedTableOrder.session?.participants && selectedTableOrder.session.participants.some(p => p.bill_requested) && (
+                <div className="space-y-2">
+                  {selectedTableOrder.session.participants.filter(p => p.bill_requested).map(p => (
+                    <div key={p.id} className="p-3 rounded-lg bg-orange-500/10 border border-orange-500/30">
+                      <div className="flex items-center gap-2 text-sm font-medium">
+                        <span>{p.customer_name || 'Cliente'} solicitou:</span>
+                        {p.selected_payment_method && (
+                          <Badge variant="outline">
+                            {p.selected_payment_method === 'credit' && 'Crédito'}
+                            {p.selected_payment_method === 'debit' && 'Débito'}
+                            {p.selected_payment_method === 'pix' && 'PIX'}
+                            {p.selected_payment_method === 'cash' && 'Dinheiro'}
+                          </Badge>
+                        )}
+                      </div>
+                      {p.selected_payment_method === 'cash' && p.change_for && (
+                        <div className="mt-2 p-2 rounded bg-green-500/10 border border-green-500/30">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Vai pagar com:</span>
+                            <span className="font-bold">{formatCurrency(p.change_for)}</span>
+                          </div>
+                          <div className="flex justify-between text-sm font-bold text-green-600">
+                            <span>Troco esperado:</span>
+                            <span>{formatCurrency(p.change_for - selectedTableOrder.total)}</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {/* Payment Method */}
               <div>
                 <Label className="mb-2 block">Forma de Pagamento</Label>
@@ -2068,7 +2127,7 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
 
       {/* Close Individual Participant Modal (for split bills) */}
       <Dialog open={showCloseParticipantModal} onOpenChange={setShowCloseParticipantModal}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Fechar Comanda Individual</DialogTitle>
           </DialogHeader>
@@ -2087,6 +2146,33 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
                 </div>
               </div>
 
+              {/* Show customer's selected payment info if they requested the bill */}
+              {selectedParticipant.participant.bill_requested && selectedParticipant.participant.selected_payment_method && (
+                <div className="p-3 rounded-lg bg-orange-500/10 border border-orange-500/30">
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    <span>Pagamento solicitado:</span>
+                    <Badge variant="outline">
+                      {selectedParticipant.participant.selected_payment_method === 'credit' && 'Crédito'}
+                      {selectedParticipant.participant.selected_payment_method === 'debit' && 'Débito'}
+                      {selectedParticipant.participant.selected_payment_method === 'pix' && 'PIX'}
+                      {selectedParticipant.participant.selected_payment_method === 'cash' && 'Dinheiro'}
+                    </Badge>
+                  </div>
+                  {selectedParticipant.participant.selected_payment_method === 'cash' && selectedParticipant.participant.change_for && (
+                    <div className="mt-2 p-2 rounded bg-green-500/10 border border-green-500/30">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Cliente vai pagar com:</span>
+                        <span className="font-bold">{formatCurrency(selectedParticipant.participant.change_for)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm font-bold text-green-600">
+                        <span>Troco esperado:</span>
+                        <span>{formatCurrency(selectedParticipant.participant.change_for - selectedParticipant.total)}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div>
                 <Label>Forma de Pagamento</Label>
                 <Select value={participantPaymentMethod} onValueChange={setParticipantPaymentMethod}>
@@ -2102,29 +2188,44 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
               </div>
 
               {participantPaymentMethod === 'cash' && (
-                <div>
-                  <Label>Valor Recebido (R$)</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={participantCashReceived}
-                    onChange={(e) => setParticipantCashReceived(e.target.value)}
-                    placeholder={selectedParticipant.total.toFixed(2)}
-                  />
-                  {participantChange > 0 && (
-                    <p className="text-sm text-green-600 mt-1">
-                      Troco: {formatCurrency(participantChange)}
-                    </p>
+                <div className="space-y-3 p-3 rounded-lg border bg-muted/30">
+                  <div>
+                    <Label>Valor Recebido (R$)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={participantCashReceived}
+                      onChange={(e) => setParticipantCashReceived(e.target.value)}
+                      placeholder={selectedParticipant.total.toFixed(2)}
+                    />
+                  </div>
+                  <div className="flex justify-between font-bold text-lg">
+                    <span>Total:</span>
+                    <span>{formatCurrency(selectedParticipant.total)}</span>
+                  </div>
+                  {participantCashReceived && (
+                    <div className={`p-3 rounded-lg ${participantChange >= 0 ? 'bg-green-500/10 border border-green-500/30' : 'bg-destructive/10 border border-destructive/30'}`}>
+                      <p className="text-sm text-muted-foreground">Troco a devolver</p>
+                      <p className={`text-2xl font-bold ${participantChange >= 0 ? 'text-green-600' : 'text-destructive'}`}>
+                        {formatCurrency(participantChange)}
+                      </p>
+                      {participantChange < 0 && (
+                        <p className="text-xs text-destructive mt-1">Valor insuficiente!</p>
+                      )}
+                    </div>
                   )}
                 </div>
               )}
             </div>
           )}
-          <DialogFooter>
+          <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setShowCloseParticipantModal(false)}>
               Cancelar
             </Button>
-            <Button onClick={closeParticipantOrder}>
+            <Button 
+              onClick={closeParticipantOrder}
+              disabled={participantPaymentMethod === 'cash' && participantCashReceived && participantChange < 0}
+            >
               Confirmar Pagamento
             </Button>
           </DialogFooter>
