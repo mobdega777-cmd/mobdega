@@ -1219,6 +1219,7 @@ export type Database = {
         Row: {
           bill_requested: boolean | null
           bill_requested_at: string | null
+          change_for: number | null
           customer_name: string | null
           id: string
           is_host: boolean
@@ -1230,6 +1231,7 @@ export type Database = {
         Insert: {
           bill_requested?: boolean | null
           bill_requested_at?: string | null
+          change_for?: number | null
           customer_name?: string | null
           id?: string
           is_host?: boolean
@@ -1241,6 +1243,7 @@ export type Database = {
         Update: {
           bill_requested?: boolean | null
           bill_requested_at?: string | null
+          change_for?: number | null
           customer_name?: string | null
           id?: string
           is_host?: boolean

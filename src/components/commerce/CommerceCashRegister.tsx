@@ -104,6 +104,7 @@ interface TableParticipant {
   bill_requested: boolean;
   bill_requested_at: string | null;
   selected_payment_method: string | null;
+  change_for: number | null;
 }
 
 interface TableSession {
@@ -317,7 +318,7 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
           // Fetch participants for these sessions
           const { data: participantsData } = await supabase
             .from('table_participants')
-            .select('id, session_id, user_id, customer_name, is_host, bill_requested, bill_requested_at, selected_payment_method')
+            .select('id, session_id, user_id, customer_name, is_host, bill_requested, bill_requested_at, selected_payment_method, change_for')
             .in('session_id', sessionIds);
 
           sessionsData.forEach(session => {
@@ -333,7 +334,8 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
                 is_host: p.is_host,
                 bill_requested: p.bill_requested ?? false,
                 bill_requested_at: p.bill_requested_at,
-                selected_payment_method: p.selected_payment_method ?? null
+                selected_payment_method: p.selected_payment_method ?? null,
+                change_for: p.change_for ?? null
               }))
             });
           });
@@ -1620,6 +1622,20 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
                                   <span className="font-bold text-primary text-base">{formatCurrency(po.total)}</span>
                                 </div>
                                 
+                                {/* Cash payment info with change calculation */}
+                                {po.participant.bill_requested && po.participant.selected_payment_method === 'cash' && po.participant.change_for && (
+                                  <div className="p-2 rounded-lg bg-green-500/10 border border-green-500/30 mb-2">
+                                    <div className="flex justify-between text-xs">
+                                      <span className="text-muted-foreground">Vai pagar com:</span>
+                                      <span className="font-medium">{formatCurrency(po.participant.change_for)}</span>
+                                    </div>
+                                    <div className="flex justify-between text-xs font-bold text-green-600">
+                                      <span>Troco esperado:</span>
+                                      <span>{formatCurrency(po.participant.change_for - po.total)}</span>
+                                    </div>
+                                  </div>
+                                )}
+                                
                                 {/* Participant's items */}
                                 <div className="text-xs space-y-0.5 mb-2 max-h-16 overflow-y-auto">
                                   {po.items.slice(0, 2).map((item, idx) => (
@@ -1663,6 +1679,39 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
                                     <span>{order.customer_phone}</span>
                                   </div>
                                 )}
+                              </div>
+                            )}
+
+                            {/* Payment info for single bill - show participant who requested bill */}
+                            {order.session?.participants && order.session.participants.some(p => p.bill_requested) && (
+                              <div className="space-y-2">
+                                {order.session.participants.filter(p => p.bill_requested).map(p => (
+                                  <div key={p.id} className="p-2 rounded-lg bg-orange-500/10 border border-orange-500/30">
+                                    <div className="flex items-center gap-2 text-sm">
+                                      <span className="text-muted-foreground">{p.customer_name || 'Cliente'}:</span>
+                                      {p.selected_payment_method && (
+                                        <Badge variant="outline" className="text-xs">
+                                          {p.selected_payment_method === 'credit' && 'Crédito'}
+                                          {p.selected_payment_method === 'debit' && 'Débito'}
+                                          {p.selected_payment_method === 'pix' && 'PIX'}
+                                          {p.selected_payment_method === 'cash' && 'Dinheiro'}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    {p.selected_payment_method === 'cash' && p.change_for && (
+                                      <div className="mt-1 p-1.5 rounded bg-green-500/10 border border-green-500/30">
+                                        <div className="flex justify-between text-xs">
+                                          <span className="text-muted-foreground">Vai pagar com:</span>
+                                          <span className="font-medium">{formatCurrency(p.change_for)}</span>
+                                        </div>
+                                        <div className="flex justify-between text-xs font-bold text-green-600">
+                                          <span>Troco esperado:</span>
+                                          <span>{formatCurrency(p.change_for - order.total)}</span>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
                               </div>
                             )}
 

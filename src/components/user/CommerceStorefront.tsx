@@ -888,8 +888,8 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
     setShowBillPaymentModal(true);
   };
 
-  // Confirm bill request with selected payment method
-  const confirmBillRequest = async (paymentMethod: string) => {
+  // Confirm bill request with selected payment method and optional change_for
+  const confirmBillRequest = async (paymentMethod: string, changeFor?: number) => {
     if (!user || !currentSession) {
       toast({ variant: "destructive", title: "Erro ao solicitar conta" });
       return;
@@ -903,13 +903,14 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
 
     setRequestingBill(true);
 
-    // Update the bill_requested flag with selected payment method
+    // Update the bill_requested flag with selected payment method and change_for
     const { error } = await supabase
       .from('table_participants')
       .update({ 
         bill_requested: true,
         bill_requested_at: new Date().toISOString(),
-        selected_payment_method: paymentMethod
+        selected_payment_method: paymentMethod,
+        change_for: changeFor ?? null
       })
       .eq('id', participant.id);
 
@@ -2245,6 +2246,7 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
         onOpenChange={setShowBillPaymentModal}
         onConfirm={confirmBillRequest}
         loading={requestingBill}
+        billTotal={cartTotal + activeOrderItems.reduce((sum, item) => sum + item.total_price, 0)}
       />
     </motion.div>
   );
