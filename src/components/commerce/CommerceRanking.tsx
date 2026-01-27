@@ -117,7 +117,9 @@ const ALL_ZONES = ZONE_GROUPS.flatMap(g => g.zones);
 const getZoneFromCep = (cep: string | null): string => {
   if (!cep) return "centro";
   
-  const numCep = parseInt(cep.replace(/\D/g, ''));
+  // Remove non-digits and ensure 8 digits
+  const cleanCep = cep.replace(/\D/g, '').padStart(8, '0');
+  const numCep = parseInt(cleanCep);
   
   // São Paulo Capital
   if (numCep >= 1000000 && numCep <= 1599999) return "centro";
@@ -170,7 +172,7 @@ const getZoneFromCep = (cep: string | null): string => {
   if (numCep >= 9600000 && numCep <= 9899999) return "sao_bernardo";
   if (numCep >= 9900000 && numCep <= 9999999) return "diadema";
   
-  return "centro";
+  return "leste"; // Default to leste for unmatched São Paulo CEPs (08xxxxxx range)
 };
 
 interface CommerceRankingProps {
@@ -354,66 +356,112 @@ const CommerceRanking = ({ currentCommerceId }: CommerceRankingProps) => {
               </Card>
             ) : (
               <div className="space-y-3">
-                {filteredCommerces.map((commerce, index) => (
-                  <motion.div
-                    key={commerce.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                  >
-                    <Card className={`transition-colors ${commerce.id === currentCommerceId ? 'border-primary border-2 bg-primary/5' : 'hover:border-primary/50'}`}>
-                      <CardContent className="p-4">
-                        <div className="flex items-center gap-4">
-                          <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg ${
-                            index === 0 ? 'bg-yellow-500 text-white' :
-                            index === 1 ? 'bg-gray-400 text-white' :
-                            index === 2 ? 'bg-amber-700 text-white' :
-                            'bg-muted text-muted-foreground'
-                          }`}>
-                            {index + 1}
-                          </div>
+                {filteredCommerces.map((commerce, index) => {
+                  const isTop3 = index < 3;
+                  const positionStyles = {
+                    0: { 
+                      bg: 'bg-gradient-to-r from-yellow-400/20 via-yellow-500/10 to-yellow-400/20 border-yellow-500/50',
+                      badge: 'bg-gradient-to-r from-yellow-400 to-yellow-600 text-white shadow-lg shadow-yellow-500/30',
+                      icon: Crown
+                    },
+                    1: { 
+                      bg: 'bg-gradient-to-r from-gray-300/20 via-gray-400/10 to-gray-300/20 border-gray-400/50',
+                      badge: 'bg-gradient-to-r from-gray-400 to-gray-600 text-white shadow-lg shadow-gray-500/30',
+                      icon: Trophy
+                    },
+                    2: { 
+                      bg: 'bg-gradient-to-r from-amber-600/20 via-amber-700/10 to-amber-600/20 border-amber-600/50',
+                      badge: 'bg-gradient-to-r from-amber-600 to-amber-800 text-white shadow-lg shadow-amber-600/30',
+                      icon: Medal
+                    },
+                  };
+                  
+                  const style = positionStyles[index as keyof typeof positionStyles];
+                  const PositionIcon = style?.icon;
 
-                          <div className="w-12 h-12 rounded-xl bg-muted overflow-hidden flex-shrink-0">
-                            {commerce.logo_url ? (
-                              <img src={commerce.logo_url} alt="" className="w-full h-full object-cover" />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center">
-                                <Store className="w-5 h-5 text-muted-foreground" />
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="flex-1 min-w-0">
-                            <h3 className="font-semibold truncate flex items-center gap-2">
-                              {commerce.fantasy_name}
-                              {commerce.id === currentCommerceId && (
-                                <Badge variant="secondary" className="text-xs">Você</Badge>
+                  return (
+                    <motion.div
+                      key={commerce.id}
+                      initial={{ opacity: 0, y: 20, scale: isTop3 ? 0.95 : 1 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{ delay: index * 0.05, type: isTop3 ? "spring" : "tween" }}
+                    >
+                      <Card className={`transition-all duration-300 ${
+                        commerce.id === currentCommerceId 
+                          ? 'border-primary border-2 bg-primary/5' 
+                          : isTop3 
+                            ? `border-2 ${style?.bg}` 
+                            : 'hover:border-primary/50'
+                      }`}>
+                        <CardContent className="p-4">
+                          <div className="flex items-center gap-4">
+                            {/* Position Badge with Special Styling for Top 3 */}
+                            <motion.div 
+                              className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg ${
+                                isTop3 ? style?.badge : 'bg-muted text-muted-foreground'
+                              }`}
+                              animate={isTop3 ? { scale: [1, 1.05, 1] } : {}}
+                              transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
+                            >
+                              {isTop3 && PositionIcon ? (
+                                <PositionIcon className="w-5 h-5" />
+                              ) : (
+                                index + 1
                               )}
-                            </h3>
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                              <MapPin className="w-3 h-3" />
-                              <span className="truncate">
-                                {commerce.neighborhood || commerce.city || 'Local não informado'}
-                              </span>
-                            </div>
-                          </div>
+                            </motion.div>
 
-                          <div className="flex items-center gap-4 flex-shrink-0">
-                            <div className="flex items-center gap-1">
-                              <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                              <span className="font-bold">{commerce.avg_rating.toFixed(1)}</span>
-                              <span className="text-xs text-muted-foreground">({commerce.review_count})</span>
+                            {/* Logo */}
+                            <div className={`w-12 h-12 rounded-xl overflow-hidden flex-shrink-0 ${
+                              isTop3 ? 'ring-2 ring-offset-2 ring-offset-background' : 'bg-muted'
+                            } ${index === 0 ? 'ring-yellow-500' : index === 1 ? 'ring-gray-400' : index === 2 ? 'ring-amber-600' : ''}`}>
+                              {commerce.logo_url ? (
+                                <img src={commerce.logo_url} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center bg-muted">
+                                  <Store className="w-5 h-5 text-muted-foreground" />
+                                </div>
+                              )}
                             </div>
-                            <div className="flex items-center gap-1 text-muted-foreground">
-                              <Heart className="w-4 h-4" />
-                              <span className="text-sm">{commerce.favorites_count}</span>
+
+                            {/* Commerce Info */}
+                            <div className="flex-1 min-w-0">
+                              <h3 className={`font-semibold truncate flex items-center gap-2 ${isTop3 ? 'text-base' : ''}`}>
+                                {commerce.fantasy_name}
+                                {commerce.id === currentCommerceId && (
+                                  <Badge variant="secondary" className="text-xs">Você</Badge>
+                                )}
+                                {index === 0 && (
+                                  <Badge className="bg-yellow-500 text-white text-xs">🏆 Líder</Badge>
+                                )}
+                              </h3>
+                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <MapPin className="w-3 h-3" />
+                                <span className="truncate">
+                                  {commerce.neighborhood || commerce.city || 'Local não informado'}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Stats */}
+                            <div className="flex items-center gap-4 flex-shrink-0">
+                              <div className="flex items-center gap-1">
+                                <Star className={`w-4 h-4 ${isTop3 ? 'fill-yellow-400 text-yellow-400' : 'fill-yellow-400 text-yellow-400'}`} />
+                                <span className={`font-bold ${isTop3 ? 'text-base' : ''}`}>
+                                  {commerce.avg_rating > 0 ? commerce.avg_rating.toFixed(1) : '-'}
+                                </span>
+                                <span className="text-xs text-muted-foreground">({commerce.review_count})</span>
+                              </div>
+                              <div className="flex items-center gap-1 text-muted-foreground">
+                                <Heart className={`w-4 h-4 ${commerce.favorites_count > 0 ? 'fill-red-400 text-red-400' : ''}`} />
+                                <span className="text-sm">{commerce.favorites_count}</span>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-              ))}
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  );
+                })}
             </div>
           )}
       </div>
