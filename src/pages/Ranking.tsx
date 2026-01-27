@@ -104,11 +104,11 @@ const Ranking = () => {
   const fetchRankingData = async () => {
     setLoading(true);
 
-    // Fetch commerces with their plans
+    // Fetch commerces using public view for security (excludes sensitive owner data)
+    // Note: plan info not available in view, will default to 'basic' for public ranking
     const { data: commercesData, error: commercesError } = await supabase
-      .from('commerces')
-      .select('id, fantasy_name, logo_url, city, neighborhood, cep, plan_id, plans(type)')
-      .eq('status', 'approved')
+      .from('commerces_public')
+      .select('id, fantasy_name, logo_url, city, neighborhood, cep')
       .eq('is_open', true);
 
     if (commercesError) {
@@ -140,7 +140,7 @@ const Ranking = () => {
       favoritesByCommerce.set(fav.commerce_id, (favoritesByCommerce.get(fav.commerce_id) || 0) + 1);
     });
 
-    // Build ranking data
+    // Build ranking data (plan_type defaults to 'basic' for public view)
     const rankingData: CommerceRanking[] = (commercesData || []).map(commerce => {
       const reviews = reviewsByCommerce.get(commerce.id) || [];
       const avgRating = reviews.length > 0 
@@ -154,7 +154,7 @@ const Ranking = () => {
         city: commerce.city,
         neighborhood: commerce.neighborhood,
         cep: commerce.cep,
-        plan_type: (commerce.plans as any)?.type || 'basic',
+        plan_type: 'basic', // Plan info not available in public view
         avg_rating: avgRating,
         review_count: reviews.length,
         favorites_count: favoritesByCommerce.get(commerce.id) || 0,

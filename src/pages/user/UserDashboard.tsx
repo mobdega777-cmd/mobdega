@@ -256,10 +256,10 @@ const UserDashboard = () => {
   };
 
   const fetchCommerces = async () => {
+    // Use public view for security (excludes sensitive owner data)
     const { data, error } = await supabase
-      .from('commerces')
+      .from('commerces_public')
       .select('id, fantasy_name, logo_url, cover_url, city, neighborhood, is_open, opening_hours, whatsapp')
-      .eq('status', 'approved')
       .eq('is_open', true)
       .limit(50);
     

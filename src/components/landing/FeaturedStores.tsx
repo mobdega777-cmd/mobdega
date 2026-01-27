@@ -151,11 +151,10 @@ const FeaturedStores = () => {
     // Fetch delivery zones first
     const zones = await fetchDeliveryZones();
 
-    // Fetch approved commerces that are open
+    // Fetch approved commerces that are open (using public view for security)
     const { data: commerces, error } = await supabase
-      .from('commerces')
+      .from('commerces_public')
       .select('id, fantasy_name, city, cep, logo_url, cover_url, neighborhood, is_open, opening_hours, whatsapp, phone')
-      .eq('status', 'approved')
       .eq('is_open', true)
       .limit(50);
 

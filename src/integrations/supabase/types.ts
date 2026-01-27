@@ -54,6 +54,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "admin_notifications_commerce_id_fkey"
+            columns: ["commerce_id"]
+            isOneToOne: false
+            referencedRelation: "commerces_public"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "admin_notifications_invoice_id_fkey"
             columns: ["invoice_id"]
             isOneToOne: false
@@ -151,6 +158,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "cash_movements_commerce_id_fkey"
+            columns: ["commerce_id"]
+            isOneToOne: false
+            referencedRelation: "commerces_public"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "cash_movements_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
@@ -213,6 +227,13 @@ export type Database = {
             referencedRelation: "commerces"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "cash_registers_commerce_id_fkey"
+            columns: ["commerce_id"]
+            isOneToOne: false
+            referencedRelation: "commerces_public"
+            referencedColumns: ["id"]
+          },
         ]
       }
       categories: {
@@ -255,6 +276,13 @@ export type Database = {
             columns: ["commerce_id"]
             isOneToOne: false
             referencedRelation: "commerces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "categories_commerce_id_fkey"
+            columns: ["commerce_id"]
+            isOneToOne: false
+            referencedRelation: "commerces_public"
             referencedColumns: ["id"]
           },
         ]
@@ -322,6 +350,13 @@ export type Database = {
             referencedRelation: "commerces"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "commerce_coupons_commerce_id_fkey"
+            columns: ["commerce_id"]
+            isOneToOne: false
+            referencedRelation: "commerces_public"
+            referencedColumns: ["id"]
+          },
         ]
       }
       commerce_photos: {
@@ -358,6 +393,13 @@ export type Database = {
             columns: ["commerce_id"]
             isOneToOne: false
             referencedRelation: "commerces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_photos_commerce_id_fkey"
+            columns: ["commerce_id"]
+            isOneToOne: false
+            referencedRelation: "commerces_public"
             referencedColumns: ["id"]
           },
         ]
@@ -533,6 +575,13 @@ export type Database = {
             referencedRelation: "commerces"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "delivery_zones_commerce_id_fkey"
+            columns: ["commerce_id"]
+            isOneToOne: false
+            referencedRelation: "commerces_public"
+            referencedColumns: ["id"]
+          },
         ]
       }
       discount_coupons: {
@@ -628,6 +677,13 @@ export type Database = {
             referencedRelation: "commerces"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "expenses_commerce_id_fkey"
+            columns: ["commerce_id"]
+            isOneToOne: false
+            referencedRelation: "commerces_public"
+            referencedColumns: ["id"]
+          },
         ]
       }
       favorites: {
@@ -655,6 +711,13 @@ export type Database = {
             columns: ["commerce_id"]
             isOneToOne: false
             referencedRelation: "commerces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "favorites_commerce_id_fkey"
+            columns: ["commerce_id"]
+            isOneToOne: false
+            referencedRelation: "commerces_public"
             referencedColumns: ["id"]
           },
         ]
@@ -699,6 +762,13 @@ export type Database = {
             columns: ["commerce_id"]
             isOneToOne: false
             referencedRelation: "commerces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "financial_transactions_commerce_id_fkey"
+            columns: ["commerce_id"]
+            isOneToOne: false
+            referencedRelation: "commerces_public"
             referencedColumns: ["id"]
           },
           {
@@ -765,6 +835,13 @@ export type Database = {
             columns: ["commerce_id"]
             isOneToOne: false
             referencedRelation: "commerces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_commerce_id_fkey"
+            columns: ["commerce_id"]
+            isOneToOne: false
+            referencedRelation: "commerces_public"
             referencedColumns: ["id"]
           },
         ]
@@ -899,6 +976,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "orders_commerce_id_fkey"
+            columns: ["commerce_id"]
+            isOneToOne: false
+            referencedRelation: "commerces_public"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "orders_session_id_fkey"
             columns: ["session_id"]
             isOneToOne: false
@@ -963,6 +1047,13 @@ export type Database = {
             columns: ["commerce_id"]
             isOneToOne: false
             referencedRelation: "commerces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_methods_commerce_id_fkey"
+            columns: ["commerce_id"]
+            isOneToOne: false
+            referencedRelation: "commerces_public"
             referencedColumns: ["id"]
           },
         ]
@@ -1070,6 +1161,13 @@ export type Database = {
             referencedRelation: "commerces"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "products_commerce_id_fkey"
+            columns: ["commerce_id"]
+            isOneToOne: false
+            referencedRelation: "commerces_public"
+            referencedColumns: ["id"]
+          },
         ]
       }
       profiles: {
@@ -1166,6 +1264,13 @@ export type Database = {
             columns: ["commerce_id"]
             isOneToOne: false
             referencedRelation: "commerces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reviews_commerce_id_fkey"
+            columns: ["commerce_id"]
+            isOneToOne: false
+            referencedRelation: "commerces_public"
             referencedColumns: ["id"]
           },
         ]
@@ -1302,6 +1407,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "table_sessions_commerce_id_fkey"
+            columns: ["commerce_id"]
+            isOneToOne: false
+            referencedRelation: "commerces_public"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "table_sessions_table_id_fkey"
             columns: ["table_id"]
             isOneToOne: false
@@ -1359,6 +1471,13 @@ export type Database = {
             columns: ["commerce_id"]
             isOneToOne: false
             referencedRelation: "commerces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tables_commerce_id_fkey"
+            columns: ["commerce_id"]
+            isOneToOne: false
+            referencedRelation: "commerces_public"
             referencedColumns: ["id"]
           },
           {
@@ -1432,7 +1551,66 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      commerces_public: {
+        Row: {
+          address: string | null
+          address_number: string | null
+          cep: string | null
+          city: string | null
+          cover_url: string | null
+          created_at: string | null
+          delivery_enabled: boolean | null
+          fantasy_name: string | null
+          id: string | null
+          is_open: boolean | null
+          logo_url: string | null
+          neighborhood: string | null
+          opening_hours: Json | null
+          phone: string | null
+          status: Database["public"]["Enums"]["commerce_status"] | null
+          table_payment_required: boolean | null
+          whatsapp: string | null
+        }
+        Insert: {
+          address?: string | null
+          address_number?: string | null
+          cep?: string | null
+          city?: string | null
+          cover_url?: string | null
+          created_at?: string | null
+          delivery_enabled?: boolean | null
+          fantasy_name?: string | null
+          id?: string | null
+          is_open?: boolean | null
+          logo_url?: string | null
+          neighborhood?: string | null
+          opening_hours?: Json | null
+          phone?: string | null
+          status?: Database["public"]["Enums"]["commerce_status"] | null
+          table_payment_required?: boolean | null
+          whatsapp?: string | null
+        }
+        Update: {
+          address?: string | null
+          address_number?: string | null
+          cep?: string | null
+          city?: string | null
+          cover_url?: string | null
+          created_at?: string | null
+          delivery_enabled?: boolean | null
+          fantasy_name?: string | null
+          id?: string | null
+          is_open?: boolean | null
+          logo_url?: string | null
+          neighborhood?: string | null
+          opening_hours?: Json | null
+          phone?: string | null
+          status?: Database["public"]["Enums"]["commerce_status"] | null
+          table_payment_required?: boolean | null
+          whatsapp?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       apply_stock_deduction_for_order: {
