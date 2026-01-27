@@ -9,7 +9,7 @@ import {
   Medal,
   Crown,
   Loader2,
-  ChevronDown
+  Info
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -190,11 +190,11 @@ const CommerceRanking = ({ currentCommerceId }: CommerceRankingProps) => {
   const fetchRankingData = async () => {
     setLoading(true);
 
+    // Fetch ALL approved commerces (not just open ones) for ranking
     const { data: commercesData, error: commercesError } = await supabase
       .from('commerces')
       .select('id, fantasy_name, logo_url, city, neighborhood, cep, plan_id, plans(type)')
-      .eq('status', 'approved')
-      .eq('is_open', true);
+      .eq('status', 'approved');
 
     if (commercesError) {
       console.error('Error fetching commerces:', commercesError);
@@ -243,9 +243,11 @@ const CommerceRanking = ({ currentCommerceId }: CommerceRankingProps) => {
       };
     });
 
+    // Sort by: 1st avg_rating (desc), 2nd favorites_count (desc), 3rd review_count (desc)
     rankingData.sort((a, b) => {
       if (b.avg_rating !== a.avg_rating) return b.avg_rating - a.avg_rating;
-      return b.favorites_count - a.favorites_count;
+      if (b.favorites_count !== a.favorites_count) return b.favorites_count - a.favorites_count;
+      return b.review_count - a.review_count;
     });
 
     setCommerces(rankingData);
@@ -415,6 +417,46 @@ const CommerceRanking = ({ currentCommerceId }: CommerceRankingProps) => {
             </div>
           )}
       </div>
+
+      {/* Rules Explanation */}
+      <Card className="mt-8 border-primary/20">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Info className="w-5 h-5 text-primary" />
+            Como funciona o Ranking
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4 text-sm text-muted-foreground">
+          <div>
+            <p className="font-semibold text-foreground mb-2">Divisões por Plano:</p>
+            <div className="flex flex-wrap gap-2 mb-2">
+              <Badge className="bg-amber-700 text-white">Bronze - Plano Básico</Badge>
+              <Badge className="bg-gray-500 text-white">Prata - Plano Startup</Badge>
+              <Badge className="bg-yellow-500 text-black">Ouro - Plano Business</Badge>
+            </div>
+            <p>Os estabelecimentos competem apenas com outros do mesmo plano, garantindo uma competição justa entre negócios de porte similar.</p>
+          </div>
+
+          <div>
+            <p className="font-semibold text-foreground mb-2">Critérios de Classificação:</p>
+            <ol className="list-decimal list-inside space-y-1 ml-2">
+              <li><strong>Média de Avaliações</strong> - Principal critério. Quanto maior a nota média (1-5 estrelas), melhor a posição.</li>
+              <li><strong>Quantidade de Favoritos</strong> - Em caso de empate na nota, quem tem mais favoritos fica à frente.</li>
+              <li><strong>Número de Avaliações</strong> - Como desempate final, mais avaliações indicam maior engajamento.</li>
+            </ol>
+          </div>
+
+          <div>
+            <p className="font-semibold text-foreground mb-2">Regiões:</p>
+            <p>Os comércios são organizados por região baseado no CEP cadastrado. Isso permite que clientes encontrem os melhores estabelecimentos perto deles.</p>
+          </div>
+
+          <div className="bg-primary/10 p-3 rounded-lg border border-primary/20">
+            <p className="font-semibold text-foreground mb-1">💡 Dica para melhorar sua posição:</p>
+            <p>Incentive seus clientes a avaliar e favoritar seu estabelecimento. Um bom atendimento e produtos de qualidade naturalmente geram melhores avaliações!</p>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
