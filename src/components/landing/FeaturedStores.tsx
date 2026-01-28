@@ -64,7 +64,7 @@ const isStoreOpen = (isOpen: boolean | null, openingHours: OpeningHours | null):
     return adjustedCurrentTime >= openTime && adjustedCurrentTime <= closeTime;
   }
   
-  return currentTime >= openTime && currentTime <= closeTime;
+  return currentTime >= openTime && currentTime < closeTime;
 };
 
 const getTodayHours = (openingHours: OpeningHours | null): string => {

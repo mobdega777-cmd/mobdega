@@ -196,10 +196,9 @@ const CommerceRanking = ({ currentCommerceId }: CommerceRankingProps) => {
   const fetchRankingData = async () => {
     setLoading(true);
 
-    // Fetch ALL approved commerces using the public view (accessible to all)
+    // Use secure RPC function to get ALL approved commerces (bypasses RLS safely)
     const { data: commercesData, error: commercesError } = await supabase
-      .from('commerces_public')
-      .select('id, fantasy_name, logo_url, city, neighborhood, cep, plan_id');
+      .rpc('get_ranking_commerces');
 
     if (commercesError) {
       console.error('Error fetching commerces:', commercesError);
@@ -248,7 +247,7 @@ const CommerceRanking = ({ currentCommerceId }: CommerceRankingProps) => {
       
       return {
         id: commerce.id,
-        fantasy_name: commerce.fantasy_name,
+        fantasy_name: commerce.fantasy_name || '',
         logo_url: commerce.logo_url,
         city: commerce.city,
         neighborhood: commerce.neighborhood,

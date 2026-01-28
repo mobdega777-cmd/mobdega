@@ -104,17 +104,27 @@ const Ranking = () => {
   const fetchRankingData = async () => {
     setLoading(true);
 
-    // Fetch commerces using public view for security (excludes sensitive owner data)
-    // Note: plan info not available in view, will default to 'basic' for public ranking
+    // Use secure RPC function to get ALL approved commerces (bypasses RLS safely)
     const { data: commercesData, error: commercesError } = await supabase
-      .from('commerces_public')
-      .select('id, fantasy_name, logo_url, city, neighborhood, cep')
-      .eq('is_open', true);
+      .rpc('get_ranking_commerces');
 
     if (commercesError) {
       console.error('Error fetching commerces:', commercesError);
       setLoading(false);
       return;
+    }
+
+    // Fetch plan types for the commerces
+    const planIds = [...new Set((commercesData || []).map(c => c.plan_id).filter(Boolean))];
+    const planTypesMap = new Map<string, string>();
+    
+    if (planIds.length > 0) {
+      const { data: plansData } = await supabase
+        .from('plans')
+        .select('id, type')
+        .in('id', planIds);
+      
+      plansData?.forEach(p => planTypesMap.set(p.id, p.type));
     }
 
     // Fetch reviews for ratings
@@ -140,7 +150,7 @@ const Ranking = () => {
       favoritesByCommerce.set(fav.commerce_id, (favoritesByCommerce.get(fav.commerce_id) || 0) + 1);
     });
 
-    // Build ranking data (plan_type defaults to 'basic' for public view)
+    // Build ranking data with plan info
     const rankingData: CommerceRanking[] = (commercesData || []).map(commerce => {
       const reviews = reviewsByCommerce.get(commerce.id) || [];
       const avgRating = reviews.length > 0 
@@ -149,12 +159,12 @@ const Ranking = () => {
       
       return {
         id: commerce.id,
-        fantasy_name: commerce.fantasy_name,
+        fantasy_name: commerce.fantasy_name || '',
         logo_url: commerce.logo_url,
         city: commerce.city,
         neighborhood: commerce.neighborhood,
         cep: commerce.cep,
-        plan_type: 'basic', // Plan info not available in public view
+        plan_type: commerce.plan_id ? (planTypesMap.get(commerce.plan_id) || 'basic') : 'basic',
         avg_rating: avgRating,
         review_count: reviews.length,
         favorites_count: favoritesByCommerce.get(commerce.id) || 0,
