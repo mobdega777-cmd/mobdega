@@ -33,8 +33,18 @@ const dateOptions = [
   { value: "custom", label: "Personalizar" },
 ];
 
+/**
+ * Retorna a data atual no fuso horário local (Brasil)
+ * Evita problemas de UTC que causam datas erradas
+ */
+const getLocalToday = (): Date => {
+  const now = new Date();
+  // Cria uma nova data usando os componentes locais para evitar problemas de UTC
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0, 0);
+};
+
 export const getDateRange = (option: string): { start: Date; end: Date } => {
-  const today = new Date();
+  const today = getLocalToday();
   const endDate = endOfDay(today);
 
   switch (option) {

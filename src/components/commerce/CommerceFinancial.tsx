@@ -90,9 +90,15 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
   const [pendingInvoicesCount, setPendingInvoicesCount] = useState(0);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  // Usa data local para evitar problemas de fuso horário UTC
+  const getLocalToday = () => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0);
+  };
+  
   const [dateFilter, setDateFilter] = useState({ 
-    start: startOfMonth(new Date()), 
-    end: endOfDay(new Date()) 
+    start: startOfMonth(getLocalToday()), 
+    end: endOfDay(getLocalToday()) 
   });
   const [operatorFees, setOperatorFees] = useState(0);
   const [stats, setStats] = useState<FinancialStats>({

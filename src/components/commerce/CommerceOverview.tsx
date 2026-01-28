@@ -65,7 +65,13 @@ const CommerceOverview = ({ commerce }: CommerceOverviewProps) => {
   const [stats, setStats] = useState<Stats>({ totalOrders: 0, pendingOrders: 0, todayRevenue: 0, totalProducts: 0, activeDeliveries: 0, completedToday: 0 });
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [dateFilter, setDateFilter] = useState({ start: startOfDay(new Date()), end: endOfDay(new Date()) });
+  // Usa data local para evitar problemas de fuso horário UTC
+  const getLocalToday = () => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0);
+  };
+  const localToday = getLocalToday();
+  const [dateFilter, setDateFilter] = useState({ start: startOfDay(localToday), end: endOfDay(localToday) });
   const [isOpen, setIsOpen] = useState(true);
   const [openingHours, setOpeningHours] = useState<OpeningHours>(DEFAULT_HOURS);
   const [savingStatus, setSavingStatus] = useState(false);
