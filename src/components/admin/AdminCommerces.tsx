@@ -372,6 +372,34 @@ const AdminCommerces = () => {
                     </div>
 
                     <div className="flex items-center gap-2">
+                      {/* Upgrade Approval Button - Blinking when pending */}
+                      {commerce.upgrade_request_status === 'pending' && commerce.requested_plan_id && (
+                        <Button
+                          size="sm"
+                          className="gap-1 bg-purple-500 hover:bg-purple-600 text-white animate-pulse"
+                          onClick={async () => {
+                            const { error } = await supabase
+                              .from('commerces')
+                              .update({
+                                plan_id: commerce.requested_plan_id,
+                                upgrade_request_status: 'approved',
+                                requested_plan_id: null,
+                                upgrade_request_date: null,
+                              })
+                              .eq('id', commerce.id);
+                            
+                            if (error) {
+                              toast({ variant: 'destructive', title: 'Erro ao aprovar upgrade', description: error.message });
+                            } else {
+                              toast({ title: 'Upgrade aprovado com sucesso!' });
+                              fetchCommerces();
+                            }
+                          }}
+                        >
+                          <ArrowUp className="w-4 h-4" />
+                          Upgrade
+                        </Button>
+                      )}
                       {commerce.status === 'pending' && (
                         <>
                           <Button

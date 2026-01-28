@@ -37,6 +37,7 @@ interface Commerce {
   delivery_enabled: boolean | null;
   opening_hours: Record<string, { open: string; close: string; enabled: boolean }> | null;
   table_payment_required: boolean;
+  plan_id: string | null;
 }
 
 interface Category {
@@ -128,6 +129,7 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
   const [isFavorite, setIsFavorite] = useState(false);
   const [favoritesCount, setFavoritesCount] = useState(0);
   const [activeTab, setActiveTab] = useState("menu");
+  const [allowedMenuItems, setAllowedMenuItems] = useState<string[]>([]);
   
   // Order mode and cart
   const [orderMode, setOrderMode] = useState<'none' | 'table' | 'delivery'>('none');
@@ -314,6 +316,31 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
     
     if (commerceData && commerceData.length > 0) {
       const c = commerceData[0];
+      
+      // Fetch commerce's plan_id and plan's allowed_menu_items
+      let planId: string | null = null;
+      let planAllowedItems: string[] = [];
+      
+      // Need to fetch plan_id from commerces_public view since RPC doesn't include it
+      const { data: commercePlanData } = await supabase
+        .from('commerces_public')
+        .select('plan_id')
+        .eq('id', c.id)
+        .single();
+      
+      if (commercePlanData?.plan_id) {
+        planId = commercePlanData.plan_id;
+        const { data: planData } = await supabase
+          .from('plans')
+          .select('allowed_menu_items')
+          .eq('id', commercePlanData.plan_id)
+          .single();
+        if (planData?.allowed_menu_items && Array.isArray(planData.allowed_menu_items)) {
+          planAllowedItems = planData.allowed_menu_items as string[];
+        }
+      }
+      setAllowedMenuItems(planAllowedItems);
+      
       setCommerce({
         id: c.id,
         fantasy_name: c.fantasy_name,
@@ -327,7 +354,8 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
         is_open: c.is_open,
         delivery_enabled: c.delivery_enabled,
         opening_hours: c.opening_hours as Record<string, { open: string; close: string; enabled: boolean }> | null,
-        table_payment_required: c.table_payment_required ?? true
+        table_payment_required: c.table_payment_required ?? true,
+        plan_id: planId
       });
     }
 
@@ -1451,25 +1479,56 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
         </div>
       </div>
 
-      {/* Action Buttons - Exclusive selection */}
+      {/* Action Buttons - Exclusive selection with plan feature checks */}
       <div className="grid grid-cols-2 gap-3">
-        <Button 
-          className={`gap-1 h-14 text-sm sm:text-base px-2 sm:px-4`} 
-          variant={orderMode === 'table' ? 'default' : 'outline'}
-          onClick={handlePedirNaMesa}
-        >
-          <UtensilsCrossed className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
-          <span className="truncate">{selectedTable ? `Mesa ${selectedTable.number}` : 'Mesa'}</span>
-        </Button>
-        <Button 
-          className={`gap-1 h-14 text-sm sm:text-base px-2 sm:px-4`} 
-          variant={orderMode === 'delivery' ? 'default' : 'outline'}
-          onClick={handlePedirDelivery}
-          disabled={!commerce.delivery_enabled}
-        >
-          <Truck className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
-          <span className="truncate">Delivery</span>
-        </Button>
+        {/* Mesa Button */}
+        {allowedMenuItems.includes('tables') ? (
+          <Button 
+            className={`gap-1 h-14 text-sm sm:text-base px-2 sm:px-4`} 
+            variant={orderMode === 'table' ? 'default' : 'outline'}
+            onClick={handlePedirNaMesa}
+          >
+            <UtensilsCrossed className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+            <span className="truncate">{selectedTable ? `Mesa ${selectedTable.number}` : 'Mesa'}</span>
+          </Button>
+        ) : (
+          <Button 
+            className="gap-1 h-14 text-sm sm:text-base px-2 sm:px-4 opacity-60 cursor-not-allowed"
+            variant="outline"
+            onClick={() => toast({
+              title: "Serviço não disponível",
+              description: "Este comércio aceita apenas retirada no local. Entre em contato para mais informações.",
+            })}
+          >
+            <UtensilsCrossed className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+            <span className="truncate">Mesa</span>
+          </Button>
+        )}
+        
+        {/* Delivery Button */}
+        {allowedMenuItems.includes('delivery') ? (
+          <Button 
+            className={`gap-1 h-14 text-sm sm:text-base px-2 sm:px-4`} 
+            variant={orderMode === 'delivery' ? 'default' : 'outline'}
+            onClick={handlePedirDelivery}
+            disabled={!commerce.delivery_enabled}
+          >
+            <Truck className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+            <span className="truncate">Delivery</span>
+          </Button>
+        ) : (
+          <Button 
+            className="gap-1 h-14 text-sm sm:text-base px-2 sm:px-4 opacity-60 cursor-not-allowed"
+            variant="outline"
+            onClick={() => toast({
+              title: "Serviço não disponível",
+              description: "Este comércio aceita apenas retirada no local. Entre em contato para mais informações.",
+            })}
+          >
+            <Truck className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+            <span className="truncate">Delivery</span>
+          </Button>
+        )}
       </div>
 
       {/* Tabs */}
