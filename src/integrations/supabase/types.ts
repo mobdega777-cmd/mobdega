@@ -1727,6 +1727,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_commerce_approved: {
+        Args: { p_commerce_id: string }
+        Returns: boolean
+      }
       is_commerce_owner_or_admin: {
         Args: { _commerce_id: string }
         Returns: boolean
