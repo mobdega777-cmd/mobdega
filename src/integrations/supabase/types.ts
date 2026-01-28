@@ -1720,6 +1720,10 @@ export type Database = {
           plan_id: string
         }[]
       }
+      get_session_commerce_id: {
+        Args: { _session_id: string }
+        Returns: string
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1736,6 +1740,14 @@ export type Database = {
         Returns: boolean
       }
       is_master_admin: { Args: never; Returns: boolean }
+      is_session_commerce_owner: {
+        Args: { _session_id: string }
+        Returns: boolean
+      }
+      is_session_participant: {
+        Args: { _session_id: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "user" | "commerce" | "master_admin"
