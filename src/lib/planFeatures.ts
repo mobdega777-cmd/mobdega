@@ -16,6 +16,7 @@ export const menuItemLabels: Record<string, string> = {
   paymentconfig: "Configuração de Pagamentos",
   contract: "Contrato",
   training: "Treinamento",
+  expenses: "Despesas/Gastos",
 };
 
 // Items that are always included and shouldn't be shown as "features"
@@ -39,4 +40,12 @@ export const getFeatureLabels = (allowedItems: string[]): string[] => {
  */
 export const getTopFeatureLabels = (allowedItems: string[], limit: number = 6): string[] => {
   return getFeatureLabels(allowedItems).slice(0, limit);
+};
+
+/**
+ * Checks if a specific feature is allowed in the plan
+ */
+export const isPlanFeatureAllowed = (allowedItems: string[], feature: string): boolean => {
+  if (!Array.isArray(allowedItems)) return false;
+  return allowedItems.includes(feature);
 };

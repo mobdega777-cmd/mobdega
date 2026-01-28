@@ -9,7 +9,8 @@ import {
   BarChart3,
   Calendar,
   Plus,
-  Filter
+  Filter,
+  Target
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -41,6 +42,7 @@ interface FinancialStats {
   pendingReceivables: number;
   paidInvoices: number;
   overdueInvoices: number;
+  projectedRevenue: number;
 }
 
 interface Transaction {
@@ -61,6 +63,7 @@ const AdminFinancial = () => {
     pendingReceivables: 0,
     paidInvoices: 0,
     overdueInvoices: 0,
+    projectedRevenue: 0,
   });
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -108,7 +111,7 @@ const AdminFinancial = () => {
     const startISO = dateFilter.start;
     const endISO = dateFilter.end;
 
-    const [transactionsRes, invoicesRes] = await Promise.all([
+    const [transactionsRes, invoicesRes, commercesRes] = await Promise.all([
       supabase
         .from('financial_transactions')
         .select('*')
@@ -120,6 +123,11 @@ const AdminFinancial = () => {
         .select('amount, status, type, created_at')
         .gte('created_at', `${startISO}T00:00:00.000Z`)
         .lte('created_at', `${endISO}T23:59:59.999Z`),
+      // Fetch all active commerces with their plan prices for projected revenue
+      supabase
+        .from('commerces')
+        .select('id, plan_id, plans!commerces_plan_id_fkey(price)')
+        .eq('status', 'approved'),
     ]);
 
     if (transactionsRes.error) {
@@ -142,6 +150,7 @@ const AdminFinancial = () => {
 
     const transactionsData = transactionsRes.data || [];
     const invoicesData = invoicesRes.data || [];
+    const commercesData = commercesRes.data || [];
 
     setTransactions(transactionsData);
 
@@ -169,6 +178,12 @@ const AdminFinancial = () => {
     const totalIncome = incomeFromTransactions + paidInvoices;
     const totalExpense = expenseFromTransactions;
 
+    // Calculate projected monthly revenue from all approved commerces
+    const projectedRevenue = commercesData.reduce((sum, c) => {
+      const planPrice = (c.plans as any)?.price || 0;
+      return sum + Number(planPrice);
+    }, 0);
+
     setStats({
       totalIncome,
       totalExpense,
@@ -176,6 +191,7 @@ const AdminFinancial = () => {
       pendingReceivables,
       paidInvoices,
       overdueInvoices,
+      projectedRevenue,
     });
 
     setIsLoading(false);
@@ -275,6 +291,14 @@ const AdminFinancial = () => {
       icon: ArrowUpRight,
       color: "text-blue-500",
       bgColor: "bg-blue-500/10",
+    },
+    {
+      title: "Previsão Mensal",
+      value: stats.projectedRevenue,
+      icon: Target,
+      color: "text-purple-500",
+      bgColor: "bg-purple-500/10",
+      tooltip: "Soma dos valores dos planos de todos os comércios aprovados",
     },
   ];
 
