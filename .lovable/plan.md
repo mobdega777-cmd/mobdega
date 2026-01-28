@@ -1,195 +1,222 @@
 
+# Plano de Implementação: Sincronização de Planos, Notificações de Upgrade e Cupons no Checkout
 
-# Relatório Completo de Segurança - Sistema Mobdega
+## Resumo das Solicitações
 
-## Resumo Executivo
+Baseado nas 7 imagens anexadas, identifiquei 4 problemas principais a resolver:
 
-Após análise completa do sistema, identifiquei **17 pontos de atenção** sendo:
-- **5 críticos** (já corrigidos anteriormente ✅)
-- **8 moderados** (3 precisam atenção ⚠️)
-- **4 informativos** (aceitáveis para o negócio ℹ️)
-
-| Status Geral | Avaliação |
-|--------------|-----------|
-| Pronto para produção | ⚠️ Com ressalvas |
-| Segurança contra hackers | ✅ Boa (após correções) |
-| Dados expostos no F12 | ✅ Protegido |
-| Políticas RLS | ✅ Funcionando |
+1. **Sincronizar funcionalidades dos planos** - As opções ativadas/desativadas no Master Admin (allowed_menu_items) devem aparecer como features nos cards de plano no cadastro e no modal de upgrade
+2. **Notificação de upgrade não chega** - A solicitação de upgrade é salva, mas a notificação para o Master Admin falha silenciosamente
+3. **Indicador visual de upgrade pendente** - Falta um contador/badge no menu "Adegas/Tabacarias" e nos cards dos comércios
+4. **Campo de cupom no checkout** - Adicionar campo para cupons do comércio nos modais de delivery/mesa, com integração no PDV e financeiro
 
 ---
 
-## O Que Já Está Corrigido ✅
+## Parte 1: Sincronizar Features dos Planos com allowed_menu_items
 
-### 1. Edge Function Admin Protegida
-A criação de admin agora exige token `ADMIN_SETUP_SECRET` no header - não é possível criar admin sem autorização.
+### Problema Atual
+Os planos possuem duas colunas separadas:
+- `features` - Lista de textos descritivos (hardcoded)
+- `allowed_menu_items` - IDs das funcionalidades ativas
 
-### 2. Senha Admin em Environment Variable
-A senha não está mais hardcoded - usa `ADMIN_DEFAULT_PASSWORD` do ambiente.
+No cadastro e modal de upgrade, o sistema exibe a coluna `features` estática, ignorando o que o Master Admin configura em `allowed_menu_items`.
 
-### 3. Storage com Ownership Verificado
-Cada comércio só pode modificar arquivos na sua própria pasta.
+### Solução
+Criar uma função utilitária que converte `allowed_menu_items` em labels legíveis para exibição.
 
-### 4. Políticas de Senha Melhoradas
-Sistema exige 8+ caracteres com maiúsculas, minúsculas e números.
+### Arquivos a Modificar
 
-### 5. View Pública Segura
-A `commerces_public` expõe apenas dados comerciais, sem CPF/CNPJ ou email do dono.
+1. **`src/components/auth/AuthModal.tsx`**
+   - Criar mapeamento de ID → label amigável
+   - Modificar a exibição dos cards de plano para usar `allowed_menu_items` 
+   - Adicionar query para buscar `allowed_menu_items` junto com os planos
+   - Filtrar apenas itens não-obrigatórios (excluir overview e settings)
 
----
+2. **`src/components/commerce/UpgradeModal.tsx`**
+   - Mesma lógica: substituir `features` por labels derivados de `allowed_menu_items`
+   - Buscar `allowed_menu_items` na query de planos
 
-## Pontos que Precisam Atenção ⚠️
-
-### 1. Proteção contra Senhas Vazadas DESABILITADA (Nível: Médio)
-
-**Problema**: O sistema não verifica se a senha escolhida foi vazada em data breaches.
-
-**Risco**: Usuários podem usar senhas comprometidas (ex: "Password123") sem aviso.
-
-**Correção Necessária**: Habilitar "Leaked Password Protection" no backend.
-
-### 2. Reclamação de Mesas Cross-Commerce (Nível: Médio)
-
-**Problema**: Qualquer usuário autenticado pode "reclamar" mesas de qualquer comércio.
-
-**Risco**: Um atacante poderia ocupar todas as mesas de um concorrente, causando DoS.
-
-**Correção Necessária**: Adicionar verificação de commerce_id na política de UPDATE.
-
-### 3. Cupons de Comércio Públicos (Nível: Baixo)
-
-**Problema**: Códigos de desconto ativos são visíveis para qualquer usuário.
-
-**Risco**: Concorrentes podem ver estratégias promocionais ou usar códigos.
-
-**Correção Sugerida**: Restringir SELECT a usuários autenticados no momento do pedido.
+### Mapeamento de IDs para Labels
+```text
+cashregister → Caixa/PDV
+orders → Gestão Pedidos
+delivery → Delivery
+deliveryzones → Áreas de Entrega
+tables → Mesas/Comandas
+products → Produtos
+categories → Categorias
+stockcontrol → Controle Estoque
+financial → Financeiro
+coupons → Cupons
+customers → Clientes
+photos → Fotos
+ranking → Ranking
+```
 
 ---
 
-## O Que Aparece no F12 (DevTools)
+## Parte 2: Corrigir Notificação de Upgrade
 
-| Dado | Exposto? | Justificativa |
-|------|----------|---------------|
-| Produtos e preços | ✅ Sim | Normal - necessário para vitrine |
-| Categorias | ✅ Sim | Normal - necessário para navegação |
-| Nome fantasia do comércio | ✅ Sim | Normal - dado público |
-| CPF/CNPJ do dono | ❌ Não | Protegido pela RLS |
-| Email do dono | ❌ Não | Protegido pela RLS |
-| Endereço pessoal do dono | ❌ Não | Protegido pela RLS |
-| Dados de pagamento (PIX) | ⚠️ Parcial | Visível apenas para cliente no checkout |
-| Pedidos de outros clientes | ❌ Não | Protegido pela RLS |
-| Faturamento do comércio | ❌ Não | Protegido pela RLS |
-
----
-
-## Políticas RLS - Resumo por Tabela
-
-| Tabela | Status | Observação |
-|--------|--------|------------|
-| `profiles` | ✅ Seguro | Cada usuário vê apenas seu perfil |
-| `commerces` | ✅ Seguro | Dono e admin veem, público usa view |
-| `commerces_public` | ✅ Seguro | View sem dados sensíveis |
-| `orders` | ✅ Seguro | Cliente e comércio veem apenas os seus |
-| `invoices` | ✅ Seguro | Comerciante e admin apenas |
-| `user_roles` | ✅ Seguro | Usuário vê apenas sua role |
-| `billing_config` | ✅ Seguro | Apenas master admin |
-| `tables` | ⚠️ Atenção | UPDATE muito permissivo |
-| `reviews` | ⚠️ Atenção | user_id exposto publicamente |
-| `commerce_coupons` | ⚠️ Atenção | Códigos visíveis para todos |
-
----
-
-## Recomendações para Produção
-
-### Correções Críticas (Fazer Antes de Lançar)
-
-1. **Habilitar Leaked Password Protection**
-   - Impacto: Médio
-   - Esforço: 1 migration SQL
-
-2. **Corrigir Política de Tables**
-   - Impacto: Baixo (DoS limitado)
-   - Esforço: 1 migration SQL
-
-### Melhorias Recomendadas (Podem Esperar)
-
-3. **Anonimizar user_id em reviews**
-   - Criar view que não expõe o ID do avaliador
-   - Impacto: Privacidade de clientes
-
-4. **Restringir visualização de cupons**
-   - Mudar política para authenticated + no momento do pedido
-   - Impacto: Proteção de estratégia comercial
-
----
-
-## Logs e Console
-
-Os `console.log` encontrados no código são informativos e não expõem dados sensíveis:
-- CEP lookups (debug de zona)
-- Movimentações de caixa (logs operacionais)
-
-**Recomendação**: Remover antes de produção para performance, mas não são risco de segurança.
-
----
-
-## Conclusão
-
-O sistema está **bem estruturado** em termos de segurança. As principais vulnerabilidades já foram corrigidas em sprints anteriores. 
-
-Para lançar em produção com segurança, recomendo aplicar as **2 correções críticas** (leaked password protection e política de tables).
-
-Os demais pontos são melhorias incrementais que podem ser endereçadas após o lançamento.
-
----
-
-## Seção Técnica - Correções SQL Necessárias
-
-### 1. Habilitar Leaked Password Protection
-Isso é configurado via painel do backend, não via SQL.
-
-### 2. Corrigir Política de Tables
-
+### Problema Atual
+A política RLS da tabela `admin_notifications` permite apenas `master_admin`:
 ```sql
--- Corrigir UPDATE de tables para prevenir DoS cross-commerce
-DROP POLICY IF EXISTS "Users can claim available tables" ON public.tables;
+POLICY "Master admin can manage notifications"
+ON admin_notifications FOR ALL
+USING (is_master_admin())
+```
 
-CREATE POLICY "Users can claim available tables"
-ON public.tables
-FOR UPDATE
+Quando um **commerce** tenta inserir uma notificação, a operação falha silenciosamente devido ao RLS.
+
+### Solução
+Criar uma política adicional que permite `INSERT` para usuários autenticados:
+
+### Migração SQL
+```sql
+-- Permitir que qualquer usuário autenticado insira notificações
+CREATE POLICY "Authenticated users can insert notifications"
+ON public.admin_notifications
+FOR INSERT
 TO authenticated
-USING (
-  (status = 'available'::table_status OR status IS NULL)
-  -- Usuário deve ter uma sessão ativa nesta mesa ou estar criando uma
-  AND (
-    session_id IS NULL 
-    OR EXISTS (
-      SELECT 1 FROM table_participants tp
-      JOIN table_sessions ts ON ts.id = tp.session_id
-      WHERE ts.table_id = tables.id 
-      AND tp.user_id = auth.uid()
-      AND ts.status = 'active'
-    )
-  )
-)
-WITH CHECK (status = 'occupied'::table_status);
+WITH CHECK (true);
 ```
 
-### 3. Anonimizar Reviews (Opcional)
+### Alternativa (mais segura)
+Criar uma função `SECURITY DEFINER` que encapsula a criação de notificações, permitindo que commerce users criem notificações sem acesso direto à tabela.
 
+---
+
+## Parte 3: Indicador Visual de Solicitações de Upgrade
+
+### Problema Atual
+Não há feedback visual no painel do Master Admin quando há solicitações de upgrade pendentes.
+
+### Solução
+
+1. **Contador no Menu "Adegas/Tabacarias"**
+   - Adicionar badge com número de solicitações pendentes no menu lateral
+
+2. **Badge nos Cards de Comércio**
+   - Exibir indicador visual nos cards de comércios que têm `upgrade_request_status = 'pending'`
+
+3. **Ícone de upgrade no sino de notificações**
+   - Adicionar ícone específico para tipo `upgrade_request`
+
+### Arquivos a Modificar
+
+1. **`src/pages/admin/AdminDashboard.tsx`**
+   - Buscar contagem de `upgrade_request_status = 'pending'`
+   - Exibir badge no item "Adegas/Tabacarias" do menu
+
+2. **`src/components/admin/AdminCommerces.tsx`**
+   - Adicionar badge "Upgrade Pendente" nos cards de comércios com solicitação
+
+3. **`src/components/admin/AdminNotificationBell.tsx`**
+   - Adicionar ícone específico para `upgrade_request`
+   - Usar ícone `ArrowUp` para distinguir de outros tipos
+
+---
+
+## Parte 4: Campo de Cupom no Checkout
+
+### Problema Atual
+O checkout de delivery/mesa não possui campo para aplicar cupons criados pelo comércio (tabela `commerce_coupons`).
+
+### Alterações no Banco de Dados
+
+Adicionar colunas na tabela `orders`:
 ```sql
--- Criar view que esconde user_id
-CREATE VIEW public.reviews_public AS
-SELECT 
-  id,
-  commerce_id,
-  rating,
-  comment,
-  created_at
-  -- user_id omitido intencionalmente
-FROM public.reviews;
-
-GRANT SELECT ON public.reviews_public TO anon;
-GRANT SELECT ON public.reviews_public TO authenticated;
+ALTER TABLE orders 
+ADD COLUMN coupon_code text,
+ADD COLUMN coupon_discount numeric DEFAULT 0;
 ```
 
+### Arquivos a Modificar
 
+1. **`src/components/user/CommerceStorefront.tsx`**
+   - Adicionar estados para cupom: `couponCode`, `couponValid`, `couponDiscount`
+   - Adicionar campo de input no modal de carrinho (antes do resumo)
+   - Validar cupom contra tabela `commerce_coupons` do comércio específico
+   - Calcular desconto e atualizar total
+   - Salvar `coupon_code` e `coupon_discount` ao criar pedido
+
+2. **`src/components/commerce/CommerceCashRegister.tsx`**
+   - Exibir `coupon_code` e `coupon_discount` nos detalhes do pedido no PDV
+
+3. **`src/components/commerce/CommerceFinancial.tsx`**
+   - Incluir descontos de cupom nos cálculos financeiros
+
+### Fluxo de Validação do Cupom
+1. Cliente digita código do cupom
+2. Sistema busca em `commerce_coupons` WHERE `commerce_id` = comércio atual AND `code` = cupom digitado
+3. Valida: ativo, datas, limite de uso, valor mínimo do pedido
+4. Calcula desconto (percentual ou fixo)
+5. Aplica limite máximo se houver
+6. Atualiza total exibido
+
+---
+
+## Resumo das Tarefas
+
+| # | Tarefa | Arquivos | Prioridade |
+|---|--------|----------|------------|
+| 1 | Migração SQL: política RLS para INSERT em admin_notifications | migration | Alta |
+| 2 | Migração SQL: colunas coupon_code/discount em orders | migration | Alta |
+| 3 | Sincronizar features com allowed_menu_items no AuthModal | AuthModal.tsx | Média |
+| 4 | Sincronizar features com allowed_menu_items no UpgradeModal | UpgradeModal.tsx | Média |
+| 5 | Contador de upgrades no menu lateral | AdminDashboard.tsx | Alta |
+| 6 | Badge de upgrade nos cards de comércio | AdminCommerces.tsx | Média |
+| 7 | Ícone de upgrade no sino de notificações | AdminNotificationBell.tsx | Baixa |
+| 8 | Campo de cupom no checkout delivery/mesa | CommerceStorefront.tsx | Alta |
+| 9 | Exibir cupom nos detalhes do PDV | CommerceCashRegister.tsx | Média |
+| 10 | Incluir cupom nos relatórios financeiros | CommerceFinancial.tsx | Média |
+
+---
+
+## Detalhes Técnicos
+
+### Mapeamento menuItemsConfig (compartilhado)
+Criar arquivo utilitário em `src/lib/planFeatures.ts`:
+```typescript
+export const menuItemLabels: Record<string, string> = {
+  cashregister: "Caixa/PDV",
+  orders: "Gestão Pedidos",
+  delivery: "Delivery",
+  deliveryzones: "Áreas de Entrega",
+  tables: "Mesas/Comandas",
+  products: "Produtos",
+  categories: "Categorias",
+  stockcontrol: "Controle Estoque",
+  financial: "Financeiro",
+  coupons: "Cupons",
+  customers: "Clientes",
+  photos: "Fotos",
+  ranking: "Ranking",
+};
+
+export const getFeatureLabels = (allowedItems: string[]): string[] => {
+  const excluded = ['overview', 'settings', 'paymentconfig', 'contract', 'training'];
+  return allowedItems
+    .filter(item => !excluded.includes(item))
+    .map(item => menuItemLabels[item])
+    .filter(Boolean);
+};
+```
+
+### Validação de Cupom do Comércio
+```typescript
+const validateCommerceCoupon = async (code: string, commerceId: string, subtotal: number) => {
+  const { data: coupon } = await supabase
+    .from('commerce_coupons')
+    .select('*')
+    .eq('commerce_id', commerceId)
+    .eq('code', code.toUpperCase())
+    .eq('is_active', true)
+    .maybeSingle();
+    
+  if (!coupon) return { valid: false };
+  
+  // Validar datas, limite de usos, valor mínimo
+  // Calcular desconto
+  // Retornar { valid: true, discount: number, type: string }
+};
+```
