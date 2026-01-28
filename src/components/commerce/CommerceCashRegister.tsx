@@ -194,10 +194,15 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
   const [participantPaymentMethod, setParticipantPaymentMethod] = useState<string>("cash");
   const [participantCashReceived, setParticipantCashReceived] = useState("");
 
-  // Date filter state
+  // Date filter state - usa data local para evitar problemas de fuso horário UTC
+  const getLocalToday = () => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0);
+  };
+  const localToday = getLocalToday();
   const [dateFilter, setDateFilter] = useState({ 
-    start: startOfDay(new Date()), 
-    end: endOfDay(new Date()) 
+    start: startOfDay(localToday), 
+    end: endOfDay(localToday) 
   });
 
   const [openingAmount, setOpeningAmount] = useState("");

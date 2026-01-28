@@ -67,8 +67,10 @@ const AdminFinancial = () => {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [filterDialogOpen, setFilterDialogOpen] = useState(false);
   const [dateFilter, setDateFilter] = useState(() => {
-    const end = new Date();
-    const start = new Date();
+    // Usa data local para evitar problemas de fuso horário UTC
+    const now = new Date();
+    const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0);
+    const start = new Date(end);
     start.setDate(end.getDate() - 29);
     return {
       start: start.toISOString().split('T')[0],
@@ -76,12 +78,19 @@ const AdminFinancial = () => {
     };
   });
 
+  // Helper para data local
+  const getLocalDateString = () => {
+    const now = new Date();
+    const local = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0);
+    return local.toISOString().split('T')[0];
+  };
+
   const [newTransaction, setNewTransaction] = useState({
     type: 'income',
     category: '',
     description: '',
     amount: '',
-    transaction_date: new Date().toISOString().split('T')[0],
+    transaction_date: getLocalDateString(),
   });
   const { toast } = useToast();
 
@@ -232,7 +241,7 @@ const AdminFinancial = () => {
         category: '',
         description: '',
         amount: '',
-        transaction_date: new Date().toISOString().split('T')[0],
+        transaction_date: getLocalDateString(),
       });
       fetchData();
     }

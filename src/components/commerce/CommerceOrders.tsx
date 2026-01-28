@@ -123,9 +123,16 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [paymentMethodsConfig, setPaymentMethodsConfig] = useState<PaymentMethodConfig[]>([]);
+  // Usa função centralizada para evitar problemas de fuso horário UTC
+  const getLocalToday = () => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0);
+  };
+  const localToday = getLocalToday();
+  
   const [dateFilter, setDateFilter] = useState({ 
-    start: startOfDay(subDays(new Date(), 29)), 
-    end: endOfDay(new Date()) 
+    start: startOfDay(subDays(localToday, 29)), 
+    end: endOfDay(localToday) 
   });
   const { user } = useAuth();
   const { toast } = useToast();
