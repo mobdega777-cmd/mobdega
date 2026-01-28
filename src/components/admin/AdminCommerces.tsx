@@ -14,7 +14,8 @@ import {
   Ban,
   Eye,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  ArrowUp
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -65,6 +66,8 @@ interface Commerce {
   is_open: boolean | null;
   approved_at: string | null;
   rejection_reason: string | null;
+  upgrade_request_status: string | null;
+  requested_plan_id: string | null;
   plans: { name: string; price: number } | null;
 }
 
@@ -327,11 +330,17 @@ const AdminCommerces = () => {
                         {commerce.fantasy_name.charAt(0)}
                       </div>
                       <div className="space-y-2">
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 flex-wrap">
                           <h3 className="font-semibold text-lg text-foreground">
                             {commerce.fantasy_name}
                           </h3>
                           {getStatusBadge(commerce.status)}
+                          {commerce.upgrade_request_status === 'pending' && (
+                            <Badge className="gap-1 bg-purple-500 text-white">
+                              <ArrowUp className="w-3 h-3" />
+                              Upgrade Pendente
+                            </Badge>
+                          )}
                         </div>
                         <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
                           <span className="flex items-center gap-1">

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Bell, Check, CheckCheck, CreditCard, AlertCircle } from "lucide-react";
+import { Bell, Check, CheckCheck, CreditCard, AlertCircle, ArrowUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -106,6 +106,8 @@ const AdminNotificationBell = () => {
     switch (type) {
       case 'payment_confirmation':
         return <CreditCard className="w-4 h-4 text-green-500" />;
+      case 'upgrade_request':
+        return <ArrowUp className="w-4 h-4 text-purple-500" />;
       default:
         return <AlertCircle className="w-4 h-4 text-primary" />;
     }

@@ -20,6 +20,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/formatCurrency";
+import { getFeatureLabels } from "@/lib/planFeatures";
 
 interface Plan {
   id: string;
@@ -28,6 +29,7 @@ interface Plan {
   price: number;
   description: string | null;
   features: string[];
+  allowed_menu_items: string[];
 }
 
 interface UpgradeModalProps {
@@ -66,7 +68,8 @@ const UpgradeModal = ({ isOpen, onClose, commerceId, currentPlanId }: UpgradeMod
         type: p.type,
         price: Number(p.price),
         description: p.description,
-        features: Array.isArray(p.features) ? (p.features as string[]) : []
+        features: Array.isArray(p.features) ? (p.features as string[]) : [],
+        allowed_menu_items: Array.isArray(p.allowed_menu_items) ? (p.allowed_menu_items as string[]) : []
       }));
       
       setPlans(formattedPlans);
@@ -228,14 +231,19 @@ const UpgradeModal = ({ isOpen, onClose, commerceId, currentPlanId }: UpgradeMod
                         </div>
                       </div>
 
-                      {plan.features.length > 0 && (
+                      {getFeatureLabels(plan.allowed_menu_items).length > 0 && (
                         <div className="mt-4 grid grid-cols-2 gap-2">
-                          {plan.features.slice(0, 6).map((feature, idx) => (
+                          {getFeatureLabels(plan.allowed_menu_items).slice(0, 6).map((feature, idx) => (
                             <div key={idx} className="flex items-center gap-2 text-sm">
                               <Check className="w-4 h-4 text-green-500 flex-shrink-0" />
                               <span className="text-muted-foreground">{feature}</span>
                             </div>
                           ))}
+                          {getFeatureLabels(plan.allowed_menu_items).length > 6 && (
+                            <div className="text-xs text-muted-foreground col-span-2">
+                              +{getFeatureLabels(plan.allowed_menu_items).length - 6} mais funcionalidades
+                            </div>
+                          )}
                         </div>
                       )}
 

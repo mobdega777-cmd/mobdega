@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { fetchAddressByCep, formatCep } from "@/lib/viaCepService";
 import { formatCurrency, formatPercentage } from "@/lib/formatCurrency";
+import { getFeatureLabels } from "@/lib/planFeatures";
 type AuthMode = "login" | "register";
 type UserType = "user" | "commerce";
 type DocumentType = "cpf" | "cnpj";
@@ -28,6 +29,7 @@ interface Plan {
   type: string;
   features: string[];
   description: string | null;
+  allowed_menu_items: string[];
 }
 
 const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) => {
@@ -84,7 +86,8 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
           price: Number(p.price),
           type: p.type,
           features: Array.isArray(p.features) ? p.features as string[] : [],
-          description: p.description
+          description: p.description,
+          allowed_menu_items: Array.isArray(p.allowed_menu_items) ? p.allowed_menu_items as string[] : []
         })));
       }
       setLoadingPlans(false);
@@ -1088,7 +1091,10 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
                                     {plan.name}
                                   </div>
                                   <div className="text-xs text-muted-foreground mt-1">
-                                    {plan.features.length > 0 ? plan.features.join(" • ") : plan.description || ''}
+                                    {plan.allowed_menu_items.length > 0 
+                                      ? getFeatureLabels(plan.allowed_menu_items).slice(0, 4).join(" • ")
+                                      : plan.description || ''}
+                                    {getFeatureLabels(plan.allowed_menu_items).length > 4 && ' ...'}
                                   </div>
                                 </div>
                                 <div className={`font-bold ${formData.plan === plan.type ? "text-secondary" : "text-foreground"}`}>
