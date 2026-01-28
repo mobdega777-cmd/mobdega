@@ -1671,6 +1671,22 @@ export type Database = {
         Args: { p_document: string }
         Returns: string
       }
+      get_public_commerces: {
+        Args: { p_limit?: number }
+        Returns: {
+          cep: string
+          city: string
+          cover_url: string
+          fantasy_name: string
+          id: string
+          is_open: boolean
+          logo_url: string
+          neighborhood: string
+          opening_hours: Json
+          phone: string
+          whatsapp: string
+        }[]
+      }
       get_public_stats: { Args: never; Returns: Json }
       has_role: {
         Args: {

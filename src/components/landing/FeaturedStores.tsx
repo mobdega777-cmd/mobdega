@@ -156,12 +156,9 @@ const FeaturedStores = () => {
     // Fetch delivery zones first
     const zones = await fetchDeliveryZones();
 
-    // Fetch approved commerces that are open (using public view for security)
+    // Fetch approved commerces using secure RPC function (bypasses RLS safely)
     const { data: commerces, error } = await supabase
-      .from('commerces_public')
-      .select('id, fantasy_name, city, cep, logo_url, cover_url, neighborhood, is_open, opening_hours, whatsapp, phone')
-      .eq('is_open', true)
-      .limit(50);
+      .rpc('get_public_commerces', { p_limit: 50 });
 
     if (error) {
       console.error('Error fetching stores:', error);
