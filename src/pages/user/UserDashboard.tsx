@@ -107,14 +107,19 @@ const isStoreOpen = (isOpen: boolean | null, openingHours: OpeningHours | null):
   const openTime = openHour * 60 + openMinute;
   let closeTime = closeHour * 60 + closeMinute;
   
-  // Handle overnight hours (e.g., 18:00 - 00:00 or 18:00 - 02:00)
-  if (closeTime <= openTime) {
+  // Treat 00:00 closing time as 24:00 (midnight = end of day)
+  if (closeTime === 0) {
+    closeTime = 24 * 60; // 1440 minutes = 24:00
+  }
+  
+  // Handle overnight hours (e.g., 18:00 - 02:00) - but not 00:00 which is already handled
+  if (closeTime < openTime) {
     closeTime += 24 * 60;
     const adjustedCurrentTime = currentTime < openTime ? currentTime + 24 * 60 : currentTime;
     return adjustedCurrentTime >= openTime && adjustedCurrentTime <= closeTime;
   }
   
-  return currentTime >= openTime && currentTime <= closeTime;
+  return currentTime >= openTime && currentTime < closeTime;
 };
 
 const UserDashboard = () => {
@@ -256,12 +261,9 @@ const UserDashboard = () => {
   };
 
   const fetchCommerces = async () => {
-    // Use public view for security (excludes sensitive owner data)
+    // Use secure RPC function (bypasses RLS safely, returns only public fields)
     const { data, error } = await supabase
-      .from('commerces_public')
-      .select('id, fantasy_name, logo_url, cover_url, city, neighborhood, is_open, opening_hours, whatsapp')
-      .eq('is_open', true)
-      .limit(50);
+      .rpc('get_public_commerces', { p_limit: 50 });
     
     if (error) {
       console.error('Error fetching commerces:', error);
@@ -271,7 +273,7 @@ const UserDashboard = () => {
     // Filter by actual opening hours and fetch ratings
     const commercesWithRatings = await Promise.all(
       (data || [])
-        .filter(commerce => isStoreOpen(commerce.is_open, commerce.opening_hours as OpeningHours))
+        .filter(commerce => isStoreOpen(commerce.is_open, commerce.opening_hours as unknown as OpeningHours))
         .map(async (commerce) => {
           const { data: reviews } = await supabase
             .from('reviews')
@@ -284,14 +286,22 @@ const UserDashboard = () => {
             : 0;
           
           return {
-            ...commerce,
+            id: commerce.id,
+            fantasy_name: commerce.fantasy_name,
+            logo_url: commerce.logo_url,
+            cover_url: commerce.cover_url,
+            city: commerce.city,
+            neighborhood: commerce.neighborhood,
+            is_open: commerce.is_open,
+            opening_hours: commerce.opening_hours as unknown as OpeningHours,
+            whatsapp: commerce.whatsapp,
             averageRating,
             reviewCount
-          };
+          } as Commerce;
         })
     );
     
-    setCommerces(commercesWithRatings as Commerce[]);
+    setCommerces(commercesWithRatings);
   };
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {

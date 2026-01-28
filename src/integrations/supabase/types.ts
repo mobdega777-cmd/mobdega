@@ -1688,6 +1688,18 @@ export type Database = {
         }[]
       }
       get_public_stats: { Args: never; Returns: Json }
+      get_ranking_commerces: {
+        Args: never
+        Returns: {
+          cep: string
+          city: string
+          fantasy_name: string
+          id: string
+          logo_url: string
+          neighborhood: string
+          plan_id: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
