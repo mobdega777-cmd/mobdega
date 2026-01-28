@@ -29,7 +29,8 @@ import {
   Wallet,
   TrendingDown as TrendingDownIcon,
   Bell,
-  Loader2
+  Loader2,
+  Calculator
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -37,6 +38,7 @@ import DateFilter from "./DateFilter";
 import InvoicePaymentModal from "./InvoicePaymentModal";
 import CommerceExpenses from "./CommerceExpenses";
 import SalesEvolutionChart from "./SalesEvolutionChart";
+import TaxConfigModal from "./TaxConfigModal";
 import { startOfDay, endOfDay, subDays, startOfMonth, format, eachDayOfInterval } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { formatCurrency, formatPercentage } from "@/lib/formatCurrency";
@@ -75,11 +77,23 @@ interface FinancialStats {
   projectedRevenue: number;
   growthRate: number;
   productCostSold: number;
+  taxAmount: number;
+}
+
+interface TaxConfig {
+  tax_type: 'fixed' | 'percentage';
+  tax_value: number;
+  tax_regime: 'mei' | 'simples' | 'lucro_presumido' | 'lucro_real';
+  tax_payment_day: number;
 }
 
 interface Commerce {
   fantasy_name: string;
   logo_url: string | null;
+  tax_type?: string;
+  tax_value?: number;
+  tax_regime?: string;
+  tax_payment_day?: number;
 }
 
 const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
@@ -118,7 +132,10 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
     projectedRevenue: 0,
     growthRate: 0,
     productCostSold: 0,
+    taxAmount: 0,
   });
+  const [taxConfig, setTaxConfig] = useState<TaxConfig | null>(null);
+  const [isTaxModalOpen, setIsTaxModalOpen] = useState(false);
   const { toast } = useToast();
 
   // Using centralized formatCurrency from @/lib/formatCurrency
@@ -132,15 +149,23 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
     const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1).toISOString();
     const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0).toISOString();
     
-    // Fetch commerce info
+    // Fetch commerce info including tax settings
     const { data: commerceData } = await supabase
       .from('commerces')
-      .select('fantasy_name, logo_url')
+      .select('fantasy_name, logo_url, tax_type, tax_value, tax_regime, tax_payment_day')
       .eq('id', commerceId)
       .single();
     
     if (commerceData) {
       setCommerce(commerceData);
+      if (commerceData.tax_type) {
+        setTaxConfig({
+          tax_type: commerceData.tax_type as 'fixed' | 'percentage',
+          tax_value: commerceData.tax_value || 0,
+          tax_regime: (commerceData.tax_regime || 'simples') as TaxConfig['tax_regime'],
+          tax_payment_day: commerceData.tax_payment_day || 20,
+        });
+      }
     }
     
     // Fetch orders for revenue (filtered by date)
@@ -306,6 +331,14 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
       i.status === 'overdue'
     ).reduce((sum, i) => sum + Number(i.amount), 0) || 0;
 
+    // Calculate tax amount based on config
+    let taxAmount = 0;
+    if (commerceData?.tax_type === 'fixed') {
+      taxAmount = commerceData.tax_value || 0;
+    } else if (commerceData?.tax_type === 'percentage') {
+      taxAmount = (monthlyRevenue * (commerceData.tax_value || 0)) / 100;
+    }
+
     setStats({
       monthlyRevenue,
       monthlyCost,
@@ -323,6 +356,7 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
       projectedRevenue,
       growthRate,
       productCostSold,
+      taxAmount,
     });
     setInvoices(invoicesData || []);
     setLoading(false);
@@ -340,6 +374,36 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
       cancelled: { label: "Cancelado", color: "bg-gray-500/20 text-gray-500" },
     };
     return config[status] || config.pending;
+  };
+
+  const handleSaveTaxConfig = async (config: TaxConfig) => {
+    const { error } = await supabase
+      .from('commerces')
+      .update({
+        tax_type: config.tax_type,
+        tax_value: config.tax_value,
+        tax_regime: config.tax_regime,
+        tax_payment_day: config.tax_payment_day,
+      })
+      .eq('id', commerceId);
+
+    if (error) {
+      toast({ variant: "destructive", title: "Erro ao salvar configuração de impostos" });
+    } else {
+      setTaxConfig(config);
+      toast({ title: "Configuração de impostos salva com sucesso!" });
+      fetchData(); // Refresh stats with new tax calculation
+    }
+  };
+
+  const getTaxRegimeLabel = (regime: string) => {
+    const labels: Record<string, string> = {
+      mei: "MEI",
+      simples: "Simples Nacional",
+      lucro_presumido: "Lucro Presumido",
+      lucro_real: "Lucro Real",
+    };
+    return labels[regime] || regime;
   };
 
   const handleGenerateSalesReport = async () => {
@@ -570,6 +634,15 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
           <Button 
             variant="outline" 
             size="sm" 
+            onClick={() => setIsTaxModalOpen(true)}
+            className="text-xs sm:text-sm"
+          >
+            <Calculator className="w-4 h-4 mr-1 sm:mr-2" />
+            <span className="hidden xs:inline">Configurar</span> Impostos
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
             onClick={handleGenerateSalesReport}
             disabled={!!generatingPdf}
             className="text-xs sm:text-sm"
@@ -597,6 +670,15 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
           </Button>
         </div>
       </div>
+
+      {/* Tax Config Modal */}
+      <TaxConfigModal
+        isOpen={isTaxModalOpen}
+        onClose={() => setIsTaxModalOpen(false)}
+        commerceId={commerceId}
+        currentConfig={taxConfig}
+        onSave={handleSaveTaxConfig}
+      />
 
       {/* Main Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -746,6 +828,48 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Tax Card */}
+      <Card className="border-amber-500/20 bg-amber-500/5">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-amber-500/10">
+                <Calculator className="w-5 h-5 text-amber-500" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm text-muted-foreground">Imposto Estimado</p>
+                  <HelpTooltip content={
+                    taxConfig 
+                      ? `Cálculo baseado no regime ${getTaxRegimeLabel(taxConfig.tax_regime)}. ${
+                          taxConfig.tax_type === 'fixed' 
+                            ? `Valor fixo de ${formatCurrency(taxConfig.tax_value)}/mês.` 
+                            : `${taxConfig.tax_value}% sobre o faturamento.`
+                        } Vencimento todo dia ${taxConfig.tax_payment_day}. Configure para ajustar às suas necessidades.`
+                      : "Configure o tipo de imposto e regime tributário para calcular o valor estimado. Clique em 'Configurar Impostos' para definir."
+                  } />
+                </div>
+                <p className="text-2xl font-bold text-amber-500">{formatCurrency(stats.taxAmount)}</p>
+                {taxConfig && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {getTaxRegimeLabel(taxConfig.tax_regime)} • Vencimento dia {taxConfig.tax_payment_day}
+                  </p>
+                )}
+              </div>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => setIsTaxModalOpen(true)}>
+              Configurar
+            </Button>
+          </div>
+          {!taxConfig && (
+            <p className="text-xs text-muted-foreground mt-3 p-2 bg-muted/50 rounded">
+              💡 <strong>Dica:</strong> Configure seus impostos para ter uma visão mais precisa do lucro líquido. 
+              MEI: DAS fixo ~R$71,60/mês. Simples Nacional: 4% a 33% do faturamento.
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Sales Evolution Chart */}
       <SalesEvolutionChart commerceId={commerceId} dateFilter={dateFilter} />
