@@ -301,18 +301,27 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
   const fetchCommerceData = async () => {
     setLoading(true);
     
-    // Fetch commerce details including table_payment_required
+    // Fetch commerce details using RPC function (bypasses RLS for public data)
     const { data: commerceData } = await supabase
-      .from('commerces')
-      .select('*, table_payment_required')
-      .eq('id', commerceId)
-      .single();
+      .rpc('get_commerce_storefront', { p_commerce_id: commerceId });
     
-    if (commerceData) {
+    if (commerceData && commerceData.length > 0) {
+      const c = commerceData[0];
       setCommerce({
-        ...commerceData,
-        table_payment_required: commerceData.table_payment_required ?? true
-      } as unknown as Commerce);
+        id: c.id,
+        fantasy_name: c.fantasy_name,
+        logo_url: c.logo_url,
+        cover_url: c.cover_url,
+        city: c.city,
+        neighborhood: c.neighborhood,
+        address: c.address,
+        phone: c.phone,
+        whatsapp: c.whatsapp,
+        is_open: c.is_open,
+        delivery_enabled: c.delivery_enabled,
+        opening_hours: c.opening_hours as Record<string, { open: string; close: string; enabled: boolean }> | null,
+        table_payment_required: c.table_payment_required ?? true
+      });
     }
 
     // Check for active table order for this user at this commerce

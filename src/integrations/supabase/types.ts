@@ -1671,6 +1671,26 @@ export type Database = {
         Args: { p_document: string }
         Returns: string
       }
+      get_commerce_storefront: {
+        Args: { p_commerce_id: string }
+        Returns: {
+          address: string
+          address_number: string
+          city: string
+          cover_url: string
+          delivery_enabled: boolean
+          fantasy_name: string
+          id: string
+          is_open: boolean
+          logo_url: string
+          neighborhood: string
+          opening_hours: Json
+          phone: string
+          status: string
+          table_payment_required: boolean
+          whatsapp: string
+        }[]
+      }
       get_public_commerces: {
         Args: { p_limit?: number }
         Returns: {
