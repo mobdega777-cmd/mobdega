@@ -436,6 +436,10 @@ export type Database = {
           requested_plan_id: string | null
           status: Database["public"]["Enums"]["commerce_status"]
           table_payment_required: boolean
+          tax_payment_day: number | null
+          tax_regime: string | null
+          tax_type: string | null
+          tax_value: number | null
           updated_at: string
           upgrade_request_date: string | null
           upgrade_request_status: string | null
@@ -472,6 +476,10 @@ export type Database = {
           requested_plan_id?: string | null
           status?: Database["public"]["Enums"]["commerce_status"]
           table_payment_required?: boolean
+          tax_payment_day?: number | null
+          tax_regime?: string | null
+          tax_type?: string | null
+          tax_value?: number | null
           updated_at?: string
           upgrade_request_date?: string | null
           upgrade_request_status?: string | null
@@ -508,6 +516,10 @@ export type Database = {
           requested_plan_id?: string | null
           status?: Database["public"]["Enums"]["commerce_status"]
           table_payment_required?: boolean
+          tax_payment_day?: number | null
+          tax_regime?: string | null
+          tax_type?: string | null
+          tax_value?: number | null
           updated_at?: string
           upgrade_request_date?: string | null
           upgrade_request_status?: string | null
