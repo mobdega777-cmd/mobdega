@@ -84,8 +84,10 @@ const SalesEvolutionChart = ({ commerceId, dateFilter }: SalesEvolutionChartProp
       });
 
       // Add orders data
+      // IMPORTANTE: Usa T12:00:00 para evitar shift de timezone
       orders?.forEach(order => {
-        const dateKey = format(new Date(order.created_at), 'yyyy-MM-dd');
+        const orderDate = new Date(order.created_at.replace('Z', ''));
+        const dateKey = format(orderDate, 'yyyy-MM-dd');
         const existing = dailyMap.get(dateKey) || { revenue: 0, orders: 0 };
         dailyMap.set(dateKey, {
           revenue: existing.revenue + Number(order.total),
@@ -94,8 +96,10 @@ const SalesEvolutionChart = ({ commerceId, dateFilter }: SalesEvolutionChartProp
       });
 
       // Add cash movements data
+      // IMPORTANTE: Usa mesmo tratamento de timezone
       cashMovements?.forEach(movement => {
-        const dateKey = format(new Date(movement.created_at), 'yyyy-MM-dd');
+        const movementDate = new Date(movement.created_at.replace('Z', ''));
+        const dateKey = format(movementDate, 'yyyy-MM-dd');
         const existing = dailyMap.get(dateKey) || { revenue: 0, orders: 0 };
         dailyMap.set(dateKey, {
           revenue: existing.revenue + Number(movement.amount),
@@ -104,17 +108,21 @@ const SalesEvolutionChart = ({ commerceId, dateFilter }: SalesEvolutionChartProp
       });
 
       // Convert to array and sort
+      // IMPORTANTE: Adiciona T12:00:00 para evitar shift de timezone UTC
       const dailyArray: DailyData[] = Array.from(dailyMap.entries())
-        .map(([dateKey, data]) => ({
-          date: format(new Date(dateKey), 'dd/MM', { locale: ptBR }),
-          fullDate: format(new Date(dateKey), 'dd/MM/yyyy', { locale: ptBR }),
-          revenue: data.revenue,
-          orders: data.orders
-        }))
+        .map(([dateKey, data]) => {
+          const localDate = new Date(`${dateKey}T12:00:00`);
+          return {
+            date: format(localDate, 'dd/MM', { locale: ptBR }),
+            fullDate: format(localDate, 'dd/MM/yyyy', { locale: ptBR }),
+            revenue: data.revenue,
+            orders: data.orders
+          };
+        })
         .sort((a, b) => {
-          const [dA, mA] = a.fullDate.split('/').map(Number);
-          const [dB, mB] = b.fullDate.split('/').map(Number);
-          return new Date(2024, mA - 1, dA).getTime() - new Date(2024, mB - 1, dB).getTime();
+          const [dA, mA, yA] = a.fullDate.split('/').map(Number);
+          const [dB, mB, yB] = b.fullDate.split('/').map(Number);
+          return new Date(yA, mA - 1, dA).getTime() - new Date(yB, mB - 1, dB).getTime();
         });
 
       setDailyData(dailyArray);
