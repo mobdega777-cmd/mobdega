@@ -900,6 +900,8 @@ export type Database = {
       orders: {
         Row: {
           commerce_id: string
+          coupon_code: string | null
+          coupon_discount: number | null
           created_at: string
           customer_name: string | null
           customer_phone: string | null
@@ -923,6 +925,8 @@ export type Database = {
         }
         Insert: {
           commerce_id: string
+          coupon_code?: string | null
+          coupon_discount?: number | null
           created_at?: string
           customer_name?: string | null
           customer_phone?: string | null
@@ -946,6 +950,8 @@ export type Database = {
         }
         Update: {
           commerce_id?: string
+          coupon_code?: string | null
+          coupon_discount?: number | null
           created_at?: string
           customer_name?: string | null
           customer_phone?: string | null

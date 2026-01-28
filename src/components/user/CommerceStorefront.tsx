@@ -4,7 +4,7 @@ import {
   ArrowLeft, Store, MapPin, Phone, Clock, Star, Heart,
   UtensilsCrossed, Truck, MessageCircle, ShoppingCart, ChevronRight,
   X, Plus, Minus, Send, User, CreditCard, Banknote, Smartphone, DollarSign,
-  Check, Loader2, Camera, Users
+  Check, Loader2, Camera, Users, Tag
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -196,6 +196,13 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
   // Order status tracking
   const [createdOrderId, setCreatedOrderId] = useState<string | null>(null);
   const [orderStatus, setOrderStatus] = useState<string>("pending");
+
+  // Coupon states
+  const [couponCode, setCouponCode] = useState("");
+  const [couponDiscount, setCouponDiscount] = useState(0);
+  const [couponValid, setCouponValid] = useState<boolean | null>(null);
+  const [validatingCoupon, setValidatingCoupon] = useState(false);
+  const [couponMessage, setCouponMessage] = useState<string | null>(null);
 
   // Fetch tables separately for real-time updates
   const fetchTables = async () => {
@@ -710,10 +717,92 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
   };
 
   const deliveryFee = calculateDeliveryFee();
-  const orderTotal = orderMode === 'delivery' ? cartTotal + deliveryFee : cartTotal;
+  const orderSubtotal = orderMode === 'delivery' ? cartTotal + deliveryFee : cartTotal;
+  const orderTotal = Math.max(0, orderSubtotal - couponDiscount);
 
   // Calculate change for cash payment
   const cashChange = cashReceived ? Math.max(0, parseFloat(cashReceived) - orderTotal) : 0;
+
+  // Validate commerce coupon
+  const validateCoupon = async (code: string) => {
+    if (!code || code.length < 2) {
+      setCouponValid(null);
+      setCouponDiscount(0);
+      setCouponMessage(null);
+      return;
+    }
+
+    setValidatingCoupon(true);
+
+    const { data: coupon, error } = await supabase
+      .from('commerce_coupons')
+      .select('*')
+      .eq('commerce_id', commerceId)
+      .eq('code', code.toUpperCase())
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (error || !coupon) {
+      setCouponValid(false);
+      setCouponDiscount(0);
+      setCouponMessage(null);
+      setValidatingCoupon(false);
+      return;
+    }
+
+    // Check validity dates
+    const now = new Date();
+    if (coupon.valid_from && new Date(coupon.valid_from) > now) {
+      setCouponValid(false);
+      setCouponDiscount(0);
+      setCouponMessage("Cupom ainda não está válido");
+      setValidatingCoupon(false);
+      return;
+    }
+    if (coupon.valid_until && new Date(coupon.valid_until) < now) {
+      setCouponValid(false);
+      setCouponDiscount(0);
+      setCouponMessage("Cupom expirado");
+      setValidatingCoupon(false);
+      return;
+    }
+
+    // Check max uses
+    if (coupon.max_uses && (coupon.used_count || 0) >= coupon.max_uses) {
+      setCouponValid(false);
+      setCouponDiscount(0);
+      setCouponMessage("Cupom esgotado");
+      setValidatingCoupon(false);
+      return;
+    }
+
+    // Check minimum order value
+    if (coupon.min_order_value && cartTotal < coupon.min_order_value) {
+      setCouponValid(false);
+      setCouponDiscount(0);
+      setCouponMessage(`Pedido mínimo: R$ ${coupon.min_order_value.toFixed(2)}`);
+      setValidatingCoupon(false);
+      return;
+    }
+
+    // Calculate discount
+    let discount = 0;
+    if (coupon.discount_type === 'percentage') {
+      discount = (cartTotal * Number(coupon.discount_value)) / 100;
+    } else {
+      discount = Number(coupon.discount_value);
+    }
+
+    // Apply max discount cap if exists
+    if (coupon.max_discount && discount > coupon.max_discount) {
+      discount = coupon.max_discount;
+    }
+
+    setCouponValid(true);
+    setCouponDiscount(discount);
+    setCouponMessage(coupon.description || `Desconto aplicado!`);
+    setValidatingCoupon(false);
+  };
 
   // Handle table selection - now with session logic
   const handleSelectTable = async (table: Table) => {
@@ -1075,13 +1164,16 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
         table_id: selectedTable?.id || null,
         delivery_address: null,
         delivery_fee: 0,
+        discount: couponDiscount,
         notes: deliveryNotes || null,
         customer_name: customerName,
         customer_phone: customerPhone,
         payment_method: 'pending', // Will be set by commerce when processing
         subtotal,
         total,
-        status: 'pending'
+        status: 'pending',
+        coupon_code: couponValid && couponCode ? couponCode.toUpperCase() : null,
+        coupon_discount: couponDiscount
       })
       .select()
       .single();
@@ -1143,13 +1235,16 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
         table_id: selectedTable?.id || null,
         delivery_address: fullAddress,
         delivery_fee: orderMode === 'delivery' ? deliveryFee : 0,
+        discount: couponDiscount,
         notes: deliveryNotes || null,
         customer_name: customerName,
         customer_phone: customerPhone,
         payment_method: selectedPaymentMethod,
         subtotal,
         total,
-        status: 'pending'
+        status: 'pending',
+        coupon_code: couponValid && couponCode ? couponCode.toUpperCase() : null,
+        coupon_discount: couponDiscount
       })
       .select()
       .single();
@@ -1184,6 +1279,10 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
     setSelectedPaymentMethod(null);
     setCashReceived("");
     setDeliveryNotes("");
+    setCouponCode("");
+    setCouponDiscount(0);
+    setCouponValid(null);
+    setCouponMessage(null);
     setSubmittingOrder(false);
 
     toast({ title: "Pedido enviado com sucesso!" });
@@ -2030,6 +2129,46 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
               </div>
             </div>
 
+            {/* Coupon Code */}
+            <div className="border-t pt-4 space-y-2">
+              <Label htmlFor="couponCode" className="flex items-center gap-2">
+                <Tag className="w-4 h-4" />
+                Cupom de desconto
+              </Label>
+              <div className="relative">
+                <Input
+                  id="couponCode"
+                  value={couponCode}
+                  onChange={(e) => {
+                    const code = e.target.value.toUpperCase();
+                    setCouponCode(code);
+                    if (code.length >= 3) {
+                      validateCoupon(code);
+                    } else {
+                      setCouponValid(null);
+                      setCouponDiscount(0);
+                      setCouponMessage(null);
+                    }
+                  }}
+                  placeholder="Digite o código do cupom"
+                  className={`pr-10 uppercase ${
+                    couponValid === true ? 'border-green-500' : 
+                    couponValid === false ? 'border-destructive' : ''
+                  }`}
+                />
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  {validatingCoupon && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
+                  {couponValid === true && <Check className="w-4 h-4 text-green-500" />}
+                  {couponValid === false && <X className="w-4 h-4 text-destructive" />}
+                </div>
+              </div>
+              {couponMessage && (
+                <p className={`text-xs ${couponValid ? 'text-green-600' : 'text-destructive'}`}>
+                  {couponMessage}
+                </p>
+              )}
+            </div>
+
             {/* Order Summary */}
             <div className="border-t pt-4 space-y-2">
               <div className="flex justify-between text-sm">
@@ -2040,6 +2179,15 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Taxa de entrega</span>
                   <span>{formatCurrency(deliveryFee)}</span>
+                </div>
+              )}
+              {couponDiscount > 0 && (
+                <div className="flex justify-between text-sm text-green-600">
+                  <span className="flex items-center gap-1">
+                    <Tag className="w-3 h-3" />
+                    Desconto ({couponCode})
+                  </span>
+                  <span>-{formatCurrency(couponDiscount)}</span>
                 </div>
               )}
               <div className="flex justify-between text-lg font-bold pt-2 border-t">

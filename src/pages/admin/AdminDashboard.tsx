@@ -63,10 +63,10 @@ type AdminSection =
 const menuItems = [
   { id: "overview" as AdminSection, label: "Visão Geral", icon: LayoutDashboard },
   { id: "financial" as AdminSection, label: "Financeiro", icon: DollarSign },
-  { id: "invoices" as AdminSection, label: "Faturas", icon: Receipt, showBadge: true },
+  { id: "invoices" as AdminSection, label: "Faturas", icon: Receipt, badgeKey: 'invoices' as const },
   { id: "billing-config" as AdminSection, label: "Configurar Cobrança", icon: CreditCard },
   { id: "users" as AdminSection, label: "Usuários", icon: Users },
-  { id: "commerces" as AdminSection, label: "Adegas/Tabacarias", icon: Store },
+  { id: "commerces" as AdminSection, label: "Adegas/Tabacarias", icon: Store, badgeKey: 'commerces' as const },
   { id: "customers" as AdminSection, label: "Gestão de Clientes", icon: Users },
   { id: "plans" as AdminSection, label: "Planos", icon: Crown },
   { id: "coupons" as AdminSection, label: "Cupons", icon: Receipt },
@@ -81,14 +81,16 @@ const AdminDashboard = () => {
   const [activeSection, setActiveSection] = useState<AdminSection>("overview");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [pendingPaymentConfirmations, setPendingPaymentConfirmations] = useState(0);
+  const [pendingUpgradeRequests, setPendingUpgradeRequests] = useState(0);
   const { signOut } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchPendingConfirmations();
+    fetchPendingUpgrades();
 
     // Subscribe to invoice changes
-    const channel = supabase
+    const invoiceChannel = supabase
       .channel('invoices-changes')
       .on(
         'postgres_changes',
@@ -97,8 +99,19 @@ const AdminDashboard = () => {
       )
       .subscribe();
 
+    // Subscribe to commerce changes for upgrade requests
+    const commerceChannel = supabase
+      .channel('commerces-upgrades')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'commerces' },
+        () => fetchPendingUpgrades()
+      )
+      .subscribe();
+
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(invoiceChannel);
+      supabase.removeChannel(commerceChannel);
     };
   }, []);
 
@@ -111,6 +124,16 @@ const AdminDashboard = () => {
       .eq('status', 'pending');
     
     setPendingPaymentConfirmations(confirmedCount || 0);
+  };
+
+  const fetchPendingUpgrades = async () => {
+    // Count commerces with pending upgrade requests
+    const { count: upgradeCount } = await supabase
+      .from('commerces')
+      .select('*', { count: 'exact', head: true })
+      .eq('upgrade_request_status', 'pending');
+    
+    setPendingUpgradeRequests(upgradeCount || 0);
   };
 
   const handleLogout = async () => {
@@ -270,9 +293,14 @@ const AdminDashboard = () => {
               >
                 <Icon className="w-5 h-5 flex-shrink-0" />
                 <span className="flex-1 text-left font-medium text-sm">{item.label}</span>
-                {item.showBadge && pendingPaymentConfirmations > 0 && (
+                {item.badgeKey === 'invoices' && pendingPaymentConfirmations > 0 && (
                   <Badge variant="destructive" className="text-xs px-2 py-0.5">
                     {pendingPaymentConfirmations}
+                  </Badge>
+                )}
+                {item.badgeKey === 'commerces' && pendingUpgradeRequests > 0 && (
+                  <Badge className="text-xs px-2 py-0.5 bg-purple-500 text-white">
+                    {pendingUpgradeRequests}
                   </Badge>
                 )}
                 {isActive && <ChevronRight className="w-4 h-4" />}
