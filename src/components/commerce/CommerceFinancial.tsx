@@ -428,6 +428,20 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
         .gte('created_at', dateFilter.start.toISOString())
         .lte('created_at', dateFilter.end.toISOString());
 
+      // Fetch expenses for the report
+      const { data: expenses } = await supabase
+        .from('expenses')
+        .select('name, type, amount, created_at')
+        .eq('commerce_id', commerceId)
+        .eq('is_active', true);
+
+      // Separate fixed expenses from stock purchases
+      const fixedExpenses = expenses?.filter(e => e.type !== 'stock_purchase') || [];
+      const stockPurchases = expenses?.filter(e => e.type === 'stock_purchase') || [];
+      
+      const totalFixedExpenses = fixedExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
+      const totalStockPurchases = stockPurchases.reduce((sum, e) => sum + Number(e.amount), 0);
+
       // Payment method breakdown
       const paymentMap = new Map<string, { total: number; count: number }>();
       orders?.forEach(o => {
@@ -516,6 +530,15 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
         orders: data.orders
       }));
 
+      // Calculate financial details
+      const grossRevenue = stats.monthlyRevenue;
+      const netRevenue = grossRevenue - operatorFees;
+      const netProfit = netRevenue - stats.productCostSold - totalFixedExpenses - totalStockPurchases - stats.taxAmount;
+      
+      // Business valuation: 12x monthly net profit
+      const monthlyNetProfit = netProfit > 0 ? netProfit : 0;
+      const businessValuation = monthlyNetProfit * 12;
+
       await generateSalesReportPDF({
         commerceName: commerce.fantasy_name,
         logoUrl: commerce.logo_url,
@@ -532,7 +555,34 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
           count: data.count
         })),
         dailySales: dailySalesArray,
-        weeklySales: weeklySalesArray
+        weeklySales: weeklySalesArray,
+        financialDetails: {
+          grossRevenue,
+          netRevenue,
+          operatorFees,
+          productCostSold: stats.productCostSold,
+          taxAmount: stats.taxAmount,
+          taxRegime: taxConfig?.tax_regime || 'simples',
+          taxPaymentDay: taxConfig?.tax_payment_day || 20,
+          fixedExpenses: totalFixedExpenses,
+          stockPurchases: totalStockPurchases,
+          netProfit,
+          stockValue: stats.stockCostValue,
+          potentialStockProfit: stats.potentialProfit,
+          projectedRevenue: stats.projectedRevenue,
+          businessValuation,
+          expenses: fixedExpenses.map(e => ({
+            name: e.name,
+            type: e.type,
+            amount: Number(e.amount),
+          })),
+          stockPurchaseHistory: stockPurchases.map(e => ({
+            name: e.name,
+            type: e.type,
+            amount: Number(e.amount),
+            date: format(new Date(e.created_at), 'dd/MM/yyyy'),
+          })),
+        }
       });
 
       toast({ title: "Relatório de Vendas gerado com sucesso!" });
