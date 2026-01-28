@@ -51,10 +51,15 @@ const isStoreOpen = (isOpen: boolean | null, openingHours: OpeningHours | null):
   const openTime = openHour * 60 + openMinute;
   let closeTime = closeHour * 60 + closeMinute;
   
-  // Handle overnight hours (e.g., 18:00 - 00:00 or 18:00 - 02:00)
-  if (closeTime <= openTime) {
-    // Closing time crosses midnight
-    closeTime += 24 * 60; // Add 24 hours
+  // Handle closing at midnight (00:00) - treat as end of day (24:00)
+  if (closeTime === 0 && closeHour === 0) {
+    closeTime = 24 * 60; // 24:00 = 1440 minutes
+  }
+  
+  // Handle overnight hours (e.g., 18:00 - 02:00, but NOT 08:00 - 00:00)
+  if (closeTime < openTime) {
+    // Closing time crosses midnight (like 22:00 - 02:00)
+    closeTime += 24 * 60;
     const adjustedCurrentTime = currentTime < openTime ? currentTime + 24 * 60 : currentTime;
     return adjustedCurrentTime >= openTime && adjustedCurrentTime <= closeTime;
   }
