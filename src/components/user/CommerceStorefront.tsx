@@ -1828,11 +1828,35 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
                         <span>{cartItemsCount}</span>
                       </div>
                     )}
+                    
+                    {/* Subtotal before discount */}
+                    {activeOrderCoupon && activeOrderCoupon.discount > 0 && (
+                      <>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Subtotal</span>
+                          <span>
+                            {formatCurrency(
+                              cartTotal + activeOrderItems.reduce((sum, item) => sum + item.total_price, 0)
+                            )}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-sm text-green-600">
+                          <span className="flex items-center gap-1">
+                            <Tag className="w-3 h-3" />
+                            Cupom {activeOrderCoupon.code}
+                          </span>
+                          <span>- {formatCurrency(activeOrderCoupon.discount)}</span>
+                        </div>
+                      </>
+                    )}
+                    
                     <div className="flex justify-between font-bold text-lg">
                       <span>Total da Comanda</span>
                       <span className="text-primary">
                         {formatCurrency(
-                          cartTotal + activeOrderItems.reduce((sum, item) => sum + item.total_price, 0)
+                          Math.max(0, 
+                            cartTotal + activeOrderItems.reduce((sum, item) => sum + item.total_price, 0) - (activeOrderCoupon?.discount || 0)
+                          )
                         )}
                       </span>
                     </div>
