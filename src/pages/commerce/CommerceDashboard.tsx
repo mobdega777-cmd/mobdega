@@ -244,6 +244,24 @@ const CommerceDashboard = () => {
     fetchCommerce();
   }, [user]);
 
+  // Keep plan/menu in sync after upgrades (plan_id changes)
+  useEffect(() => {
+    if (!commerce?.id) return;
+
+    const channel = supabase
+      .channel(`commerce-plan-sync-${commerce.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'commerces', filter: `id=eq.${commerce.id}` },
+        () => fetchCommerce()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [commerce?.id]);
+
   useEffect(() => {
     if (commerce?.id) {
       fetchPendingInvoices(commerce.id);
@@ -320,7 +338,7 @@ const CommerceDashboard = () => {
   const isMenuItemLocked = (itemId: string) => {
     if (!planConfig) return false;
     // Items that are always available
-    const alwaysAvailable = ["overview", "settings", "contract", "training"];
+    const alwaysAvailable = ["overview", "settings", "contract", "training", "forum"];
     if (alwaysAvailable.includes(itemId)) return false;
     return !planConfig.allowed_menu_items.includes(itemId);
   };

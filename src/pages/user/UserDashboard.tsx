@@ -244,7 +244,6 @@ const UserDashboard = () => {
   const fetchFavorites = async () => {
     if (!user) return;
     
-    // Use the public view to bypass RLS and get commerce details
     const { data: favsData, error } = await supabase
       .from('favorites')
       .select('id, commerce_id')
@@ -255,26 +254,49 @@ const UserDashboard = () => {
       return;
     }
 
-    // Fetch commerce details from public view
+    // Fetch commerce details using secure RPC (works even when direct table/view reads are restricted)
     if (favsData && favsData.length > 0) {
-      const commerceIds = favsData.map(f => f.commerce_id);
-      const { data: commercesData } = await supabase
-        .from('commerces_public')
-        .select('id, fantasy_name, logo_url, cover_url, city, is_open')
-        .in('id', commerceIds);
+      const commerceIds = favsData.map((f) => f.commerce_id);
 
-      const commerceMap = new Map(commercesData?.map(c => [c.id, c]) || []);
-      
-      const favoritesWithCommerce = favsData.map(fav => ({
+      const results = await Promise.all(
+        commerceIds.map(async (id) => {
+          const { data, error: commerceErr } = await supabase
+            .rpc('get_commerce_storefront', { p_commerce_id: id });
+
+          if (commerceErr) {
+            console.error('Error fetching favorite commerce details:', commerceErr);
+            return [id, null] as const;
+          }
+
+          const c = data?.[0];
+          if (!c) return [id, null] as const;
+
+          return [
+            id,
+            {
+              fantasy_name: c.fantasy_name,
+              logo_url: c.logo_url,
+              cover_url: c.cover_url,
+              city: c.city,
+              is_open: c.is_open,
+            },
+          ] as const;
+        })
+      );
+
+      const commerceMap = new Map(results);
+
+      const favoritesWithCommerce = favsData.map((fav) => ({
         id: fav.id,
         commerce_id: fav.commerce_id,
-        commerce: commerceMap.get(fav.commerce_id) || null
+        commerce: (commerceMap.get(fav.commerce_id) as Favorite['commerce']) || null,
       }));
 
       setFavorites(favoritesWithCommerce as Favorite[]);
-    } else {
-      setFavorites([]);
+      return;
     }
+
+    setFavorites([]);
   };
 
   const fetchCommerces = async () => {
