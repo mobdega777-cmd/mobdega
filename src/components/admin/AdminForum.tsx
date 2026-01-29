@@ -1,0 +1,706 @@
+import { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  MessageSquare,
+  Plus,
+  MessageCircle,
+  Eye,
+  Clock,
+  User,
+  CheckCircle,
+  Pin,
+  Lightbulb,
+  Bug,
+  HelpCircle,
+  Star,
+  Search,
+  Loader2,
+  Send,
+  ArrowLeft,
+  MoreVertical,
+  Trash2,
+  PinOff,
+  Lock,
+  Unlock
+} from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
+import { formatDistanceToNow } from "date-fns";
+import { ptBR } from "date-fns/locale";
+
+interface ForumTopic {
+  id: string;
+  title: string;
+  content: string;
+  category: string;
+  author_id: string;
+  author_name: string;
+  author_avatar_url: string | null;
+  author_type: string;
+  commerce_id: string | null;
+  is_pinned: boolean;
+  is_closed: boolean;
+  views_count: number;
+  replies_count: number;
+  last_reply_at: string | null;
+  created_at: string;
+}
+
+interface ForumReply {
+  id: string;
+  topic_id: string;
+  content: string;
+  author_id: string;
+  author_name: string;
+  author_avatar_url: string | null;
+  author_type: string;
+  commerce_id: string | null;
+  is_solution: boolean;
+  created_at: string;
+}
+
+const categories = [
+  { value: 'general', label: 'Geral', icon: MessageCircle },
+  { value: 'suggestion', label: 'Sugestão', icon: Lightbulb },
+  { value: 'bug', label: 'Problema', icon: Bug },
+  { value: 'question', label: 'Dúvida', icon: HelpCircle },
+  { value: 'feature', label: 'Nova Funcionalidade', icon: Star },
+];
+
+const AdminForum = () => {
+  const [topics, setTopics] = useState<ForumTopic[]>([]);
+  const [selectedTopic, setSelectedTopic] = useState<ForumTopic | null>(null);
+  const [replies, setReplies] = useState<ForumReply[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingReplies, setLoadingReplies] = useState(false);
+  const [showNewTopicModal, setShowNewTopicModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [submitting, setSubmitting] = useState(false);
+  const { user } = useAuth();
+  const { toast } = useToast();
+
+  const [newTopic, setNewTopic] = useState({
+    title: "",
+    content: "",
+    category: "general",
+  });
+
+  const [newReply, setNewReply] = useState("");
+
+  useEffect(() => {
+    fetchTopics();
+  }, []);
+
+  const fetchTopics = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('forum_topics')
+      .select('*')
+      .order('is_pinned', { ascending: false })
+      .order('last_reply_at', { ascending: false, nullsFirst: false })
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching topics:', error);
+    } else {
+      setTopics(data || []);
+    }
+    setLoading(false);
+  };
+
+  const fetchReplies = async (topicId: string) => {
+    setLoadingReplies(true);
+    const { data, error } = await supabase
+      .from('forum_replies')
+      .select('*')
+      .eq('topic_id', topicId)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching replies:', error);
+    } else {
+      setReplies(data || []);
+    }
+    setLoadingReplies(false);
+  };
+
+  const handleOpenTopic = async (topic: ForumTopic) => {
+    setSelectedTopic(topic);
+    await fetchReplies(topic.id);
+    
+    await supabase
+      .from('forum_topics')
+      .update({ views_count: topic.views_count + 1 })
+      .eq('id', topic.id);
+  };
+
+  const handleCreateTopic = async () => {
+    if (!user || !newTopic.title.trim() || !newTopic.content.trim()) {
+      toast({ variant: "destructive", title: "Preencha todos os campos" });
+      return;
+    }
+
+    setSubmitting(true);
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name, avatar_url')
+      .eq('user_id', user.id)
+      .single();
+
+    const { error } = await supabase
+      .from('forum_topics')
+      .insert({
+        title: newTopic.title,
+        content: newTopic.content,
+        category: newTopic.category,
+        author_id: user.id,
+        author_name: profile?.full_name || 'Administrador',
+        author_avatar_url: profile?.avatar_url,
+        author_type: 'admin',
+        commerce_id: null,
+      });
+
+    if (error) {
+      toast({ variant: "destructive", title: "Erro ao criar tópico", description: error.message });
+    } else {
+      toast({ title: "Tópico criado com sucesso!" });
+      setShowNewTopicModal(false);
+      setNewTopic({ title: "", content: "", category: "general" });
+      fetchTopics();
+    }
+
+    setSubmitting(false);
+  };
+
+  const handleSubmitReply = async () => {
+    if (!user || !selectedTopic || !newReply.trim()) {
+      toast({ variant: "destructive", title: "Digite uma resposta" });
+      return;
+    }
+
+    setSubmitting(true);
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name, avatar_url')
+      .eq('user_id', user.id)
+      .single();
+
+    const { error } = await supabase
+      .from('forum_replies')
+      .insert({
+        topic_id: selectedTopic.id,
+        content: newReply,
+        author_id: user.id,
+        author_name: profile?.full_name || 'Administrador',
+        author_avatar_url: profile?.avatar_url,
+        author_type: 'admin',
+        commerce_id: null,
+      });
+
+    if (error) {
+      toast({ variant: "destructive", title: "Erro ao enviar resposta", description: error.message });
+    } else {
+      setNewReply("");
+      fetchReplies(selectedTopic.id);
+      setSelectedTopic(prev => prev ? { ...prev, replies_count: prev.replies_count + 1 } : null);
+    }
+
+    setSubmitting(false);
+  };
+
+  const handleTogglePin = async (topic: ForumTopic) => {
+    await supabase
+      .from('forum_topics')
+      .update({ is_pinned: !topic.is_pinned })
+      .eq('id', topic.id);
+    fetchTopics();
+    if (selectedTopic?.id === topic.id) {
+      setSelectedTopic({ ...topic, is_pinned: !topic.is_pinned });
+    }
+    toast({ title: topic.is_pinned ? "Tópico desafixado" : "Tópico fixado" });
+  };
+
+  const handleToggleClosed = async (topic: ForumTopic) => {
+    await supabase
+      .from('forum_topics')
+      .update({ is_closed: !topic.is_closed })
+      .eq('id', topic.id);
+    fetchTopics();
+    if (selectedTopic?.id === topic.id) {
+      setSelectedTopic({ ...topic, is_closed: !topic.is_closed });
+    }
+    toast({ title: topic.is_closed ? "Tópico reaberto" : "Tópico fechado" });
+  };
+
+  const handleDeleteTopic = async (topicId: string) => {
+    await supabase.from('forum_topics').delete().eq('id', topicId);
+    fetchTopics();
+    if (selectedTopic?.id === topicId) {
+      setSelectedTopic(null);
+    }
+    toast({ title: "Tópico excluído" });
+  };
+
+  const handleMarkAsSolution = async (replyId: string) => {
+    await supabase
+      .from('forum_replies')
+      .update({ is_solution: true })
+      .eq('id', replyId);
+    if (selectedTopic) {
+      fetchReplies(selectedTopic.id);
+    }
+    toast({ title: "Marcado como solução" });
+  };
+
+  const getCategoryConfig = (category: string) => {
+    const config = categories.find(c => c.value === category);
+    return config || categories[0];
+  };
+
+  const filteredTopics = topics.filter(topic => {
+    const matchesSearch = topic.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      topic.content.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = categoryFilter === 'all' || topic.category === categoryFilter;
+    return matchesSearch && matchesCategory;
+  });
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // Topic detail view
+  if (selectedTopic) {
+    const categoryConfig = getCategoryConfig(selectedTopic.category);
+    const CategoryIcon = categoryConfig.icon;
+
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <Button variant="ghost" onClick={() => setSelectedTopic(null)} className="gap-2">
+            <ArrowLeft className="w-4 h-4" />
+            Voltar ao Fórum
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon">
+                <MoreVertical className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => handleTogglePin(selectedTopic)}>
+                {selectedTopic.is_pinned ? (
+                  <>
+                    <PinOff className="w-4 h-4 mr-2" />
+                    Desafixar
+                  </>
+                ) : (
+                  <>
+                    <Pin className="w-4 h-4 mr-2" />
+                    Fixar
+                  </>
+                )}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleToggleClosed(selectedTopic)}>
+                {selectedTopic.is_closed ? (
+                  <>
+                    <Unlock className="w-4 h-4 mr-2" />
+                    Reabrir
+                  </>
+                ) : (
+                  <>
+                    <Lock className="w-4 h-4 mr-2" />
+                    Fechar
+                  </>
+                )}
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={() => handleDeleteTopic(selectedTopic.id)}
+                className="text-destructive"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Excluir
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-start gap-4">
+              <Avatar className="w-12 h-12">
+                <AvatarImage src={selectedTopic.author_avatar_url || undefined} />
+                <AvatarFallback>
+                  <User className="w-6 h-6" />
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {selectedTopic.is_pinned && (
+                    <Pin className="w-4 h-4 text-primary" />
+                  )}
+                  {selectedTopic.is_closed && (
+                    <Lock className="w-4 h-4 text-red-500" />
+                  )}
+                  <CardTitle className="text-xl">{selectedTopic.title}</CardTitle>
+                </div>
+                <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1">
+                  <span className="font-medium text-foreground">{selectedTopic.author_name}</span>
+                  {selectedTopic.author_type === 'admin' && (
+                    <Badge variant="default" className="text-xs">Admin</Badge>
+                  )}
+                  <Badge variant="outline" className="gap-1">
+                    <CategoryIcon className="w-3 h-3" />
+                    {categoryConfig.label}
+                  </Badge>
+                  <span className="flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    {formatDistanceToNow(new Date(selectedTopic.created_at), { addSuffix: true, locale: ptBR })}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="whitespace-pre-wrap">{selectedTopic.content}</p>
+          </CardContent>
+        </Card>
+
+        {/* Replies */}
+        <div className="space-y-4">
+          <h3 className="font-semibold flex items-center gap-2">
+            <MessageCircle className="w-5 h-5" />
+            Respostas ({selectedTopic.replies_count})
+          </h3>
+
+          {loadingReplies ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin" />
+            </div>
+          ) : replies.length === 0 ? (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground">
+                <MessageCircle className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p>Nenhuma resposta ainda.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {replies.map((reply) => (
+                <Card key={reply.id} className={reply.is_solution ? 'border-green-500 bg-green-500/5' : ''}>
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-3">
+                      <Avatar className="w-10 h-10">
+                        <AvatarImage src={reply.author_avatar_url || undefined} />
+                        <AvatarFallback>
+                          <User className="w-5 h-5" />
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-medium">{reply.author_name}</span>
+                            {reply.author_type === 'admin' && (
+                              <Badge variant="default" className="text-xs">Admin</Badge>
+                            )}
+                            {reply.is_solution && (
+                              <Badge className="bg-green-500 gap-1">
+                                <CheckCircle className="w-3 h-3" />
+                                Solução
+                              </Badge>
+                            )}
+                            <span className="text-xs text-muted-foreground">
+                              {formatDistanceToNow(new Date(reply.created_at), { addSuffix: true, locale: ptBR })}
+                            </span>
+                          </div>
+                          {!reply.is_solution && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleMarkAsSolution(reply.id)}
+                              className="text-green-600 hover:text-green-700"
+                            >
+                              <CheckCircle className="w-4 h-4 mr-1" />
+                              Marcar Solução
+                            </Button>
+                          )}
+                        </div>
+                        <p className="whitespace-pre-wrap text-sm">{reply.content}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          {/* Reply Form */}
+          {!selectedTopic.is_closed && (
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex gap-3">
+                  <Avatar className="w-10 h-10">
+                    <AvatarFallback className="bg-primary text-primary-foreground">
+                      <User className="w-5 h-5" />
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 space-y-2">
+                    <Textarea
+                      placeholder="Responder como Administrador..."
+                      value={newReply}
+                      onChange={(e) => setNewReply(e.target.value)}
+                      rows={3}
+                    />
+                    <div className="flex justify-end">
+                      <Button onClick={handleSubmitReply} disabled={submitting || !newReply.trim()}>
+                        {submitting ? (
+                          <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                        ) : (
+                          <Send className="w-4 h-4 mr-2" />
+                        )}
+                        Responder
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {selectedTopic.is_closed && (
+            <Card className="border-red-500/30 bg-red-500/5">
+              <CardContent className="py-4 text-center text-muted-foreground">
+                <Lock className="w-5 h-5 mx-auto mb-2 text-red-500" />
+                Este tópico está fechado para novas respostas.
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Topics list view
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
+              <MessageSquare className="w-7 h-7" />
+              Fórum da Comunidade
+            </h1>
+            <p className="text-muted-foreground text-sm">Gerencie discussões, sugestões e melhorias</p>
+          </div>
+          <Button onClick={() => setShowNewTopicModal(true)} className="gap-2">
+            <Plus className="w-4 h-4" />
+            Novo Anúncio
+          </Button>
+        </div>
+
+        {/* Filters */}
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar tópicos..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <SelectTrigger className="w-full sm:w-48">
+              <SelectValue placeholder="Categoria" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas as categorias</SelectItem>
+              {categories.map((cat) => (
+                <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {/* Topics List */}
+      {filteredTopics.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <MessageSquare className="w-16 h-16 mx-auto mb-4 text-muted-foreground opacity-50" />
+            <h3 className="text-lg font-semibold mb-2">Nenhum tópico encontrado</h3>
+            <p className="text-muted-foreground mb-4">
+              Crie um anúncio para a comunidade!
+            </p>
+            <Button onClick={() => setShowNewTopicModal(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              Criar Anúncio
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {filteredTopics.map((topic) => {
+            const categoryConfig = getCategoryConfig(topic.category);
+            const CategoryIcon = categoryConfig.icon;
+
+            return (
+              <Card 
+                key={topic.id} 
+                className={`hover:border-primary/50 transition-colors cursor-pointer ${topic.is_closed ? 'opacity-60' : ''}`}
+                onClick={() => handleOpenTopic(topic)}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-4">
+                    <Avatar className="w-10 h-10 flex-shrink-0">
+                      <AvatarImage src={topic.author_avatar_url || undefined} />
+                      <AvatarFallback>
+                        <User className="w-5 h-5" />
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {topic.is_pinned && (
+                          <Pin className="w-4 h-4 text-primary flex-shrink-0" />
+                        )}
+                        {topic.is_closed && (
+                          <Lock className="w-4 h-4 text-red-500 flex-shrink-0" />
+                        )}
+                        <h3 className="font-semibold truncate">{topic.title}</h3>
+                        <Badge variant="outline" className="gap-1 text-xs flex-shrink-0">
+                          <CategoryIcon className="w-3 h-3" />
+                          {categoryConfig.label}
+                        </Badge>
+                        {topic.author_type === 'admin' && (
+                          <Badge variant="default" className="text-xs flex-shrink-0">Admin</Badge>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground line-clamp-1 mt-1">
+                        {topic.content}
+                      </p>
+                      <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                        <span className="font-medium text-foreground">{topic.author_name}</span>
+                        <span className="flex items-center gap-1">
+                          <MessageCircle className="w-3 h-3" />
+                          {topic.replies_count}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Eye className="w-3 h-3" />
+                          {topic.views_count}
+                        </span>
+                        <span>
+                          {formatDistanceToNow(new Date(topic.created_at), { addSuffix: true, locale: ptBR })}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      {/* New Topic Modal */}
+      <Dialog open={showNewTopicModal} onOpenChange={setShowNewTopicModal}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="w-5 h-5" />
+              Novo Anúncio
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="topic-title">Título</Label>
+              <Input
+                id="topic-title"
+                placeholder="Resumo do anúncio..."
+                value={newTopic.title}
+                onChange={(e) => setNewTopic({ ...newTopic, title: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label htmlFor="topic-category">Categoria</Label>
+              <Select 
+                value={newTopic.category} 
+                onValueChange={(value) => setNewTopic({ ...newTopic, category: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((cat) => {
+                    const Icon = cat.icon;
+                    return (
+                      <SelectItem key={cat.value} value={cat.value}>
+                        <span className="flex items-center gap-2">
+                          <Icon className="w-4 h-4" />
+                          {cat.label}
+                        </span>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="topic-content">Conteúdo</Label>
+              <Textarea
+                id="topic-content"
+                placeholder="Escreva o conteúdo do anúncio..."
+                value={newTopic.content}
+                onChange={(e) => setNewTopic({ ...newTopic, content: e.target.value })}
+                rows={5}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowNewTopicModal(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleCreateTopic} disabled={submitting}>
+              {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Publicar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
+
+export default AdminForum;
