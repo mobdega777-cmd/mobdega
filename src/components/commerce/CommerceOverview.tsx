@@ -25,8 +25,8 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import DateFilter from "./DateFilter";
-import { startOfDay, endOfDay } from "date-fns";
 import { formatCurrency } from "@/lib/formatCurrency";
+import { getSupabaseDateRange, getTodayDateRange } from "@/lib/dateUtils";
 import HelpTooltip from "@/components/ui/help-tooltip";
 
 interface OpeningHours {
@@ -65,13 +65,8 @@ const CommerceOverview = ({ commerce }: CommerceOverviewProps) => {
   const [stats, setStats] = useState<Stats>({ totalOrders: 0, pendingOrders: 0, todayRevenue: 0, totalProducts: 0, activeDeliveries: 0, completedToday: 0 });
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  // Usa data local para evitar problemas de fuso horário UTC
-  const getLocalToday = () => {
-    const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0);
-  };
-  const localToday = getLocalToday();
-  const [dateFilter, setDateFilter] = useState({ start: startOfDay(localToday), end: endOfDay(localToday) });
+  const todayRange = getTodayDateRange();
+  const [dateFilter, setDateFilter] = useState({ start: todayRange.start, end: todayRange.end });
   const [isOpen, setIsOpen] = useState(true);
   const [openingHours, setOpeningHours] = useState<OpeningHours>(DEFAULT_HOURS);
   const [savingStatus, setSavingStatus] = useState(false);
@@ -112,17 +107,47 @@ const CommerceOverview = ({ commerce }: CommerceOverviewProps) => {
 
   useEffect(() => {
     const fetchStats = async () => {
+      const { startISO, endISO } = getSupabaseDateRange(dateFilter.start, dateFilter.end);
+      
+      // Busca pedidos para status e entregas ativas
       const { data: orders } = await supabase.from('orders').select('id, status, total, created_at, order_type').eq('commerce_id', commerce.id);
-      const { data: cashMovements } = await supabase.from('cash_movements').select('id, type, amount, created_at').eq('commerce_id', commerce.id).eq('type', 'sale');
+      
+      // Busca cash_movements como fonte única de verdade para faturamento
+      const { data: cashMovements } = await supabase
+        .from('cash_movements')
+        .select('id, type, amount, created_at')
+        .eq('commerce_id', commerce.id)
+        .eq('type', 'sale')
+        .gte('created_at', startISO)
+        .lte('created_at', endISO);
+      
       const pendingOrders = orders?.filter(o => ['pending', 'confirmed', 'preparing'].includes(o.status)).length || 0;
-      const filteredOrders = orders?.filter(o => { const d = new Date(o.created_at); return d >= dateFilter.start && d <= dateFilter.end && o.status === 'delivered'; }) || [];
-      const filteredMovements = cashMovements?.filter(m => { const d = new Date(m.created_at); return d >= dateFilter.start && d <= dateFilter.end; }) || [];
-      const dateRangeRevenue = filteredOrders.reduce((s, o) => s + Number(o.total), 0) + filteredMovements.reduce((s, m) => s + Number(m.amount), 0);
       const activeDeliveries = orders?.filter(o => o.status === 'delivering' && o.order_type === 'delivery').length || 0;
+      
+      // Faturamento e finalizados vêm apenas de cash_movements (fonte única)
+      const dateRangeRevenue = cashMovements?.reduce((s, m) => s + Number(m.amount), 0) || 0;
+      const completedCount = cashMovements?.length || 0;
+      
       const { count: productsCount } = await supabase.from('products').select('id', { count: 'exact', head: true }).eq('commerce_id', commerce.id);
-      // Fetch recent orders filtered by date range
-      const { data: recent } = await supabase.from('orders').select('*').eq('commerce_id', commerce.id).gte('created_at', dateFilter.start.toISOString()).lte('created_at', dateFilter.end.toISOString()).order('created_at', { ascending: false }).limit(10);
-      setStats({ totalOrders: orders?.length || 0, pendingOrders, todayRevenue: dateRangeRevenue, totalProducts: productsCount || 0, activeDeliveries, completedToday: filteredOrders.length + filteredMovements.length });
+      
+      // Pedidos recentes filtrados por data
+      const { data: recent } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('commerce_id', commerce.id)
+        .gte('created_at', startISO)
+        .lte('created_at', endISO)
+        .order('created_at', { ascending: false })
+        .limit(10);
+      
+      setStats({ 
+        totalOrders: orders?.length || 0, 
+        pendingOrders, 
+        todayRevenue: dateRangeRevenue, 
+        totalProducts: productsCount || 0, 
+        activeDeliveries, 
+        completedToday: completedCount 
+      });
       setRecentOrders(recent || []);
       setLoading(false);
     };
