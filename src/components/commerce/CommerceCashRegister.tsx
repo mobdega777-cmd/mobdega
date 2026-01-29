@@ -52,7 +52,8 @@ import {
   Percent,
   AlertTriangle,
   Users,
-  Receipt
+  Receipt,
+  Tag
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -143,6 +144,8 @@ interface TableOrder {
   session?: TableSession | null;
   participantOrders?: ParticipantOrder[];
   hasBillRequests?: boolean;
+  coupon_code?: string | null;
+  coupon_discount?: number;
   items: {
     id?: string;
     product_name: string;
@@ -283,6 +286,8 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
         total,
         status,
         payment_method,
+        coupon_code,
+        coupon_discount,
         order_items (
           id,
           product_name,
@@ -367,6 +372,14 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
           existingOrder.items = [...existingOrder.items, ...itemsWithUserId];
           existingOrder.total = Number(existingOrder.total) + Number(order.total);
           existingOrder.all_order_ids.push(order.id);
+          // Aggregate coupon discount
+          if (order.coupon_discount) {
+            existingOrder.coupon_discount = (existingOrder.coupon_discount || 0) + Number(order.coupon_discount);
+          }
+          // Keep first coupon code found
+          if (!existingOrder.coupon_code && order.coupon_code) {
+            existingOrder.coupon_code = order.coupon_code;
+          }
           // Manter o status MENOS avançado para não habilitar fechamento antes de todos estarem prontos
           const statusPriority: Record<string, number> = { pending: 1, confirmed: 2, preparing: 3, delivered: 4 };
           if (statusPriority[order.status] < statusPriority[existingOrder.status]) {
@@ -390,7 +403,9 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
             items: itemsWithUserId,
             all_order_ids: [order.id],
             session: session || null,
-            hasBillRequests
+            hasBillRequests,
+            coupon_code: order.coupon_code || null,
+            coupon_discount: Number(order.coupon_discount) || 0
           });
         }
       });
@@ -1762,6 +1777,21 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
                           </>
                         )}
 
+                        {/* Coupon Discount Display */}
+                        {order.coupon_code && order.coupon_discount && order.coupon_discount > 0 && (
+                          <div className="p-2 rounded-lg bg-green-500/10 border border-green-500/30">
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="flex items-center gap-1 text-green-600">
+                                <Tag className="w-3 h-3" />
+                                Cupom: {order.coupon_code}
+                              </span>
+                              <span className="font-medium text-green-600">
+                                - {formatCurrency(order.coupon_discount)}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+
                         {/* Total */}
                         <div className="border-t pt-2 flex justify-between items-center">
                           <span className="text-sm font-medium">Total Mesa</span>
@@ -1983,6 +2013,21 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
                   ))}
                 </div>
               </div>
+
+              {/* Coupon Discount in Details */}
+              {selectedTableOrder.coupon_code && selectedTableOrder.coupon_discount && selectedTableOrder.coupon_discount > 0 && (
+                <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/30">
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-2 text-green-600 font-medium">
+                      <Tag className="w-4 h-4" />
+                      Cupom aplicado: {selectedTableOrder.coupon_code}
+                    </span>
+                    <span className="font-bold text-green-600">
+                      - {formatCurrency(selectedTableOrder.coupon_discount)}
+                    </span>
+                  </div>
+                </div>
+              )}
 
               {/* Total */}
               <div className="border-t pt-3 flex justify-between items-center">
