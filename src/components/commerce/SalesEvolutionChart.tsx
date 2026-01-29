@@ -14,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { format, eachDayOfInterval, startOfWeek, endOfWeek, eachWeekOfInterval, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { formatCurrency } from "@/lib/formatCurrency";
+import { getSupabaseDateRange } from "@/lib/dateUtils";
 
 interface SalesEvolutionChartProps {
   commerceId: string;
@@ -55,23 +56,19 @@ const SalesEvolutionChart = ({ commerceId, dateFilter }: SalesEvolutionChartProp
     const fetchSalesData = async () => {
       setLoading(true);
       
-      // Fetch orders
-      const { data: orders } = await supabase
-        .from('orders')
-        .select('total, created_at')
-        .eq('commerce_id', commerceId)
-        .eq('status', 'delivered')
-        .gte('created_at', dateFilter.start.toISOString())
-        .lte('created_at', dateFilter.end.toISOString());
-
-      // Fetch cash movements (POS sales)
+      // Usa conversão correta de timezone para queries
+      const { startISO, endISO } = getSupabaseDateRange(dateFilter.start, dateFilter.end);
+      
+      // IMPORTANTE: Usar apenas cash_movements para faturamento real
+      // Os cash_movements já contêm o valor final (com descontos aplicados)
+      // Evita duplicação entre orders e movements
       const { data: cashMovements } = await supabase
         .from('cash_movements')
         .select('amount, created_at')
         .eq('commerce_id', commerceId)
         .eq('type', 'sale')
-        .gte('created_at', dateFilter.start.toISOString())
-        .lte('created_at', dateFilter.end.toISOString());
+        .gte('created_at', startISO)
+        .lte('created_at', endISO);
 
       // Process daily data
       const dailyMap = new Map<string, { revenue: number; orders: number }>();
@@ -83,20 +80,8 @@ const SalesEvolutionChart = ({ commerceId, dateFilter }: SalesEvolutionChartProp
         dailyMap.set(dateKey, { revenue: 0, orders: 0 });
       });
 
-      // Add orders data
+      // Add cash movements data (única fonte de faturamento)
       // IMPORTANTE: Usa T12:00:00 para evitar shift de timezone
-      orders?.forEach(order => {
-        const orderDate = new Date(order.created_at.replace('Z', ''));
-        const dateKey = format(orderDate, 'yyyy-MM-dd');
-        const existing = dailyMap.get(dateKey) || { revenue: 0, orders: 0 };
-        dailyMap.set(dateKey, {
-          revenue: existing.revenue + Number(order.total),
-          orders: existing.orders + 1
-        });
-      });
-
-      // Add cash movements data
-      // IMPORTANTE: Usa mesmo tratamento de timezone
       cashMovements?.forEach(movement => {
         const movementDate = new Date(movement.created_at.replace('Z', ''));
         const dateKey = format(movementDate, 'yyyy-MM-dd');
