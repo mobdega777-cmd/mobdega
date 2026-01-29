@@ -42,6 +42,7 @@ import TaxConfigModal from "./TaxConfigModal";
 import { startOfDay, endOfDay, subDays, startOfMonth, format, eachDayOfInterval } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { formatCurrency, formatPercentage } from "@/lib/formatCurrency";
+import { getSupabaseDateRange } from "@/lib/dateUtils";
 import HelpTooltip from "@/components/ui/help-tooltip";
 import { generateSalesReportPDF, generateStockReportPDF } from "@/lib/pdfReportGenerator";
 
@@ -151,6 +152,9 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
     const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1).toISOString();
     const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0).toISOString();
     
+    // Usa conversão correta de timezone para queries
+    const { startISO, endISO } = getSupabaseDateRange(dateFilter.start, dateFilter.end);
+    
     // Fetch commerce info including tax settings
     const { data: commerceData } = await supabase
       .from('commerces')
@@ -170,23 +174,16 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
       }
     }
     
-    // Fetch orders for revenue (filtered by date)
-    const { data: orders } = await supabase
-      .from('orders')
-      .select('total, status, created_at, payment_method')
-      .eq('commerce_id', commerceId)
-      .eq('status', 'delivered')
-      .gte('created_at', dateFilter.start.toISOString())
-      .lte('created_at', dateFilter.end.toISOString());
-
-    // Fetch cash movements (POS sales)
+    // Fetch cash movements (POS sales) with correct timezone
+    // IMPORTANTE: Usar apenas cash_movements como fonte única de faturamento
+    // Os cash_movements contêm o valor final (com descontos aplicados) e evita duplicação
     const { data: cashMovements } = await supabase
       .from('cash_movements')
       .select('amount, type, created_at, payment_method')
       .eq('commerce_id', commerceId)
       .eq('type', 'sale')
-      .gte('created_at', dateFilter.start.toISOString())
-      .lte('created_at', dateFilter.end.toISOString());
+      .gte('created_at', startISO)
+      .lte('created_at', endISO);
 
     // Fetch payment methods for fee calculation
     const { data: paymentMethods } = await supabase
@@ -195,23 +192,16 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
       .eq('commerce_id', commerceId)
       .eq('is_active', true);
 
-    // Use 'type' as key for matching with order.payment_method (e.g., 'cash', 'credit', 'debit', 'pix')
+    // Use 'type' as key for matching with movement.payment_method
     const feeMap = new Map(paymentMethods?.map(pm => [pm.type, { pct: pm.fee_percentage || 0, fixed: pm.fee_fixed || 0 }]) || []);
 
-    const ordersRevenue = orders?.reduce((sum, o) => sum + Number(o.total), 0) || 0;
-    const movementsRevenue = cashMovements?.reduce((sum, m) => sum + Number(m.amount), 0) || 0;
-    const monthlyRevenue = ordersRevenue + movementsRevenue;
-    const totalOrders = (orders?.length || 0) + (cashMovements?.length || 0);
+    // Calcular faturamento usando apenas cash_movements
+    const monthlyRevenue = cashMovements?.reduce((sum, m) => sum + Number(m.amount), 0) || 0;
+    const totalOrders = cashMovements?.length || 0;
     const avgTicket = totalOrders > 0 ? monthlyRevenue / totalOrders : 0;
 
-    // Calculate operator fees
+    // Calculate operator fees usando apenas cash_movements
     let calculatedFees = 0;
-    orders?.forEach(order => {
-      const fee = feeMap.get(order.payment_method || '');
-      if (fee) {
-        calculatedFees += Number(order.total) * (fee.pct / 100) + fee.fixed;
-      }
-    });
     cashMovements?.forEach(movement => {
       const fee = feeMap.get(movement.payment_method || '');
       if (fee) {
@@ -257,7 +247,7 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
       stockSaleValue += (p.promotional_price || p.price || 0) * stock;
     });
 
-    // Calcular categorias com base em vendas reais - FILTERED BY DATE
+    // Calcular categorias com base em vendas reais - FILTERED BY DATE with correct timezone
     const { data: orderItems } = await supabase
       .from('order_items')
       .select(`
@@ -268,8 +258,8 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
       `)
       .eq('orders.commerce_id', commerceId)
       .eq('orders.status', 'delivered')
-      .gte('orders.created_at', dateFilter.start.toISOString())
-      .lte('orders.created_at', dateFilter.end.toISOString());
+      .gte('orders.created_at', startISO)
+      .lte('orders.created_at', endISO);
 
     // Buscar produtos com suas categorias
     const { data: productsWithCategories } = await supabase
@@ -413,22 +403,19 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
     setGeneratingPdf('vendas');
     
     try {
-      // Fetch detailed data for the report
-      const { data: orders } = await supabase
-        .from('orders')
-        .select('total, status, created_at, payment_method')
-        .eq('commerce_id', commerceId)
-        .eq('status', 'delivered')
-        .gte('created_at', dateFilter.start.toISOString())
-        .lte('created_at', dateFilter.end.toISOString());
-
+      // Usa conversão correta de timezone para queries
+      const { startISO, endISO } = getSupabaseDateRange(dateFilter.start, dateFilter.end);
+      
+      // Fetch detailed data for the report with correct timezone
+      // IMPORTANTE: Usar apenas cash_movements para faturamento real
+      // Os cash_movements já contêm o valor final (com descontos aplicados)
       const { data: cashMovements } = await supabase
         .from('cash_movements')
         .select('amount, payment_method, created_at')
         .eq('commerce_id', commerceId)
         .eq('type', 'sale')
-        .gte('created_at', dateFilter.start.toISOString())
-        .lte('created_at', dateFilter.end.toISOString());
+        .gte('created_at', startISO)
+        .lte('created_at', endISO);
 
       // Fetch expenses for the report
       const { data: expenses } = await supabase
@@ -444,40 +431,30 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
       const totalFixedExpenses = fixedExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
       const totalStockPurchases = stockPurchases.reduce((sum, e) => sum + Number(e.amount), 0);
 
-      // Payment method breakdown
+      // Payment method breakdown (usando apenas cash_movements)
       const paymentMap = new Map<string, { total: number; count: number }>();
-      orders?.forEach(o => {
-        const method = o.payment_method || 'Não informado';
-        const existing = paymentMap.get(method) || { total: 0, count: 0 };
-        paymentMap.set(method, { total: existing.total + Number(o.total), count: existing.count + 1 });
-      });
       cashMovements?.forEach(m => {
         const method = m.payment_method || 'Dinheiro';
         const existing = paymentMap.get(method) || { total: 0, count: 0 };
         paymentMap.set(method, { total: existing.total + Number(m.amount), count: existing.count + 1 });
       });
 
-      // Daily sales
+      // Daily sales (usando apenas cash_movements)
       const dailyMap = new Map<string, { revenue: number; orders: number }>();
-      orders?.forEach(o => {
-        const date = format(new Date(o.created_at), 'dd/MM/yyyy');
-        const existing = dailyMap.get(date) || { revenue: 0, orders: 0 };
-        dailyMap.set(date, { revenue: existing.revenue + Number(o.total), orders: existing.orders + 1 });
-      });
       cashMovements?.forEach(m => {
         const date = format(new Date(m.created_at), 'dd/MM/yyyy');
         const existing = dailyMap.get(date) || { revenue: 0, orders: 0 };
         dailyMap.set(date, { revenue: existing.revenue + Number(m.amount), orders: existing.orders + 1 });
       });
 
-      // Fetch categories with sales
+      // Fetch categories with sales (use the same startISO/endISO)
       const { data: orderItems } = await supabase
         .from('order_items')
         .select('total_price, product_id, orders!inner(commerce_id, status, created_at)')
         .eq('orders.commerce_id', commerceId)
         .eq('orders.status', 'delivered')
-        .gte('orders.created_at', dateFilter.start.toISOString())
-        .lte('orders.created_at', dateFilter.end.toISOString());
+        .gte('orders.created_at', startISO)
+        .lte('orders.created_at', endISO);
 
       const { data: productsWithCategories } = await supabase
         .from('products')
