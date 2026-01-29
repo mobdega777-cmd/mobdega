@@ -9,7 +9,8 @@ import {
   Medal,
   Crown,
   ArrowLeft,
-  Loader2
+  Loader2,
+  AlertTriangle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -372,6 +373,19 @@ const Ranking = () => {
             <p>
               <strong className="text-foreground">Zonas:</strong> As regiões são baseadas no CEP do estabelecimento, incluindo São Paulo capital e região metropolitana.
             </p>
+            
+            <div className="bg-destructive/10 p-3 rounded-lg border border-destructive/20 mt-4">
+              <p className="font-semibold text-destructive mb-1 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4" />
+                Aviso Importante - Fraudes
+              </p>
+              <p className="text-sm">
+                A criação de contas falsas, avaliações fraudulentas ou qualquer tentativa de 
+                manipulação do ranking resultará no <strong>banimento imediato</strong> do 
+                estabelecimento da competição, sem direito a recurso. Todas as atividades 
+                são monitoradas.
+              </p>
+            </div>
           </CardContent>
         </Card>
       </main>
