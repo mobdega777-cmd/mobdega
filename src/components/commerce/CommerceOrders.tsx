@@ -310,6 +310,13 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
   const createCashMovementForOrder = async (order: Order) => {
     if (!user) return;
 
+    // NÃO criar movimentação para pedidos com pagamento pendente (mesas sem pagamento imediato)
+    // O movimento será criado quando o lojista fechar a mesa no PDV
+    if (order.payment_method === 'pending') {
+      console.log('Pedido com pagamento pendente - movimentação será criada no fechamento da mesa');
+      return;
+    }
+
     // Buscar caixa aberto do comércio
     const { data: openRegister } = await supabase
       .from('cash_registers')
