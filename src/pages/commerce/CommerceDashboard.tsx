@@ -57,6 +57,7 @@ import CommerceContract from "@/components/commerce/CommerceContract";
 import CommerceTraining from "@/components/commerce/CommerceTraining";
 import CommerceRanking from "@/components/commerce/CommerceRanking";
 import CommerceCoupons from "@/components/commerce/CommerceCoupons";
+import CommerceForum from "@/components/commerce/CommerceForum";
 import UpgradeModal from "@/components/commerce/UpgradeModal";
 
 type CommerceSection = 
@@ -77,10 +78,11 @@ type CommerceSection =
   | "contract"
   | "training"
   | "ranking"
+  | "forum"
   | "settings";
 
 // Ordem atualizada com Cupons entre Financeiro e Clientes
-import { Ticket } from "lucide-react";
+import { Ticket, MessageSquare } from "lucide-react";
 
 const menuItems = [
   { id: "overview" as CommerceSection, label: "Visão Geral", icon: LayoutDashboard },
@@ -100,6 +102,7 @@ const menuItems = [
   { id: "contract" as CommerceSection, label: "Contrato", icon: FileText },
   { id: "training" as CommerceSection, label: "Treinamento", icon: BookOpen },
   { id: "ranking" as CommerceSection, label: "Ranking", icon: Trophy },
+  { id: "forum" as CommerceSection, label: "Fórum", icon: MessageSquare },
   { id: "settings" as CommerceSection, label: "Configurações", icon: Settings },
 ];
 
@@ -303,12 +306,8 @@ const CommerceDashboard = () => {
 
   const handleMenuClick = (sectionId: CommerceSection, isDisabled: boolean, isLocked: boolean) => {
     if (isLocked) {
-      // Show upgrade message for locked items
-      import("sonner").then(({ toast }) => {
-        toast.info("Funcionalidade bloqueada", {
-          description: "Faça upgrade do seu plano para acessar esta funcionalidade."
-        });
-      });
+      // Open upgrade modal for locked items
+      setUpgradeModalOpen(true);
       return;
     }
     if (!isDisabled) {
@@ -450,6 +449,8 @@ const CommerceDashboard = () => {
         return <CommerceTraining />;
       case "ranking":
         return <CommerceRanking currentCommerceId={commerce.id} />;
+      case "forum":
+        return <CommerceForum commerceId={commerce.id} commerceName={commerce.fantasy_name} commerceLogo={commerce.logo_url} />;
       case "settings":
         return <CommerceSettings commerce={commerce} />;
       default:

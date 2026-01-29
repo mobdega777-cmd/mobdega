@@ -94,6 +94,8 @@ interface Commerce {
   tax_value?: number;
   tax_regime?: string;
   tax_payment_day?: number;
+  tax_paid_current_month?: boolean;
+  tax_paid_at?: string;
 }
 
 const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
@@ -152,7 +154,7 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
     // Fetch commerce info including tax settings
     const { data: commerceData } = await supabase
       .from('commerces')
-      .select('fantasy_name, logo_url, tax_type, tax_value, tax_regime, tax_payment_day')
+      .select('fantasy_name, logo_url, tax_type, tax_value, tax_regime, tax_payment_day, tax_paid_current_month, tax_paid_at')
       .eq('id', commerceId)
       .single();
     
@@ -880,46 +882,93 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
       </div>
 
       {/* Tax Card */}
-      <Card className="border-amber-500/20 bg-amber-500/5">
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-amber-500/10">
-                <Calculator className="w-5 h-5 text-amber-500" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <p className="text-sm text-muted-foreground">Imposto Estimado</p>
-                  <HelpTooltip content={
-                    taxConfig 
-                      ? `Cálculo baseado no regime ${getTaxRegimeLabel(taxConfig.tax_regime)}. ${
-                          taxConfig.tax_type === 'fixed' 
-                            ? `Valor fixo de ${formatCurrency(taxConfig.tax_value)}/mês.` 
-                            : `${taxConfig.tax_value}% sobre o faturamento.`
-                        } Vencimento todo dia ${taxConfig.tax_payment_day}. Configure para ajustar às suas necessidades.`
-                      : "Configure o tipo de imposto e regime tributário para calcular o valor estimado. Clique em 'Configurar Impostos' para definir."
-                  } />
+      {(() => {
+        // Calculate if payment is due in 2 days or less
+        const today = new Date();
+        const currentDay = today.getDate();
+        const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+        const paymentDay = taxConfig?.tax_payment_day || 20;
+        let daysUntilDue: number;
+        
+        if (currentDay <= paymentDay) {
+          daysUntilDue = paymentDay - currentDay;
+        } else {
+          // Already passed this month
+          daysUntilDue = daysInMonth - currentDay + paymentDay;
+        }
+        
+        const isAlertActive = daysUntilDue <= 2 && taxConfig && !commerce?.tax_paid_current_month;
+
+        const handleMarkAsPaid = async () => {
+          await supabase
+            .from('commerces')
+            .update({ 
+              tax_paid_current_month: true,
+              tax_paid_at: new Date().toISOString()
+            })
+            .eq('id', commerceId);
+          toast({ title: "Imposto marcado como pago!" });
+          fetchData();
+        };
+
+        return (
+          <Card className={`border-amber-500/20 bg-amber-500/5 ${isAlertActive ? 'animate-pulse ring-2 ring-amber-500' : ''}`}>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-lg ${isAlertActive ? 'bg-amber-500 animate-bounce' : 'bg-amber-500/10'}`}>
+                    <Calculator className={`w-5 h-5 ${isAlertActive ? 'text-white' : 'text-amber-500'}`} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm text-muted-foreground">Imposto Estimado</p>
+                      <HelpTooltip content={
+                        taxConfig 
+                          ? `Cálculo baseado no regime ${getTaxRegimeLabel(taxConfig.tax_regime)}. ${
+                              taxConfig.tax_type === 'fixed' 
+                                ? `Valor fixo de ${formatCurrency(taxConfig.tax_value)}/mês.` 
+                                : `${taxConfig.tax_value}% sobre o faturamento.`
+                            } Vencimento todo dia ${taxConfig.tax_payment_day}. Configure para ajustar às suas necessidades.`
+                          : "Configure o tipo de imposto e regime tributário para calcular o valor estimado. Clique em 'Configurar Impostos' para definir."
+                      } />
+                      {isAlertActive && (
+                        <Badge variant="destructive" className="animate-pulse">
+                          Vence em {daysUntilDue} dia{daysUntilDue !== 1 ? 's' : ''}!
+                        </Badge>
+                      )}
+                      {commerce?.tax_paid_current_month && (
+                        <Badge className="bg-green-500">Pago</Badge>
+                      )}
+                    </div>
+                    <p className="text-2xl font-bold text-amber-500">{formatCurrency(stats.taxAmount)}</p>
+                    {taxConfig && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {getTaxRegimeLabel(taxConfig.tax_regime)} • Vencimento dia {taxConfig.tax_payment_day}
+                      </p>
+                    )}
+                  </div>
                 </div>
-                <p className="text-2xl font-bold text-amber-500">{formatCurrency(stats.taxAmount)}</p>
-                {taxConfig && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {getTaxRegimeLabel(taxConfig.tax_regime)} • Vencimento dia {taxConfig.tax_payment_day}
-                  </p>
-                )}
+                <div className="flex flex-col gap-2">
+                  {isAlertActive && (
+                    <Button size="sm" className="bg-green-500 hover:bg-green-600" onClick={handleMarkAsPaid}>
+                      ✓ Paguei
+                    </Button>
+                  )}
+                  <Button variant="outline" size="sm" onClick={() => setIsTaxModalOpen(true)}>
+                    Configurar
+                  </Button>
+                </div>
               </div>
-            </div>
-            <Button variant="outline" size="sm" onClick={() => setIsTaxModalOpen(true)}>
-              Configurar
-            </Button>
-          </div>
-          {!taxConfig && (
-            <p className="text-xs text-muted-foreground mt-3 p-2 bg-muted/50 rounded">
-              💡 <strong>Dica:</strong> Configure seus impostos para ter uma visão mais precisa do lucro líquido. 
-              MEI: DAS fixo ~R$71,60/mês. Simples Nacional: 4% a 33% do faturamento.
-            </p>
-          )}
-        </CardContent>
-      </Card>
+              {!taxConfig && (
+                <p className="text-xs text-muted-foreground mt-3 p-2 bg-muted/50 rounded">
+                  💡 <strong>Dica:</strong> Configure seus impostos para ter uma visão mais precisa do lucro líquido. 
+                  MEI: DAS fixo ~R$71,60/mês. Simples Nacional: 4% a 33% do faturamento.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* Sales Evolution Chart */}
       <SalesEvolutionChart commerceId={commerceId} dateFilter={dateFilter} />

@@ -436,6 +436,8 @@ export type Database = {
           requested_plan_id: string | null
           status: Database["public"]["Enums"]["commerce_status"]
           table_payment_required: boolean
+          tax_paid_at: string | null
+          tax_paid_current_month: boolean | null
           tax_payment_day: number | null
           tax_regime: string | null
           tax_type: string | null
@@ -476,6 +478,8 @@ export type Database = {
           requested_plan_id?: string | null
           status?: Database["public"]["Enums"]["commerce_status"]
           table_payment_required?: boolean
+          tax_paid_at?: string | null
+          tax_paid_current_month?: boolean | null
           tax_payment_day?: number | null
           tax_regime?: string | null
           tax_type?: string | null
@@ -516,6 +520,8 @@ export type Database = {
           requested_plan_id?: string | null
           status?: Database["public"]["Enums"]["commerce_status"]
           table_payment_required?: boolean
+          tax_paid_at?: string | null
+          tax_paid_current_month?: boolean | null
           tax_payment_day?: number | null
           tax_regime?: string | null
           tax_type?: string | null
@@ -788,6 +794,142 @@ export type Database = {
             columns: ["invoice_id"]
             isOneToOne: false
             referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      forum_replies: {
+        Row: {
+          author_avatar_url: string | null
+          author_id: string
+          author_name: string
+          author_type: string
+          commerce_id: string | null
+          content: string
+          created_at: string
+          id: string
+          is_solution: boolean | null
+          topic_id: string
+          updated_at: string
+        }
+        Insert: {
+          author_avatar_url?: string | null
+          author_id: string
+          author_name: string
+          author_type?: string
+          commerce_id?: string | null
+          content: string
+          created_at?: string
+          id?: string
+          is_solution?: boolean | null
+          topic_id: string
+          updated_at?: string
+        }
+        Update: {
+          author_avatar_url?: string | null
+          author_id?: string
+          author_name?: string
+          author_type?: string
+          commerce_id?: string | null
+          content?: string
+          created_at?: string
+          id?: string
+          is_solution?: boolean | null
+          topic_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "forum_replies_commerce_id_fkey"
+            columns: ["commerce_id"]
+            isOneToOne: false
+            referencedRelation: "commerces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "forum_replies_commerce_id_fkey"
+            columns: ["commerce_id"]
+            isOneToOne: false
+            referencedRelation: "commerces_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "forum_replies_topic_id_fkey"
+            columns: ["topic_id"]
+            isOneToOne: false
+            referencedRelation: "forum_topics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      forum_topics: {
+        Row: {
+          author_avatar_url: string | null
+          author_id: string
+          author_name: string
+          author_type: string
+          category: string
+          commerce_id: string | null
+          content: string
+          created_at: string
+          id: string
+          is_closed: boolean | null
+          is_pinned: boolean | null
+          last_reply_at: string | null
+          replies_count: number | null
+          title: string
+          updated_at: string
+          views_count: number | null
+        }
+        Insert: {
+          author_avatar_url?: string | null
+          author_id: string
+          author_name: string
+          author_type?: string
+          category?: string
+          commerce_id?: string | null
+          content: string
+          created_at?: string
+          id?: string
+          is_closed?: boolean | null
+          is_pinned?: boolean | null
+          last_reply_at?: string | null
+          replies_count?: number | null
+          title: string
+          updated_at?: string
+          views_count?: number | null
+        }
+        Update: {
+          author_avatar_url?: string | null
+          author_id?: string
+          author_name?: string
+          author_type?: string
+          category?: string
+          commerce_id?: string | null
+          content?: string
+          created_at?: string
+          id?: string
+          is_closed?: boolean | null
+          is_pinned?: boolean | null
+          last_reply_at?: string | null
+          replies_count?: number | null
+          title?: string
+          updated_at?: string
+          views_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "forum_topics_commerce_id_fkey"
+            columns: ["commerce_id"]
+            isOneToOne: false
+            referencedRelation: "commerces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "forum_topics_commerce_id_fkey"
+            columns: ["commerce_id"]
+            isOneToOne: false
+            referencedRelation: "commerces_public"
             referencedColumns: ["id"]
           },
         ]

@@ -244,20 +244,37 @@ const UserDashboard = () => {
   const fetchFavorites = async () => {
     if (!user) return;
     
-    const { data, error } = await supabase
+    // Use the public view to bypass RLS and get commerce details
+    const { data: favsData, error } = await supabase
       .from('favorites')
-      .select(`
-        id, commerce_id,
-        commerce:commerces(fantasy_name, logo_url, cover_url, city, is_open)
-      `)
+      .select('id, commerce_id')
       .eq('user_id', user.id);
     
     if (error) {
       console.error('Error fetching favorites:', error);
       return;
     }
-    
-    setFavorites((data || []) as unknown as Favorite[]);
+
+    // Fetch commerce details from public view
+    if (favsData && favsData.length > 0) {
+      const commerceIds = favsData.map(f => f.commerce_id);
+      const { data: commercesData } = await supabase
+        .from('commerces_public')
+        .select('id, fantasy_name, logo_url, cover_url, city, is_open')
+        .in('id', commerceIds);
+
+      const commerceMap = new Map(commercesData?.map(c => [c.id, c]) || []);
+      
+      const favoritesWithCommerce = favsData.map(fav => ({
+        id: fav.id,
+        commerce_id: fav.commerce_id,
+        commerce: commerceMap.get(fav.commerce_id) || null
+      }));
+
+      setFavorites(favoritesWithCommerce as Favorite[]);
+    } else {
+      setFavorites([]);
+    }
   };
 
   const fetchCommerces = async () => {
