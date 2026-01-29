@@ -176,7 +176,9 @@ const CommerceOverview = ({ commerce }: CommerceOverviewProps) => {
     fetchStats();
   }, [commerce.id, dateFilter]);
 
-  const shareUrl = `https://mobdega.lovable.app/loja/${commerce.id}`;
+  // Use window.location.origin to dynamically get the correct domain (works in production with custom domain)
+  const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://mobdega.lovable.app';
+  const shareUrl = `${baseUrl}/loja/${commerce.id}`;
   const shareMessage = `🎉 Conheça ${commerce.fantasy_name}!\n\n✨ Novidades:\n📱 Cardápio digital\n🛵 Pedidos delivery pelo app\n💳 Pagamento online\n\nAcesse: ${shareUrl}`;
 
   const handleShare = (platform: 'copy' | 'whatsapp' | 'facebook' | 'twitter' | 'instagram') => {
