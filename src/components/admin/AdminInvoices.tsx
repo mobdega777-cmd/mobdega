@@ -294,8 +294,8 @@ const AdminInvoices = () => {
     );
   };
 
-  // Generate day options (1-28)
-  const dayOptions = Array.from({ length: 28 }, (_, i) => i + 1);
+  // Generate day options (1-31)
+  const dayOptions = Array.from({ length: 31 }, (_, i) => i + 1);
 
   return (
     <div className="space-y-6">

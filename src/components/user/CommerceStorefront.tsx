@@ -338,6 +338,22 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
           // When a session is closed, refresh tables to update availability
           if (payload.new.status === 'closed') {
             fetchTables();
+            // Check if this was the user's current session - if so, clear their table state
+            if (currentSession && payload.new.id === currentSession.id) {
+              setCurrentSession(null);
+              setSelectedTable(null);
+              setSessionParticipants([]);
+              setHasActiveTableOrder(false);
+              setActiveOrderId(null);
+              setActiveOrderTotal(0);
+              setActiveOrderCoupon(null);
+              setActiveOrderItems([]);
+              setOrderMode('none');
+              toast({ 
+                title: "Mesa encerrada", 
+                description: "O caixa encerrou a sessão da sua mesa."
+              });
+            }
             // Also check if the user's active order was closed
             if (user) {
               checkActiveTableOrder();
@@ -351,7 +367,7 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
       supabase.removeChannel(channel);
       supabase.removeChannel(sessionsChannel);
     };
-  }, [commerceId, user]);
+  }, [commerceId, user, currentSession, toast]);
 
   const fetchCommerceData = async () => {
     setLoading(true);
