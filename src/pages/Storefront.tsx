@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import CommerceStorefront from "@/components/user/CommerceStorefront";
-import AuthModal from "@/components/auth/AuthModal";
 
 const Storefront = () => {
   const { commerceId } = useParams<{ commerceId: string }>();
@@ -13,7 +12,6 @@ const Storefront = () => {
   const { isLoading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);
   const [commerceExists, setCommerceExists] = useState(false);
-  const [showAuthModal, setShowAuthModal] = useState(false);
 
   useEffect(() => {
     const checkCommerce = async () => {
@@ -62,12 +60,6 @@ const Storefront = () => {
       <CommerceStorefront 
         commerceId={commerceId} 
         onBack={handleBack}
-      />
-
-      {/* Auth Modal for unauthenticated users */}
-      <AuthModal 
-        isOpen={showAuthModal} 
-        onClose={() => setShowAuthModal(false)}
       />
     </div>
   );

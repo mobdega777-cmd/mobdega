@@ -23,6 +23,7 @@ import { ptBR } from "date-fns/locale";
 import BillModeModal from "./BillModeModal";
 import JoinSessionModal from "./JoinSessionModal";
 import BillPaymentMethodModal from "./BillPaymentMethodModal";
+import AuthModal from "@/components/auth/AuthModal";
 
 interface Commerce {
   id: string;
@@ -166,6 +167,7 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
   const [showJoinSessionModal, setShowJoinSessionModal] = useState(false);
   const [showBillPaymentModal, setShowBillPaymentModal] = useState(false);
   const [requestingBill, setRequestingBill] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
   
   // Session management for split bills
   const [pendingTable, setPendingTable] = useState<Table | null>(null);
@@ -337,23 +339,30 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
         (payload) => {
           // When a session is closed, refresh tables to update availability
           if (payload.new.status === 'closed') {
+            // Immediately refetch tables to get updated session_id
             fetchTables();
-            // Check if this was the user's current session - if so, clear their table state
-            if (currentSession && payload.new.id === currentSession.id) {
-              setCurrentSession(null);
-              setSelectedTable(null);
-              setSessionParticipants([]);
-              setHasActiveTableOrder(false);
-              setActiveOrderId(null);
-              setActiveOrderTotal(0);
-              setActiveOrderCoupon(null);
-              setActiveOrderItems([]);
-              setOrderMode('none');
-              toast({ 
-                title: "Mesa encerrada", 
-                description: "O caixa encerrou a sessão da sua mesa."
-              });
-            }
+            
+            // Use functional update to get current session value (avoid stale closure)
+            setCurrentSession(prevSession => {
+              if (prevSession && payload.new.id === prevSession.id) {
+                // This was the user's current session - clear their table state
+                setSelectedTable(null);
+                setSessionParticipants([]);
+                setHasActiveTableOrder(false);
+                setActiveOrderId(null);
+                setActiveOrderTotal(0);
+                setActiveOrderCoupon(null);
+                setActiveOrderItems([]);
+                setOrderMode('none');
+                toast({ 
+                  title: "Mesa encerrada", 
+                  description: "O caixa encerrou a sessão da sua mesa."
+                });
+                return null;
+              }
+              return prevSession;
+            });
+            
             // Also check if the user's active order was closed
             if (user) {
               checkActiveTableOrder();
@@ -367,7 +376,7 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
       supabase.removeChannel(channel);
       supabase.removeChannel(sessionsChannel);
     };
-  }, [commerceId, user, currentSession, toast]);
+  }, [commerceId, user, toast]);
 
   const fetchCommerceData = async () => {
     setLoading(true);
@@ -696,6 +705,11 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
   }, [user, loading]);
 
   const toggleFavorite = async () => {
+    // Require authentication for favorites
+    if (!user) {
+      setShowAuthModal(true);
+      return;
+    }
     
     if (isFavorite) {
       await supabase.from('favorites').delete().eq('user_id', user.id).eq('commerce_id', commerceId);
@@ -1162,6 +1176,11 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
 
   // Handle order modes - exclusive selection (toggle behavior)
   const handlePedirNaMesa = () => {
+    // Require authentication for table orders
+    if (!user) {
+      setShowAuthModal(true);
+      return;
+    }
     if (tables.length === 0) {
       toast({ variant: "destructive", title: "Nenhuma mesa disponível" });
       return;
@@ -1171,6 +1190,11 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
   };
 
   const handlePedirDelivery = () => {
+    // Require authentication for delivery orders
+    if (!user) {
+      setShowAuthModal(true);
+      return;
+    }
     if (!commerce?.delivery_enabled) {
       toast({ variant: "destructive", title: "Delivery indisponível", description: "Este estabelecimento não está aceitando pedidos de delivery no momento" });
       return;
@@ -2640,6 +2664,12 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
         onConfirm={confirmBillRequest}
         loading={requestingBill}
         billTotal={activeOrderTotal}
+      />
+
+      {/* Auth Modal for unauthenticated users */}
+      <AuthModal 
+        isOpen={showAuthModal} 
+        onClose={() => setShowAuthModal(false)}
       />
     </motion.div>
   );
