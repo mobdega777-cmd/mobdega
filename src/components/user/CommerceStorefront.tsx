@@ -139,6 +139,8 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
   // Track if user has an active table order (to keep Comanda tab visible)
   const [hasActiveTableOrder, setHasActiveTableOrder] = useState(false);
   const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
+  const [activeOrderTotal, setActiveOrderTotal] = useState<number>(0);
+  const [activeOrderCoupon, setActiveOrderCoupon] = useState<{ code: string | null; discount: number } | null>(null);
   const [activeOrderItems, setActiveOrderItems] = useState<Array<{
     id: string;
     product_name: string;
@@ -222,6 +224,47 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
   useEffect(() => {
     fetchCommerceData();
   }, [commerceId]);
+
+  // Keep plan access in sync (plan upgrades should unlock features quickly)
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      refreshPlanAccess();
+    }, 10000);
+    return () => window.clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [commerceId]);
+
+  const refreshPlanAccess = async () => {
+    const { data: rankingData, error: rankingErr } = await supabase.rpc('get_ranking_commerces');
+    if (rankingErr) {
+      console.error('Error fetching commerce plan info:', rankingErr);
+      return;
+    }
+
+    const entry = (rankingData || []).find((r: any) => r.id === commerceId);
+    const planId: string | null = entry?.plan_id ?? null;
+    if (!planId) {
+      setAllowedMenuItems([]);
+      return;
+    }
+
+    const { data: planData, error: planErr } = await supabase
+      .from('plans')
+      .select('allowed_menu_items')
+      .eq('id', planId)
+      .single();
+
+    if (planErr) {
+      console.error('Error fetching plan allowed_menu_items:', planErr);
+      setAllowedMenuItems([]);
+      return;
+    }
+
+    const items = Array.isArray(planData?.allowed_menu_items)
+      ? (planData.allowed_menu_items as string[])
+      : [];
+    setAllowedMenuItems(items);
+  };
 
   // Real-time subscription for tables status changes (so user sees updated availability)
   useEffect(() => {
@@ -316,30 +359,8 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
     
     if (commerceData && commerceData.length > 0) {
       const c = commerceData[0];
-      
-      // Fetch commerce's plan_id and plan's allowed_menu_items
-      let planId: string | null = null;
-      let planAllowedItems: string[] = [];
-      
-      // Need to fetch plan_id from commerces_public view since RPC doesn't include it
-      const { data: commercePlanData } = await supabase
-        .from('commerces_public')
-        .select('plan_id')
-        .eq('id', c.id)
-        .single();
-      
-      if (commercePlanData?.plan_id) {
-        planId = commercePlanData.plan_id;
-        const { data: planData } = await supabase
-          .from('plans')
-          .select('allowed_menu_items')
-          .eq('id', commercePlanData.plan_id)
-          .single();
-        if (planData?.allowed_menu_items && Array.isArray(planData.allowed_menu_items)) {
-          planAllowedItems = planData.allowed_menu_items as string[];
-        }
-      }
-      setAllowedMenuItems(planAllowedItems);
+
+      await refreshPlanAccess();
       
       setCommerce({
         id: c.id,
@@ -355,7 +376,7 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
         delivery_enabled: c.delivery_enabled,
         opening_hours: c.opening_hours as Record<string, { open: string; close: string; enabled: boolean }> | null,
         table_payment_required: c.table_payment_required ?? true,
-        plan_id: planId
+        plan_id: null
       });
     }
 
@@ -493,7 +514,7 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
     // Find ALL active orders (pending/confirmed/preparing/delivered with pending payment) for this user at this commerce with a table
     const { data: activeOrders } = await supabase
       .from('orders')
-      .select('id, table_id, status, payment_method, session_id')
+      .select('id, table_id, status, payment_method, session_id, total, coupon_code, coupon_discount')
       .eq('user_id', user.id)
       .eq('commerce_id', commerceId)
       .not('table_id', 'is', null)
@@ -504,8 +525,17 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
     // Only show as active if order is not yet paid
     if (activeOrders && activeOrders.length > 0) {
       const primaryOrder = activeOrders[0];
+
+      const combinedTotal = activeOrders.reduce((sum: number, o: any) => sum + Number(o.total || 0), 0);
+      const combinedCouponDiscount = activeOrders.reduce((sum: number, o: any) => sum + Number(o.coupon_discount || 0), 0);
+      const couponCodes = Array.from(
+        new Set((activeOrders.map((o: any) => o.coupon_code).filter(Boolean) as string[]).map((v) => v.toUpperCase()))
+      );
+
       setHasActiveTableOrder(true);
       setActiveOrderId(primaryOrder.id);
+      setActiveOrderTotal(combinedTotal);
+      setActiveOrderCoupon({ code: couponCodes[0] || null, discount: combinedCouponDiscount });
       setOrderMode('table');
 
       // Fetch table info directly from database
@@ -548,6 +578,8 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
     } else {
       setHasActiveTableOrder(false);
       setActiveOrderId(null);
+      setActiveOrderTotal(0);
+      setActiveOrderCoupon(null);
       setActiveOrderItems([]);
       // Don't reset session if navigating away - only reset on explicit table change
     }
@@ -2524,7 +2556,7 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
         onOpenChange={setShowBillPaymentModal}
         onConfirm={confirmBillRequest}
         loading={requestingBill}
-        billTotal={cartTotal + activeOrderItems.reduce((sum, item) => sum + item.total_price, 0)}
+        billTotal={activeOrderTotal}
       />
     </motion.div>
   );

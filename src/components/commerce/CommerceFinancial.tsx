@@ -948,12 +948,16 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
                     )}
                   </div>
                 </div>
-                <div className="flex flex-col gap-2">
-                  {isAlertActive && (
-                    <Button size="sm" className="bg-green-500 hover:bg-green-600" onClick={handleMarkAsPaid}>
-                      ✓ Paguei
-                    </Button>
-                  )}
+                 <div className="flex flex-col gap-2">
+                   {taxConfig && !commerce?.tax_paid_current_month && (
+                     <Button
+                       size="sm"
+                       onClick={handleMarkAsPaid}
+                       className={isAlertActive ? 'animate-pulse' : undefined}
+                     >
+                       Paguei
+                     </Button>
+                   )}
                   <Button variant="outline" size="sm" onClick={() => setIsTaxModalOpen(true)}>
                     Configurar
                   </Button>
