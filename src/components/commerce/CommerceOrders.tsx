@@ -72,6 +72,8 @@ interface Order {
   subtotal: number;
   delivery_fee: number | null;
   discount: number | null;
+  coupon_code?: string | null;
+  coupon_discount?: number | null;
   total: number;
   notes: string | null;
   delivery_address: string | null;
@@ -666,10 +668,16 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
                     <span>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(selectedOrder.delivery_fee))}</span>
                   </div>
                 )}
-                {selectedOrder.discount && Number(selectedOrder.discount) > 0 && (
+                {selectedOrder.discount != null && Number(selectedOrder.discount) > 0 && (
                   <div className="flex justify-between text-sm text-primary">
                     <span>Desconto</span>
                     <span>-{formatCurrency(Number(selectedOrder.discount))}</span>
+                  </div>
+                )}
+                {selectedOrder.coupon_code && selectedOrder.coupon_discount != null && Number(selectedOrder.coupon_discount) > 0 && (
+                  <div className="flex justify-between text-sm text-primary">
+                    <span>Cupom ({selectedOrder.coupon_code})</span>
+                    <span>-{formatCurrency(Number(selectedOrder.coupon_discount))}</span>
                   </div>
                 )}
                 {/* Payment Fee Calculation - using configured rates */}

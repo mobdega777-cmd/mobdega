@@ -115,17 +115,38 @@ const CommerceOverview = ({ commerce }: CommerceOverviewProps) => {
       // Busca cash_movements como fonte única de verdade para faturamento
       const { data: cashMovements } = await supabase
         .from('cash_movements')
-        .select('id, type, amount, created_at')
+        .select('id, type, amount, created_at, payment_method')
         .eq('commerce_id', commerce.id)
         .eq('type', 'sale')
         .gte('created_at', startISO)
         .lte('created_at', endISO);
+
+      // Buscar configuração de taxas dos métodos de pagamento
+      const { data: paymentMethods } = await supabase
+        .from('payment_methods')
+        .select('type, fee_percentage, fee_fixed')
+        .eq('commerce_id', commerce.id)
+        .eq('is_active', true);
+
+      const feeMap = new Map(paymentMethods?.map(pm => [pm.type, { pct: pm.fee_percentage || 0, fixed: pm.fee_fixed || 0 }]) || []);
       
       const pendingOrders = orders?.filter(o => ['pending', 'confirmed', 'preparing'].includes(o.status)).length || 0;
       const activeDeliveries = orders?.filter(o => o.status === 'delivering' && o.order_type === 'delivery').length || 0;
       
-      // Faturamento e finalizados vêm apenas de cash_movements (fonte única)
-      const dateRangeRevenue = cashMovements?.reduce((s, m) => s + Number(m.amount), 0) || 0;
+      // Faturamento bruto e cálculo de taxas
+      const grossRevenue = cashMovements?.reduce((s, m) => s + Number(m.amount), 0) || 0;
+      
+      // Calcular taxas das operadoras
+      let operatorFees = 0;
+      cashMovements?.forEach(movement => {
+        const fee = feeMap.get(movement.payment_method || '');
+        if (fee) {
+          operatorFees += Number(movement.amount) * (fee.pct / 100) + fee.fixed;
+        }
+      });
+      
+      // Faturamento líquido (após taxas)
+      const netRevenue = grossRevenue - operatorFees;
       const completedCount = cashMovements?.length || 0;
       
       const { count: productsCount } = await supabase.from('products').select('id', { count: 'exact', head: true }).eq('commerce_id', commerce.id);
@@ -143,7 +164,7 @@ const CommerceOverview = ({ commerce }: CommerceOverviewProps) => {
       setStats({ 
         totalOrders: orders?.length || 0, 
         pendingOrders, 
-        todayRevenue: dateRangeRevenue, 
+        todayRevenue: netRevenue, 
         totalProducts: productsCount || 0, 
         activeDeliveries, 
         completedToday: completedCount 
@@ -181,7 +202,7 @@ const CommerceOverview = ({ commerce }: CommerceOverviewProps) => {
 
   const statCards = [
     { title: "Pedidos Pendentes", value: stats.pendingOrders, icon: Clock, color: "text-yellow-500", bgColor: "bg-yellow-500/10", tooltip: "Pedidos que estão aguardando confirmação, em preparo ou para serem entregues." },
-    { title: "Faturamento do Período", value: formatCurrency(stats.todayRevenue), icon: DollarSign, color: "text-green-500", bgColor: "bg-green-500/10", tooltip: "Total de vendas concluídas no período selecionado (Delivery + Mesa + PDV)." },
+    { title: "Faturamento Líquido", value: formatCurrency(stats.todayRevenue), icon: DollarSign, color: "text-green-500", bgColor: "bg-green-500/10", tooltip: "Total de vendas concluídas no período selecionado menos as taxas das operadoras de cartão." },
     { title: "Entregas Ativas", value: stats.activeDeliveries, icon: Truck, color: "text-blue-500", bgColor: "bg-blue-500/10", tooltip: "Pedidos de delivery que estão em rota de entrega neste momento." },
     { title: "Finalizados no Período", value: stats.completedToday, icon: CheckCircle, color: "text-emerald-500", bgColor: "bg-emerald-500/10", tooltip: "Quantidade de pedidos concluídos com sucesso no período selecionado." },
     { title: "Total de Produtos", value: stats.totalProducts, icon: Package, color: "text-purple-500", bgColor: "bg-purple-500/10", tooltip: "Quantidade de produtos cadastrados no seu cardápio." },

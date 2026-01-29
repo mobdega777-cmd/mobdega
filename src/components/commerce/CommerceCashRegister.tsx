@@ -414,10 +414,17 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
       const finalOrders = Array.from(ordersByTable.values()).map(tableOrder => {
         if (tableOrder.session?.bill_mode === 'split') {
           const participantOrdersMap = new Map<string, ParticipantOrder>();
+          const tableCouponDiscount = tableOrder.coupon_discount || 0;
           
           tableOrder.session.participants.forEach(participant => {
             const participantItems = tableOrder.items.filter(item => item.user_id === participant.user_id);
-            const participantTotal = participantItems.reduce((sum, item) => sum + Number(item.total_price), 0);
+            let participantTotal = participantItems.reduce((sum, item) => sum + Number(item.total_price), 0);
+            
+            // Aplicar o desconto do cupom inteiro ao host/solicitante
+            if (participant.is_host && tableCouponDiscount > 0) {
+              participantTotal = Math.max(0, participantTotal - tableCouponDiscount);
+            }
+            
             const participantOrderIds = [...new Set(
               tableOrdersData
                 .filter(o => o.table_id === tableOrder.table_id && o.user_id === participant.user_id)

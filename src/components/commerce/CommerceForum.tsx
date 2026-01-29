@@ -175,6 +175,9 @@ const CommerceForum = ({ commerceId, commerceName, commerceLogo }: CommerceForum
       .eq('user_id', user.id)
       .single();
 
+    // Para comércios, usa o logo do comércio como avatar do autor
+    const authorAvatarUrl = commerceLogo || profile?.avatar_url;
+
     const { error } = await supabase
       .from('forum_topics')
       .insert({
@@ -182,8 +185,8 @@ const CommerceForum = ({ commerceId, commerceName, commerceLogo }: CommerceForum
         content: newTopic.content,
         category: newTopic.category,
         author_id: user.id,
-        author_name: profile?.full_name || 'Usuário',
-        author_avatar_url: profile?.avatar_url,
+        author_name: commerceName || profile?.full_name || 'Usuário',
+        author_avatar_url: authorAvatarUrl,
         author_type: 'commerce',
         commerce_id: commerceId,
       });
@@ -214,14 +217,17 @@ const CommerceForum = ({ commerceId, commerceName, commerceLogo }: CommerceForum
       .eq('user_id', user.id)
       .single();
 
+    // Para comércios, usa o logo do comércio como avatar do autor
+    const authorAvatarUrl = commerceLogo || profile?.avatar_url;
+
     const { error } = await supabase
       .from('forum_replies')
       .insert({
         topic_id: selectedTopic.id,
         content: newReply,
         author_id: user.id,
-        author_name: profile?.full_name || 'Usuário',
-        author_avatar_url: profile?.avatar_url,
+        author_name: commerceName || profile?.full_name || 'Usuário',
+        author_avatar_url: authorAvatarUrl,
         author_type: 'commerce',
         commerce_id: commerceId,
       });
