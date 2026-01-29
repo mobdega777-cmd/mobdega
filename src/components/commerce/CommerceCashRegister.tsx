@@ -879,6 +879,16 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
         .eq('id', orderId);
     }
 
+    // Deletar movimentações pendentes anteriores (evita duplicação)
+    // e criar nova movimentação com método de pagamento real
+    for (const orderId of allOrderIds) {
+      await supabase
+        .from('cash_movements')
+        .delete()
+        .eq('order_id', orderId)
+        .eq('payment_method', 'pending');
+    }
+
     // Criar movimentação de caixa para o total da mesa
     await supabase
       .from('cash_movements')
@@ -941,6 +951,15 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
           delivered_at: new Date().toISOString()
         })
         .eq('id', orderId);
+    }
+
+    // Deletar movimentações pendentes anteriores (evita duplicação)
+    for (const orderId of selectedParticipant.order_ids) {
+      await supabase
+        .from('cash_movements')
+        .delete()
+        .eq('order_id', orderId)
+        .eq('payment_method', 'pending');
     }
 
     // Create cash movement for this participant's total
