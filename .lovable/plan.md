@@ -1,222 +1,112 @@
 
-# Plano de Implementação: Sincronização de Planos, Notificações de Upgrade e Cupons no Checkout
+# Plano de Correção: 5 Problemas Identificados
 
-## Resumo das Solicitações
+## Resumo dos Problemas
 
-Baseado nas 7 imagens anexadas, identifiquei 4 problemas principais a resolver:
+1. **"0" aparecendo no modal de Detalhes do Pedido** - Um "0" é exibido entre Subtotal e Desconto no modal de detalhes (CommerceOrders.tsx)
 
-1. **Sincronizar funcionalidades dos planos** - As opções ativadas/desativadas no Master Admin (allowed_menu_items) devem aparecer como features nos cards de plano no cadastro e no modal de upgrade
-2. **Notificação de upgrade não chega** - A solicitação de upgrade é salva, mas a notificação para o Master Admin falha silenciosamente
-3. **Indicador visual de upgrade pendente** - Falta um contador/badge no menu "Adegas/Tabacarias" e nos cards dos comércios
-4. **Campo de cupom no checkout** - Adicionar campo para cupons do comércio nos modais de delivery/mesa, com integração no PDV e financeiro
+2. **Avatar do autor do tópico não aparece no Fórum** - A foto aparece na área de resposta (usando `commerceLogo`), mas não no tópico criado (usando `author_avatar_url` que está `null`)
 
----
+3. **Modal "Fechar Comanda Individual" mostra valor sem desconto** - Quando há cupom aplicado na mesa, o modal de fechamento mostra o valor original (R$ 60,00) e não o valor com desconto (R$ 30,00)
 
-## Parte 1: Sincronizar Features dos Planos com allowed_menu_items
+4. **Faturamento deve mostrar valor Líquido (com taxas descontadas)** - Os cards de Faturamento do Período devem mostrar o valor já com taxas de maquininha descontadas
 
-### Problema Atual
-Os planos possuem duas colunas separadas:
-- `features` - Lista de textos descritivos (hardcoded)
-- `allowed_menu_items` - IDs das funcionalidades ativas
-
-No cadastro e modal de upgrade, o sistema exibe a coluna `features` estática, ignorando o que o Master Admin configura em `allowed_menu_items`.
-
-### Solução
-Criar uma função utilitária que converte `allowed_menu_items` em labels legíveis para exibição.
-
-### Arquivos a Modificar
-
-1. **`src/components/auth/AuthModal.tsx`**
-   - Criar mapeamento de ID → label amigável
-   - Modificar a exibição dos cards de plano para usar `allowed_menu_items` 
-   - Adicionar query para buscar `allowed_menu_items` junto com os planos
-   - Filtrar apenas itens não-obrigatórios (excluir overview e settings)
-
-2. **`src/components/commerce/UpgradeModal.tsx`**
-   - Mesma lógica: substituir `features` por labels derivados de `allowed_menu_items`
-   - Buscar `allowed_menu_items` na query de planos
-
-### Mapeamento de IDs para Labels
-```text
-cashregister → Caixa/PDV
-orders → Gestão Pedidos
-delivery → Delivery
-deliveryzones → Áreas de Entrega
-tables → Mesas/Comandas
-products → Produtos
-categories → Categorias
-stockcontrol → Controle Estoque
-financial → Financeiro
-coupons → Cupons
-customers → Clientes
-photos → Fotos
-ranking → Ranking
-```
+5. **Lucro Estimado e outros cards também precisam refletir as taxas** - Todos os cálculos financeiros devem considerar as taxas das operadoras
 
 ---
 
-## Parte 2: Corrigir Notificação de Upgrade
+## Detalhes Técnicos e Correções
 
-### Problema Atual
-A política RLS da tabela `admin_notifications` permite apenas `master_admin`:
-```sql
-POLICY "Master admin can manage notifications"
-ON admin_notifications FOR ALL
-USING (is_master_admin())
-```
+### Problema 1: "0" no modal de Detalhes do Pedido
 
-Quando um **commerce** tenta inserir uma notificação, a operação falha silenciosamente devido ao RLS.
+**Análise:**
+- O modal em `CommerceOrders.tsx` (linhas 598-706) exibe detalhes do pedido
+- A interface `Order` (linhas 68-86) não inclui `coupon_code` e `coupon_discount`
+- Os dados existem no banco (`coupon_code: TESTE, coupon_discount: 5`)
+- O "0" provavelmente é renderizado pelo campo `coupon_discount` sendo acessado como propriedade "any" sem verificação adequada
 
-### Solução
-Criar uma política adicional que permite `INSERT` para usuários autenticados:
+**Correção:**
+- Adicionar `coupon_code?: string | null` e `coupon_discount?: number | null` à interface Order
+- Verificar se há renderização indevida do coupon_discount no modal
+- Se o "0" é um campo sendo exibido incorretamente, adicionar verificação condicional
 
-### Migração SQL
-```sql
--- Permitir que qualquer usuário autenticado insira notificações
-CREATE POLICY "Authenticated users can insert notifications"
-ON public.admin_notifications
-FOR INSERT
-TO authenticated
-WITH CHECK (true);
-```
-
-### Alternativa (mais segura)
-Criar uma função `SECURITY DEFINER` que encapsula a criação de notificações, permitindo que commerce users criem notificações sem acesso direto à tabela.
+**Arquivos:**
+- `src/components/commerce/CommerceOrders.tsx`
 
 ---
 
-## Parte 3: Indicador Visual de Solicitações de Upgrade
+### Problema 2: Avatar do autor do tópico no Fórum
 
-### Problema Atual
-Não há feedback visual no painel do Master Admin quando há solicitações de upgrade pendentes.
+**Análise:**
+- Na view de detalhes do tópico (CommerceForum.tsx, linha 276-281), usa `selectedTopic.author_avatar_url`
+- Na área de resposta (linha 371-375), usa `commerceLogo` (logo da loja)
+- Dados do banco: O `author_avatar_url` está `null` para o usuário "João Silva" porque ele não tem avatar cadastrado
+- A loja "Adega Premium" tem logo cadastrada
 
-### Solução
+**Correção:**
+- Quando o autor do tópico for um comércio (`author_type === 'commerce'`), buscar o logo do comércio em vez do avatar do perfil
+- Ao criar tópico, se o usuário for um comércio, usar `commerceLogo` como `author_avatar_url`
+- Modificar `handleCreateTopic` para salvar o logo do comércio quando disponível
 
-1. **Contador no Menu "Adegas/Tabacarias"**
-   - Adicionar badge com número de solicitações pendentes no menu lateral
-
-2. **Badge nos Cards de Comércio**
-   - Exibir indicador visual nos cards de comércios que têm `upgrade_request_status = 'pending'`
-
-3. **Ícone de upgrade no sino de notificações**
-   - Adicionar ícone específico para tipo `upgrade_request`
-
-### Arquivos a Modificar
-
-1. **`src/pages/admin/AdminDashboard.tsx`**
-   - Buscar contagem de `upgrade_request_status = 'pending'`
-   - Exibir badge no item "Adegas/Tabacarias" do menu
-
-2. **`src/components/admin/AdminCommerces.tsx`**
-   - Adicionar badge "Upgrade Pendente" nos cards de comércios com solicitação
-
-3. **`src/components/admin/AdminNotificationBell.tsx`**
-   - Adicionar ícone específico para `upgrade_request`
-   - Usar ícone `ArrowUp` para distinguir de outros tipos
+**Arquivos:**
+- `src/components/commerce/CommerceForum.tsx`
 
 ---
 
-## Parte 4: Campo de Cupom no Checkout
+### Problema 3: Modal "Fechar Comanda Individual" mostra valor sem desconto
 
-### Problema Atual
-O checkout de delivery/mesa não possui campo para aplicar cupons criados pelo comércio (tabela `commerce_coupons`).
+**Análise:**
+- O modal (CommerceCashRegister.tsx, linhas 2196-2300) mostra `selectedParticipant.total`
+- O cálculo de `participantTotal` (linha 420) soma apenas os `total_price` dos itens
+- Não considera o `coupon_discount` da mesa
+- Na imagem: Total mesa R$ 30,00 (com desconto), mas modal individual mostra R$ 60,00
 
-### Alterações no Banco de Dados
+**Correção:**
+Considerando a preferência do usuário de que o desconto do cupom seja aplicado apenas ao Host/solicitante:
+- Identificar se o participante é o host ou solicitante
+- Se for, aplicar o desconto proporcionalmente (ou totalmente ao host)
+- Modificar o cálculo de `participantTotal` para considerar o desconto
 
-Adicionar colunas na tabela `orders`:
-```sql
-ALTER TABLE orders 
-ADD COLUMN coupon_code text,
-ADD COLUMN coupon_discount numeric DEFAULT 0;
-```
-
-### Arquivos a Modificar
-
-1. **`src/components/user/CommerceStorefront.tsx`**
-   - Adicionar estados para cupom: `couponCode`, `couponValid`, `couponDiscount`
-   - Adicionar campo de input no modal de carrinho (antes do resumo)
-   - Validar cupom contra tabela `commerce_coupons` do comércio específico
-   - Calcular desconto e atualizar total
-   - Salvar `coupon_code` e `coupon_discount` ao criar pedido
-
-2. **`src/components/commerce/CommerceCashRegister.tsx`**
-   - Exibir `coupon_code` e `coupon_discount` nos detalhes do pedido no PDV
-
-3. **`src/components/commerce/CommerceFinancial.tsx`**
-   - Incluir descontos de cupom nos cálculos financeiros
-
-### Fluxo de Validação do Cupom
-1. Cliente digita código do cupom
-2. Sistema busca em `commerce_coupons` WHERE `commerce_id` = comércio atual AND `code` = cupom digitado
-3. Valida: ativo, datas, limite de uso, valor mínimo do pedido
-4. Calcula desconto (percentual ou fixo)
-5. Aplica limite máximo se houver
-6. Atualiza total exibido
+**Arquivos:**
+- `src/components/commerce/CommerceCashRegister.tsx`
 
 ---
 
-## Resumo das Tarefas
+### Problema 4 e 5: Faturamento Líquido (com taxas)
 
-| # | Tarefa | Arquivos | Prioridade |
-|---|--------|----------|------------|
-| 1 | Migração SQL: política RLS para INSERT em admin_notifications | migration | Alta |
-| 2 | Migração SQL: colunas coupon_code/discount em orders | migration | Alta |
-| 3 | Sincronizar features com allowed_menu_items no AuthModal | AuthModal.tsx | Média |
-| 4 | Sincronizar features com allowed_menu_items no UpgradeModal | UpgradeModal.tsx | Média |
-| 5 | Contador de upgrades no menu lateral | AdminDashboard.tsx | Alta |
-| 6 | Badge de upgrade nos cards de comércio | AdminCommerces.tsx | Média |
-| 7 | Ícone de upgrade no sino de notificações | AdminNotificationBell.tsx | Baixa |
-| 8 | Campo de cupom no checkout delivery/mesa | CommerceStorefront.tsx | Alta |
-| 9 | Exibir cupom nos detalhes do PDV | CommerceCashRegister.tsx | Média |
-| 10 | Incluir cupom nos relatórios financeiros | CommerceFinancial.tsx | Média |
+**Análise:**
+- Atualmente o card "Faturamento do Período" mostra R$ 16,00 (bruto)
+- A venda foi R$ 16,00 no Débito, que deveria ter taxa descontada
+- O usuário confirmou que quer ver o valor Líquido (após taxas)
+- As taxas já são calculadas em `calculatedFees` (CommerceFinancial.tsx, linha 204-210)
+
+**Correção:**
+- Modificar o card de "Faturamento do Período" para mostrar `monthlyRevenue - calculatedFees`
+- Alterar o label ou adicionar tooltip explicando que é o valor líquido
+- Revisar se "Lucro Estimado" também precisa ajuste (margem 40% sobre bruto ou líquido)
+- Garantir que Visão Geral (CommerceOverview.tsx) também aplique as taxas
+
+**Arquivos:**
+- `src/components/commerce/CommerceFinancial.tsx`
+- `src/components/commerce/CommerceOverview.tsx`
 
 ---
 
-## Detalhes Técnicos
+## Resumo das Alterações por Arquivo
 
-### Mapeamento menuItemsConfig (compartilhado)
-Criar arquivo utilitário em `src/lib/planFeatures.ts`:
-```typescript
-export const menuItemLabels: Record<string, string> = {
-  cashregister: "Caixa/PDV",
-  orders: "Gestão Pedidos",
-  delivery: "Delivery",
-  deliveryzones: "Áreas de Entrega",
-  tables: "Mesas/Comandas",
-  products: "Produtos",
-  categories: "Categorias",
-  stockcontrol: "Controle Estoque",
-  financial: "Financeiro",
-  coupons: "Cupons",
-  customers: "Clientes",
-  photos: "Fotos",
-  ranking: "Ranking",
-};
+| Arquivo | Alterações |
+|---------|-----------|
+| `CommerceOrders.tsx` | Adicionar campos cupom à interface, corrigir renderização do "0" |
+| `CommerceForum.tsx` | Usar commerceLogo quando author_type é commerce, salvar logo ao criar tópico |
+| `CommerceCashRegister.tsx` | Aplicar desconto de cupom ao host/solicitante no fechamento individual |
+| `CommerceFinancial.tsx` | Alterar cards para exibir valor Líquido (bruto - taxas) |
+| `CommerceOverview.tsx` | Sincronizar lógica de faturamento líquido |
 
-export const getFeatureLabels = (allowedItems: string[]): string[] => {
-  const excluded = ['overview', 'settings', 'paymentconfig', 'contract', 'training'];
-  return allowedItems
-    .filter(item => !excluded.includes(item))
-    .map(item => menuItemLabels[item])
-    .filter(Boolean);
-};
-```
+---
 
-### Validação de Cupom do Comércio
-```typescript
-const validateCommerceCoupon = async (code: string, commerceId: string, subtotal: number) => {
-  const { data: coupon } = await supabase
-    .from('commerce_coupons')
-    .select('*')
-    .eq('commerce_id', commerceId)
-    .eq('code', code.toUpperCase())
-    .eq('is_active', true)
-    .maybeSingle();
-    
-  if (!coupon) return { valid: false };
-  
-  // Validar datas, limite de usos, valor mínimo
-  // Calcular desconto
-  // Retornar { valid: true, discount: number, type: string }
-};
-```
+## Ordem de Implementação
+
+1. **CommerceOrders.tsx** - Corrigir o "0" (mais simples)
+2. **CommerceForum.tsx** - Corrigir avatar do autor
+3. **CommerceCashRegister.tsx** - Aplicar desconto ao fechar comanda individual
+4. **CommerceFinancial.tsx** e **CommerceOverview.tsx** - Implementar faturamento líquido
