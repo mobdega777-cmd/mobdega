@@ -25,6 +25,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import DateFilter from "./DateFilter";
+import SystemUpdates from "./SystemUpdates";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { getSupabaseDateRange, getTodayDateRange } from "@/lib/dateUtils";
 import HelpTooltip from "@/components/ui/help-tooltip";
@@ -320,6 +321,9 @@ const CommerceOverview = ({ commerce }: CommerceOverviewProps) => {
           </Card>
         ); })}
       </div>
+
+      {/* Atualizações do Sistema */}
+      <SystemUpdates />
 
       <Card>
         <CardHeader className="p-4 md:p-6"><CardTitle className="flex items-center gap-2 text-base md:text-lg"><ShoppingCart className="w-4 h-4 md:w-5 md:h-5" />Pedidos Recentes</CardTitle></CardHeader>

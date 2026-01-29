@@ -35,6 +35,10 @@ interface WeeklyData {
   orders: number;
 }
 
+interface PaymentFee {
+  pct: number;
+  fixed: number;
+}
 const chartConfig = {
   revenue: {
     label: "Faturamento",
@@ -59,12 +63,23 @@ const SalesEvolutionChart = ({ commerceId, dateFilter }: SalesEvolutionChartProp
       // Usa conversão correta de timezone para queries
       const { startISO, endISO } = getSupabaseDateRange(dateFilter.start, dateFilter.end);
       
+      // Buscar configuração de taxas dos métodos de pagamento
+      const { data: paymentMethods } = await supabase
+        .from('payment_methods')
+        .select('type, fee_percentage, fee_fixed')
+        .eq('commerce_id', commerceId)
+        .eq('is_active', true);
+
+      const feeMap = new Map<string, PaymentFee>(
+        paymentMethods?.map(pm => [pm.type, { pct: pm.fee_percentage || 0, fixed: pm.fee_fixed || 0 }]) || []
+      );
+      
       // IMPORTANTE: Usar apenas cash_movements para faturamento real
       // Os cash_movements já contêm o valor final (com descontos aplicados)
       // Evita duplicação entre orders e movements
       const { data: cashMovements } = await supabase
         .from('cash_movements')
-        .select('amount, created_at')
+        .select('amount, created_at, payment_method')
         .eq('commerce_id', commerceId)
         .eq('type', 'sale')
         .gte('created_at', startISO)
@@ -82,12 +97,20 @@ const SalesEvolutionChart = ({ commerceId, dateFilter }: SalesEvolutionChartProp
 
       // Add cash movements data (única fonte de faturamento)
       // IMPORTANTE: Usa T12:00:00 para evitar shift de timezone
+      // IMPORTANTE: Desconta taxas de maquininha para valor líquido
       cashMovements?.forEach(movement => {
         const movementDate = new Date(movement.created_at.replace('Z', ''));
         const dateKey = format(movementDate, 'yyyy-MM-dd');
         const existing = dailyMap.get(dateKey) || { revenue: 0, orders: 0 };
+        
+        // Calcular taxa da operadora
+        const amount = Number(movement.amount);
+        const fee = feeMap.get(movement.payment_method || '');
+        const operatorFee = fee ? (amount * (fee.pct / 100) + fee.fixed) : 0;
+        const netAmount = amount - operatorFee;
+        
         dailyMap.set(dateKey, {
-          revenue: existing.revenue + Number(movement.amount),
+          revenue: existing.revenue + netAmount,
           orders: existing.orders + 1
         });
       });

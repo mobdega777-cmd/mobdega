@@ -38,7 +38,9 @@ import {
   Send,
   ArrowLeft,
   MoreVertical,
-  Trash2
+  Trash2,
+  ThumbsUp,
+  ThumbsDown
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -60,6 +62,8 @@ interface ForumTopic {
   is_closed: boolean;
   views_count: number;
   replies_count: number;
+  likes_count: number;
+  dislikes_count: number;
   last_reply_at: string | null;
   created_at: string;
 }
@@ -111,9 +115,11 @@ const CommerceForum = ({ commerceId, commerceName, commerceLogo }: CommerceForum
   });
 
   const [newReply, setNewReply] = useState("");
+  const [userVotes, setUserVotes] = useState<Record<string, 'like' | 'dislike' | null>>({});
 
   useEffect(() => {
     fetchTopics();
+    fetchUserVotes();
   }, []);
 
   const fetchTopics = async () => {
@@ -131,6 +137,20 @@ const CommerceForum = ({ commerceId, commerceName, commerceLogo }: CommerceForum
       setTopics(data || []);
     }
     setLoading(false);
+  };
+
+  const fetchUserVotes = async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from('forum_topic_votes')
+      .select('topic_id, vote_type')
+      .eq('user_id', user.id);
+    
+    const votesMap: Record<string, 'like' | 'dislike' | null> = {};
+    data?.forEach(vote => {
+      votesMap[vote.topic_id] = vote.vote_type as 'like' | 'dislike';
+    });
+    setUserVotes(votesMap);
   };
 
   const fetchReplies = async (topicId: string) => {
@@ -256,6 +276,47 @@ const CommerceForum = ({ commerceId, commerceName, commerceLogo }: CommerceForum
     return matchesSearch && matchesCategory;
   });
 
+  const handleVote = async (topicId: string, voteType: 'like' | 'dislike', e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!user) {
+      toast({ variant: "destructive", title: "Faça login para votar" });
+      return;
+    }
+
+    const currentVote = userVotes[topicId];
+    
+    if (currentVote === voteType) {
+      // Remove vote
+      await supabase
+        .from('forum_topic_votes')
+        .delete()
+        .eq('topic_id', topicId)
+        .eq('user_id', user.id);
+      setUserVotes(prev => ({ ...prev, [topicId]: null }));
+    } else if (currentVote) {
+      // Change vote
+      await supabase
+        .from('forum_topic_votes')
+        .update({ vote_type: voteType })
+        .eq('topic_id', topicId)
+        .eq('user_id', user.id);
+      setUserVotes(prev => ({ ...prev, [topicId]: voteType }));
+    } else {
+      // New vote
+      await supabase
+        .from('forum_topic_votes')
+        .insert({
+          topic_id: topicId,
+          user_id: user.id,
+          vote_type: voteType
+        });
+      setUserVotes(prev => ({ ...prev, [topicId]: voteType }));
+    }
+    
+    // Refresh topics to get updated counts
+    fetchTopics();
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -305,6 +366,31 @@ const CommerceForum = ({ commerceId, commerceName, commerceLogo }: CommerceForum
                     <Clock className="w-3 h-3" />
                     {formatDistanceToNow(new Date(selectedTopic.created_at), { addSuffix: true, locale: ptBR })}
                   </span>
+                  {/* Vote buttons */}
+                  <button
+                    onClick={(e) => handleVote(selectedTopic.id, 'like', e)}
+                    className={`flex items-center gap-1 px-2 py-1 rounded-md transition-colors ${
+                      userVotes[selectedTopic.id] === 'like' 
+                        ? 'bg-green-500/20 text-green-500' 
+                        : 'hover:bg-muted'
+                    }`}
+                  >
+                    <ThumbsUp className="w-4 h-4" />
+                    <span className="text-xs font-medium">{selectedTopic.likes_count || 0}</span>
+                    <span className="text-xs hidden sm:inline">Concordo</span>
+                  </button>
+                  <button
+                    onClick={(e) => handleVote(selectedTopic.id, 'dislike', e)}
+                    className={`flex items-center gap-1 px-2 py-1 rounded-md transition-colors ${
+                      userVotes[selectedTopic.id] === 'dislike' 
+                        ? 'bg-red-500/20 text-red-500' 
+                        : 'hover:bg-muted'
+                    }`}
+                  >
+                    <ThumbsDown className="w-4 h-4" />
+                    <span className="text-xs font-medium">{selectedTopic.dislikes_count || 0}</span>
+                    <span className="text-xs hidden sm:inline">Não Concordo</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -515,6 +601,29 @@ const CommerceForum = ({ commerceId, commerceName, commerceLogo }: CommerceForum
                         <span>
                           {formatDistanceToNow(new Date(topic.created_at), { addSuffix: true, locale: ptBR })}
                         </span>
+                        {/* Vote buttons in list */}
+                        <button
+                          onClick={(e) => handleVote(topic.id, 'like', e)}
+                          className={`flex items-center gap-1 px-2 py-0.5 rounded transition-colors ${
+                            userVotes[topic.id] === 'like' 
+                              ? 'bg-green-500/20 text-green-500' 
+                              : 'hover:bg-muted text-muted-foreground'
+                          }`}
+                        >
+                          <ThumbsUp className="w-3 h-3" />
+                          <span className="text-xs">{topic.likes_count || 0}</span>
+                        </button>
+                        <button
+                          onClick={(e) => handleVote(topic.id, 'dislike', e)}
+                          className={`flex items-center gap-1 px-2 py-0.5 rounded transition-colors ${
+                            userVotes[topic.id] === 'dislike' 
+                              ? 'bg-red-500/20 text-red-500' 
+                              : 'hover:bg-muted text-muted-foreground'
+                          }`}
+                        >
+                          <ThumbsDown className="w-3 h-3" />
+                          <span className="text-xs">{topic.dislikes_count || 0}</span>
+                        </button>
                       </div>
                     </div>
                   </div>
