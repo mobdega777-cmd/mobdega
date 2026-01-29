@@ -716,10 +716,10 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
             <div className="flex items-center justify-between">
               <div>
                 <div className="flex items-center gap-2">
-                  <p className="text-sm text-muted-foreground">Faturamento do Período</p>
-                  <HelpTooltip content="Total de vendas realizadas no período selecionado, incluindo pedidos de delivery, mesa e vendas do PDV." />
+                  <p className="text-sm text-muted-foreground">Faturamento Líquido</p>
+                  <HelpTooltip content={`Total de vendas realizadas menos as taxas das operadoras de cartão/maquininha. Bruto: ${formatCurrency(stats.monthlyRevenue)} | Taxas: ${formatCurrency(operatorFees)}`} />
                 </div>
-                <p className="text-2xl font-bold text-green-500">{formatCurrency(stats.monthlyRevenue)}</p>
+                <p className="text-2xl font-bold text-green-500">{formatCurrency(stats.monthlyRevenue - operatorFees)}</p>
                 <p className={`text-xs mt-1 flex items-center gap-1 ${stats.growthRate >= 0 ? 'text-green-600' : 'text-red-500'}`}>
                   {stats.growthRate >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
                   {stats.growthRate.toFixed(1)}% vs mês anterior
@@ -738,10 +738,10 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
               <div>
                 <div className="flex items-center gap-2">
                   <p className="text-sm text-muted-foreground">Lucro Estimado</p>
-                  <HelpTooltip content="Lucro estimado com base em uma margem média de 40%. Para maior precisão, cadastre o custo de cada produto." />
+                  <HelpTooltip content="Lucro estimado considerando margem de 40% sobre o faturamento líquido (após taxas de operadoras)." />
                 </div>
-                <p className="text-2xl font-bold text-blue-500">{formatCurrency(stats.monthlyProfit)}</p>
-                <p className="text-xs mt-1 text-muted-foreground">Margem: {stats.profitMargin.toFixed(1)}%</p>
+                <p className="text-2xl font-bold text-blue-500">{formatCurrency((stats.monthlyRevenue - operatorFees) * 0.4)}</p>
+                <p className="text-xs mt-1 text-muted-foreground">Margem: 40% (após taxas)</p>
               </div>
               <div className="p-3 rounded-xl bg-blue-500/10">
                 <Wallet className="w-6 h-6 text-blue-500" />
