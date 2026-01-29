@@ -176,8 +176,8 @@ const CommerceOverview = ({ commerce }: CommerceOverviewProps) => {
     fetchStats();
   }, [commerce.id, dateFilter]);
 
-  const shareUrl = `www.mobdega.shop`;
-  const shareMessage = `🎉 Conheça ${commerce.fantasy_name} no nosso novo sistema!\n\n✨ Novidades:\n📱 Cardápio digital\n🛵 Pedidos delivery pelo app\n💳 Pagamento online\n\nAcesse agora: ${shareUrl}`;
+  const shareUrl = `https://mobdega.lovable.app/loja/${commerce.id}`;
+  const shareMessage = `🎉 Conheça ${commerce.fantasy_name}!\n\n✨ Novidades:\n📱 Cardápio digital\n🛵 Pedidos delivery pelo app\n💳 Pagamento online\n\nAcesse: ${shareUrl}`;
 
   const handleShare = (platform: 'whatsapp' | 'facebook' | 'twitter' | 'instagram') => {
     const encodedMessage = encodeURIComponent(shareMessage);

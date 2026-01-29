@@ -9,7 +9,8 @@ import {
   Medal,
   Crown,
   Loader2,
-  Info
+  Info,
+  AlertTriangle
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -607,6 +608,19 @@ const CommerceRanking = ({ currentCommerceId }: CommerceRankingProps) => {
           <div className="bg-primary/10 p-3 rounded-lg border border-primary/20">
             <p className="font-semibold text-foreground mb-1">💡 Dica para melhorar sua posição:</p>
             <p>Incentive seus clientes a avaliar e favoritar seu estabelecimento. Um bom atendimento e produtos de qualidade naturalmente geram melhores avaliações!</p>
+          </div>
+
+          <div className="bg-destructive/10 p-3 rounded-lg border border-destructive/20 mt-4">
+            <p className="font-semibold text-destructive mb-1 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4" />
+              Aviso Importante - Fraudes
+            </p>
+            <p className="text-sm text-muted-foreground">
+              A criação de contas falsas, avaliações fraudulentas ou qualquer tentativa de 
+              manipulação do ranking resultará no <strong className="text-destructive">banimento imediato</strong> do 
+              estabelecimento da competição, sem direito a recurso. Todas as atividades 
+              são monitoradas.
+            </p>
           </div>
         </CardContent>
       </Card>

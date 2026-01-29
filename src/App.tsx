@@ -10,6 +10,8 @@ import NotFound from "./pages/NotFound";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import CommerceDashboard from "./pages/commerce/CommerceDashboard";
 import UserDashboard from "./pages/user/UserDashboard";
+import Storefront from "./pages/Storefront";
+import Ranking from "./pages/Ranking";
 
 import ProtectedAdminRoute from "./components/auth/ProtectedAdminRoute";
 import ProtectedCommerceRoute from "./components/auth/ProtectedCommerceRoute";
@@ -52,7 +54,7 @@ function App() {
                     </ProtectedCommerceRoute>
                   } 
                 />
-                <Route 
+              <Route 
                   path="/minha-conta" 
                   element={
                     <ProtectedUserRoute>
@@ -60,6 +62,9 @@ function App() {
                     </ProtectedUserRoute>
                   } 
                 />
+                {/* Public routes */}
+                <Route path="/loja/:commerceId" element={<Storefront />} />
+                <Route path="/ranking" element={<Ranking />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>

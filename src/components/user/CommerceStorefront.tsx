@@ -6,6 +6,7 @@ import {
   X, Plus, Minus, Send, User, CreditCard, Banknote, Smartphone, DollarSign,
   Check, Loader2, Camera, Users, Tag
 } from "lucide-react";
+import { HookahIcon } from "@/components/ui/hookah-icon";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -176,6 +177,8 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState("");
   const [submittingReview, setSubmittingReview] = useState(false);
+  const [existingReviewId, setExistingReviewId] = useState<string | null>(null);
+  const [hasUserReviewed, setHasUserReviewed] = useState(false);
   
   // Delivery/order form
   const [deliveryNotes, setDeliveryNotes] = useState("");
@@ -484,6 +487,26 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
         .maybeSingle();
       
       setIsFavorite(!!favData);
+
+      // Check if user has already reviewed this commerce
+      const { data: userReview } = await supabase
+        .from('reviews')
+        .select('id, rating, comment')
+        .eq('commerce_id', commerceId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (userReview) {
+        setHasUserReviewed(true);
+        setExistingReviewId(userReview.id);
+        setReviewRating(userReview.rating);
+        setReviewComment(userReview.comment || "");
+      } else {
+        setHasUserReviewed(false);
+        setExistingReviewId(null);
+        setReviewRating(5);
+        setReviewComment("");
+      }
 
       // Fetch user profile for delivery
       const { data: profileData } = await supabase
@@ -1142,7 +1165,7 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
     toast({ title: "Modo Delivery selecionado!", description: "Adicione produtos ao carrinho" });
   };
 
-  // Submit review
+  // Submit review (create or update)
   const submitReview = async () => {
     if (!user) {
       toast({ variant: "destructive", title: "Faça login para avaliar" });
@@ -1151,27 +1174,47 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
 
     setSubmittingReview(true);
 
-    const { error } = await supabase
-      .from('reviews')
-      .insert({
-        commerce_id: commerceId,
-        user_id: user.id,
-        rating: reviewRating,
-        comment: reviewComment || null
-      });
+    if (existingReviewId) {
+      // UPDATE existing review
+      const { error } = await supabase
+        .from('reviews')
+        .update({
+          rating: reviewRating,
+          comment: reviewComment || null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', existingReviewId);
 
-    if (error) {
-      if (error.code === '23505') {
-        toast({ variant: "destructive", title: "Você já avaliou este estabelecimento" });
+      if (error) {
+        toast({ variant: "destructive", title: "Erro ao atualizar avaliação", description: error.message });
       } else {
-        toast({ variant: "destructive", title: "Erro ao enviar avaliação", description: error.message });
+        toast({ title: "Avaliação atualizada!" });
+        setShowReviewModal(false);
+        fetchCommerceData(); // Refresh reviews
       }
     } else {
-      toast({ title: "Avaliação enviada!" });
-      setShowReviewModal(false);
-      setReviewRating(5);
-      setReviewComment("");
-      fetchCommerceData(); // Refresh reviews
+      // INSERT new review
+      const { error } = await supabase
+        .from('reviews')
+        .insert({
+          commerce_id: commerceId,
+          user_id: user.id,
+          rating: reviewRating,
+          comment: reviewComment || null
+        });
+
+      if (error) {
+        if (error.code === '23505') {
+          toast({ variant: "destructive", title: "Você já avaliou este estabelecimento" });
+        } else {
+          toast({ variant: "destructive", title: "Erro ao enviar avaliação", description: error.message });
+        }
+      } else {
+        toast({ title: "Avaliação enviada!" });
+        setShowReviewModal(false);
+        setHasUserReviewed(true);
+        fetchCommerceData(); // Refresh reviews
+      }
     }
 
     setSubmittingReview(false);
@@ -1891,9 +1934,9 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
 
         {/* Reviews Tab */}
         <TabsContent value="reviews" className="space-y-4 mt-4">
-          {/* Add Review Button - At top */}
+          {/* Add/Edit Review Button - At top */}
           <Button className="w-full" variant="default" onClick={() => setShowReviewModal(true)}>
-            Adicionar Avaliação
+            {hasUserReviewed ? 'Editar Avaliação' : 'Adicionar Avaliação'}
           </Button>
 
           {/* Rating Summary */}
@@ -1986,7 +2029,7 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
       <Dialog open={showReviewModal} onOpenChange={setShowReviewModal}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Avaliar {commerce.fantasy_name}</DialogTitle>
+            <DialogTitle>{hasUserReviewed ? 'Editar Avaliação' : 'Avaliar'} {commerce.fantasy_name}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div>
@@ -2025,7 +2068,7 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
               Cancelar
             </Button>
             <Button onClick={submitReview} disabled={submittingReview}>
-              {submittingReview ? 'Enviando...' : 'Enviar Avaliação'}
+              {submittingReview ? 'Enviando...' : (hasUserReviewed ? 'Atualizar Avaliação' : 'Enviar Avaliação')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2482,7 +2525,7 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
                 <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
                   getOrderStatusStep() >= 1 ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'
                 }`}>
-                  {getOrderStatusStep() > 1 ? <Check className="w-5 h-5" /> : <UtensilsCrossed className="w-5 h-5" />}
+                  {getOrderStatusStep() > 1 ? <Check className="w-5 h-5" /> : <HookahIcon className="w-5 h-5" />}
                 </div>
                 <span className="text-xs mt-2 text-center">Preparando</span>
               </div>

@@ -11,8 +11,14 @@ export const usePWAInstall = () => {
   const [isInstalled, setIsInstalled] = useState(false);
 
   useEffect(() => {
-    // Check if already installed
-    if (window.matchMedia('(display-mode: standalone)').matches) {
+    // Check if already installed via localStorage or display-mode
+    const checkInstalled = () => {
+      if (window.matchMedia('(display-mode: standalone)').matches) return true;
+      if (localStorage.getItem('pwa-installed') === 'true') return true;
+      return false;
+    };
+
+    if (checkInstalled()) {
       setIsInstalled(true);
       return;
     }
@@ -27,6 +33,7 @@ export const usePWAInstall = () => {
       setDeferredPrompt(null);
       setIsInstallable(false);
       setIsInstalled(true);
+      localStorage.setItem('pwa-installed', 'true');
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
@@ -48,6 +55,7 @@ export const usePWAInstall = () => {
       if (outcome === 'accepted') {
         setDeferredPrompt(null);
         setIsInstallable(false);
+        localStorage.setItem('pwa-installed', 'true');
         return true;
       }
       return false;
