@@ -8,21 +8,22 @@
   "theme_color": "#F97316",
   "icons": [
     {
-      "src": "/favicon.ico",
-      "sizes": "64x64",
-      "type": "image/x-icon"
-    },
-    {
-      "src": "/favicon.ico",
+      "src": "https://storage.googleapis.com/gpt-engineer-file-uploads/WMFM4WXgTkbC1T9iHTKkZAL8ITo2/uploads/1768697291138-ChatGPT_Image_16_de_jan._de_2026__23_12_48-removebg-preview.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
-      "src": "/favicon.ico",
+      "src": "https://storage.googleapis.com/gpt-engineer-file-uploads/WMFM4WXgTkbC1T9iHTKkZAL8ITo2/uploads/1768697291138-ChatGPT_Image_16_de_jan._de_2026__23_12_48-removebg-preview.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "https://storage.googleapis.com/gpt-engineer-file-uploads/WMFM4WXgTkbC1T9iHTKkZAL8ITo2/uploads/1768697291138-ChatGPT_Image_16_de_jan._de_2026__23_12_48-removebg-preview.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ],
   "orientation": "portrait",
