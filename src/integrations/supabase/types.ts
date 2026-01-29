@@ -862,6 +862,38 @@ export type Database = {
           },
         ]
       }
+      forum_topic_votes: {
+        Row: {
+          created_at: string
+          id: string
+          topic_id: string
+          user_id: string
+          vote_type: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          topic_id: string
+          user_id: string
+          vote_type: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          topic_id?: string
+          user_id?: string
+          vote_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "forum_topic_votes_topic_id_fkey"
+            columns: ["topic_id"]
+            isOneToOne: false
+            referencedRelation: "forum_topics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       forum_topics: {
         Row: {
           author_avatar_url: string | null
@@ -872,10 +904,12 @@ export type Database = {
           commerce_id: string | null
           content: string
           created_at: string
+          dislikes_count: number | null
           id: string
           is_closed: boolean | null
           is_pinned: boolean | null
           last_reply_at: string | null
+          likes_count: number | null
           replies_count: number | null
           title: string
           updated_at: string
@@ -890,10 +924,12 @@ export type Database = {
           commerce_id?: string | null
           content: string
           created_at?: string
+          dislikes_count?: number | null
           id?: string
           is_closed?: boolean | null
           is_pinned?: boolean | null
           last_reply_at?: string | null
+          likes_count?: number | null
           replies_count?: number | null
           title: string
           updated_at?: string
@@ -908,10 +944,12 @@ export type Database = {
           commerce_id?: string | null
           content?: string
           created_at?: string
+          dislikes_count?: number | null
           id?: string
           is_closed?: boolean | null
           is_pinned?: boolean | null
           last_reply_at?: string | null
+          likes_count?: number | null
           replies_count?: number | null
           title?: string
           updated_at?: string
