@@ -1,51 +1,73 @@
 
-# Plano de Correção: 5 Problemas Identificados ✅ CONCLUÍDO
+# Correção do Ícone PWA no Android
 
-## Status: Todas as correções foram implementadas
+## Problema Identificado
+
+O `manifest.json` está usando `/favicon.ico` que contém o ícone antigo da Lovable (coração). Enquanto isso, o `index.html` já usa a URL correta do logo Mobdega para o favicon do navegador.
+
+## Solução
+
+Atualizar o `manifest.json` para usar as imagens corretas do Mobdega que já estão hospedadas no Google Cloud Storage.
+
+## Alterações Necessárias
+
+### Arquivo: `public/manifest.json`
+
+Atualizar os ícones para usar as URLs do logo Mobdega:
+
+```json
+{
+  "name": "Mobdega",
+  "short_name": "Mobdega",
+  "description": "Adegas e Tabacarias na sua mão",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#F97316",
+  "icons": [
+    {
+      "src": "https://storage.googleapis.com/gpt-engineer-file-uploads/WMFM4WXgTkbC1T9iHTKkZAL8ITo2/uploads/1768697291138-ChatGPT_Image_16_de_jan._de_2026__23_12_48-removebg-preview.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "https://storage.googleapis.com/gpt-engineer-file-uploads/WMFM4WXgTkbC1T9iHTKkZAL8ITo2/uploads/1768697291138-ChatGPT_Image_16_de_jan._de_2026__23_12_48-removebg-preview.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "https://storage.googleapis.com/gpt-engineer-file-uploads/WMFM4WXgTkbC1T9iHTKkZAL8ITo2/uploads/1768697291138-ChatGPT_Image_16_de_jan._de_2026__23_12_48-removebg-preview.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "orientation": "portrait",
+  "categories": ["food", "shopping", "lifestyle"]
+}
+```
+
+## Por que isso resolve?
+
+1. **Android usa o manifest.json** - Quando você clica em "Adicionar à tela inicial", o Android lê o `manifest.json` para obter o ícone
+2. **URLs externas funcionam** - O manifest aceita URLs absolutas, então podemos usar as mesmas imagens já hospedadas
+3. **Separação de purpose** - Usamos `"any"` para ícones normais e `"maskable"` para ícones adaptativos do Android
+
+## Importante
+
+Após a correção:
+- Limpar o cache do navegador no celular
+- Remover o ícone antigo da tela inicial
+- Adicionar novamente usando "Adicionar à tela inicial"
 
 ---
 
-## Resumo das Correções Implementadas
+## Detalhes Técnicos
 
-### ✅ Problema 1: "0" no modal de Detalhes do Pedido
-- Adicionado `coupon_code` e `coupon_discount` à interface Order
-- Implementada renderização condicional correta para cupons aplicados
-- Arquivo: `src/components/commerce/CommerceOrders.tsx`
-
-### ✅ Problema 2: Avatar do autor do tópico no Fórum
-- Modificado `handleCreateTopic` para usar `commerceLogo` quando disponível
-- Modificado `handleSubmitReply` para usar `commerceLogo` quando disponível
-- O avatar do comércio agora aparece corretamente nos tópicos e respostas
-- Arquivo: `src/components/commerce/CommerceForum.tsx`
-
-### ✅ Problema 3: Modal "Fechar Comanda Individual" mostra valor sem desconto
-- Implementada lógica para aplicar o desconto do cupom ao host/solicitante
-- Quando a mesa está em modo "Conta Separada", o desconto vai inteiro para o host
-- Arquivo: `src/components/commerce/CommerceCashRegister.tsx`
-
-### ✅ Problema 4 e 5: Faturamento Líquido (com taxas descontadas)
-- Card de "Faturamento do Período" agora mostra "Faturamento Líquido"
-- Valor exibido = Faturamento Bruto - Taxas das Operadoras
-- Tooltip mostra detalhes (Bruto e Taxas separados)
-- Lucro Estimado agora calcula 40% sobre o valor líquido
-- Arquivos: `src/components/commerce/CommerceFinancial.tsx`, `src/components/commerce/CommerceOverview.tsx`
-
----
-
-## Arquivos Modificados
-
-| Arquivo | Status |
-|---------|--------|
-| `CommerceOrders.tsx` | ✅ Concluído |
-| `CommerceForum.tsx` | ✅ Concluído |
-| `CommerceCashRegister.tsx` | ✅ Concluído |
-| `CommerceFinancial.tsx` | ✅ Concluído |
-| `CommerceOverview.tsx` | ✅ Concluído |
-
----
-
-## Notas Técnicas
-
-- As taxas são calculadas dinamicamente usando a tabela `payment_methods`
-- O sistema usa `cash_movements` como fonte única de verdade para faturamento
-- O desconto de cupom em contas separadas é aplicado exclusivamente ao host/solicitante
+| Item | Antes | Depois |
+|------|-------|--------|
+| Ícone 192x192 | `/favicon.ico` (Lovable) | URL do logo Mobdega |
+| Ícone 512x512 | `/favicon.ico` (Lovable) | URL do logo Mobdega |
+| Tipo | `image/x-icon` | `image/png` |
