@@ -15,8 +15,11 @@ const MOBDEGA_ORANGE = { r: 249, g: 115, b: 22 }; // #F97316
 const MOBDEGA_GREEN = { r: 34, g: 197, b: 94 }; // #22C55E
 const DARK_BG = { r: 28, g: 28, b: 28 }; // #1C1C1C
 
-// URL de destino do QR Code
-const MOBDEGA_URL = 'https://mobdega.shop';
+// Gera a URL de compartilhamento dinâmica do comércio
+const getCommerceShareUrl = (commerceId: string): string => {
+  const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://mobdega.shop';
+  return `${baseUrl}/loja/${commerceId}`;
+};
 
 // Gera QR Code como Data URL (base64)
 const generateQRCodeDataURL = async (url: string): Promise<string> => {
@@ -57,8 +60,9 @@ export const generateTableQRCodePDF = async (data: TableQRData) => {
     format: [90, 130], // Formato otimizado para etiqueta
   });
 
-  // Gerar QR Code dinâmico
-  const qrCodeBase64 = await generateQRCodeDataURL(MOBDEGA_URL);
+  // Gerar QR Code dinâmico com URL de compartilhamento do comércio
+  const shareUrl = getCommerceShareUrl(data.commerceId);
+  const qrCodeBase64 = await generateQRCodeDataURL(shareUrl);
   const logoBase64 = data.commerceLogoUrl ? await loadImageAsBase64(data.commerceLogoUrl) : null;
 
   await drawProfessionalLabel(doc, data, 0, 0, 90, 130, qrCodeBase64, logoBase64);
@@ -84,11 +88,13 @@ export const generateAllTablesQRCodePDF = async (tables: TableQRData[]) => {
   const gapX = (pageWidth - margin * 2 - labelWidth * cols) / (cols > 1 ? cols - 1 : 1);
   const gapY = (pageHeight - margin * 2 - labelHeight * rows) / (rows > 1 ? rows - 1 : 1);
 
-  // Gerar QR Code dinâmico uma vez e reutilizar
-  const qrCodeBase64 = await generateQRCodeDataURL(MOBDEGA_URL);
   const logoBase64 = tables.length > 0 && tables[0].commerceLogoUrl 
     ? await loadImageAsBase64(tables[0].commerceLogoUrl) 
     : null;
+
+  // Gerar QR Code uma vez (todos usam mesma URL do comércio)
+  const shareUrl = tables.length > 0 ? getCommerceShareUrl(tables[0].commerceId) : '';
+  const qrCodeBase64 = shareUrl ? await generateQRCodeDataURL(shareUrl) : '';
 
   let currentPage = 0;
   for (let index = 0; index < tables.length; index++) {

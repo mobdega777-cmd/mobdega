@@ -443,13 +443,13 @@ const FeaturedStores = () => {
         >
           <div className="bg-card rounded-xl p-4 shadow-card max-w-md mx-auto">
             <p className="text-muted-foreground">
-              Mais de <span className="font-bold text-primary text-xl">{(totalCommerces * 150).toLocaleString('pt-BR')} comércios</span> cadastrados na plataforma
+              <span className="font-bold text-primary text-xl">{totalCommerces.toLocaleString('pt-BR')}</span> comércios cadastrados na plataforma
             </p>
           </div>
           
           <div className="bg-card rounded-xl p-4 shadow-card max-w-md mx-auto">
             <p className="text-muted-foreground">
-              Mais de <span className="font-bold text-secondary text-xl">{(totalUsers * 200).toLocaleString('pt-BR')} usuários</span> cadastrados na plataforma
+              <span className="font-bold text-secondary text-xl">{totalUsers.toLocaleString('pt-BR')}</span> usuários cadastrados na plataforma
             </p>
           </div>
         </motion.div>

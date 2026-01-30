@@ -15,7 +15,8 @@ import {
   Eye,
   ChevronLeft,
   ChevronRight,
-  ArrowUp
+  ArrowUp,
+  Pencil
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -42,6 +43,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Database } from "@/integrations/supabase/types";
 import CommerceDetailsModal from "./CommerceDetailsModal";
 import CommercesAnalytics from "./CommercesAnalytics";
+import CommerceEditModal from "./CommerceEditModal";
 
 type CommerceStatus = Database['public']['Enums']['commerce_status'];
 
@@ -51,6 +53,7 @@ interface Commerce {
   owner_name: string;
   email: string;
   phone: string;
+  whatsapp: string | null;
   city: string | null;
   document_type: string;
   document: string;
@@ -62,13 +65,16 @@ interface Commerce {
   neighborhood: string | null;
   cep: string | null;
   complement: string | null;
-  whatsapp: string | null;
   is_open: boolean | null;
   approved_at: string | null;
   rejection_reason: string | null;
   upgrade_request_status: string | null;
   requested_plan_id: string | null;
   plans: { name: string; price: number } | null;
+  coupon_code: string | null;
+  payment_due_day: number | null;
+  auto_invoice_day: number | null;
+  auto_invoice_enabled: boolean | null;
 }
 
 interface CommerceStats {
@@ -88,6 +94,7 @@ const AdminCommerces = () => {
   const [selectedCommerce, setSelectedCommerce] = useState<Commerce | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [commerceStats, setCommerceStats] = useState<Record<string, CommerceStats>>({});
   const { toast } = useToast();
@@ -448,6 +455,16 @@ const AdminCommerces = () => {
                             <Eye className="w-4 h-4" />
                             Ver detalhes
                           </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            className="gap-2"
+                            onClick={() => {
+                              setSelectedCommerce(commerce);
+                              setEditModalOpen(true);
+                            }}
+                          >
+                            <Pencil className="w-4 h-4" />
+                            Editar
+                          </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           {commerce.status !== 'approved' && (
                             <DropdownMenuItem 
@@ -534,6 +551,14 @@ const AdminCommerces = () => {
         isOpen={detailsModalOpen}
         onClose={() => setDetailsModalOpen(false)}
         onStatusChange={handleStatusChangeFromModal}
+      />
+
+      {/* Commerce Edit Modal */}
+      <CommerceEditModal
+        commerce={selectedCommerce}
+        isOpen={editModalOpen}
+        onClose={() => setEditModalOpen(false)}
+        onSave={fetchCommerces}
       />
 
       {/* Reject Dialog */}

@@ -113,6 +113,7 @@ interface Commerce {
   status: string;
   plan_id: string | null;
   rejection_reason: string | null;
+  coupon_code: string | null;
 }
 
 interface PlanMenuConfig {
@@ -148,7 +149,7 @@ const CommerceDashboard = () => {
     
     const { data, error } = await supabase
       .from('commerces')
-      .select('id, fantasy_name, logo_url, status, plan_id, rejection_reason')
+      .select('id, fantasy_name, logo_url, status, plan_id, rejection_reason, coupon_code')
       .eq('owner_id', user.id)
       .maybeSingle();
     
@@ -161,7 +162,8 @@ const CommerceDashboard = () => {
         logo_url: data.logo_url,
         status: data.status,
         plan_id: data.plan_id,
-        rejection_reason: data.rejection_reason
+        rejection_reason: data.rejection_reason,
+        coupon_code: data.coupon_code
       });
       
       // Fetch plan configuration if commerce has a plan
@@ -696,6 +698,7 @@ const CommerceDashboard = () => {
           onClose={() => setUpgradeModalOpen(false)}
           commerceId={commerce.id}
           currentPlanId={commerce.plan_id}
+          couponCode={commerce.coupon_code}
         />
       )}
     </div>
