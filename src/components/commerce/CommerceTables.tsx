@@ -435,15 +435,20 @@ const CommerceTables = ({ commerceId }: CommerceTablesProps) => {
                   </div>
 
                   <div className="flex flex-wrap gap-1.5 items-center">
-                    {table.status === 'available' && (
-                      <Button
-                        size="sm"
-                        className="text-xs px-2 h-7"
-                        onClick={() => updateTableStatus(table.id, 'occupied')}
-                      >
-                        Abrir
-                      </Button>
-                    )}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 w-7 p-0"
+                      onClick={() => handleGenerateQRCode(table)}
+                      disabled={generatingQR === table.id}
+                      title="Gerar QR Code para impressão"
+                    >
+                      {generatingQR === table.id ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <QrCode className="w-3.5 h-3.5" />
+                      )}
+                    </Button>
                     {table.status === 'occupied' && (
                       <>
                         <Button
@@ -468,20 +473,6 @@ const CommerceTables = ({ commerceId }: CommerceTablesProps) => {
                         Check-in
                       </Button>
                     )}
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-7 w-7 p-0"
-                      onClick={() => handleGenerateQRCode(table)}
-                      disabled={generatingQR === table.id}
-                      title="Gerar QR Code para impressão"
-                    >
-                      {generatingQR === table.id ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
-                        <QrCode className="w-3.5 h-3.5" />
-                      )}
-                    </Button>
                     <Button
                       size="sm"
                       variant="ghost"

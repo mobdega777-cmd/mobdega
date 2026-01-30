@@ -37,21 +37,48 @@ interface UpgradeModalProps {
   onClose: () => void;
   commerceId: string;
   currentPlanId: string | null;
+  couponCode?: string | null;
 }
 
-const UpgradeModal = ({ isOpen, onClose, commerceId, currentPlanId }: UpgradeModalProps) => {
+const UpgradeModal = ({ isOpen, onClose, commerceId, currentPlanId, couponCode }: UpgradeModalProps) => {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [currentPlan, setCurrentPlan] = useState<Plan | null>(null);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [discountInfo, setDiscountInfo] = useState<{ type: string; value: number } | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
     if (isOpen) {
       fetchPlans();
+      if (couponCode) {
+        fetchCouponInfo();
+      }
     }
-  }, [isOpen, currentPlanId]);
+  }, [isOpen, currentPlanId, couponCode]);
+
+  const fetchCouponInfo = async () => {
+    if (!couponCode) return;
+    const { data } = await supabase
+      .from('discount_coupons')
+      .select('discount_type, discount_value')
+      .eq('code', couponCode.toUpperCase())
+      .eq('is_active', true)
+      .maybeSingle();
+    
+    if (data) {
+      setDiscountInfo({ type: data.discount_type, value: Number(data.discount_value) });
+    }
+  };
+
+  const calculateDiscountedPrice = (price: number): number => {
+    if (!discountInfo) return price;
+    if (discountInfo.type === 'percentage') {
+      return price * (1 - discountInfo.value / 100);
+    }
+    return Math.max(0, price - discountInfo.value);
+  };
 
   const fetchPlans = async () => {
     setLoading(true);
@@ -182,7 +209,12 @@ const UpgradeModal = ({ isOpen, onClose, commerceId, currentPlanId }: UpgradeMod
             {currentPlan && (
               <div className="mb-4 p-3 rounded-lg bg-muted/50 border">
                 <p className="text-sm text-muted-foreground">Seu plano atual:</p>
-                <p className="font-semibold">{currentPlan.name} - {formatCurrency(currentPlan.price)}/mês</p>
+                <p className="font-semibold">
+                  {currentPlan.name} - {formatCurrency(calculateDiscountedPrice(currentPlan.price))}/mês
+                  {discountInfo && (
+                    <span className="text-sm text-green-600 ml-2">(com desconto do cupom)</span>
+                  )}
+                </p>
               </div>
             )}
 
@@ -224,9 +256,20 @@ const UpgradeModal = ({ isOpen, onClose, commerceId, currentPlanId }: UpgradeMod
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className="text-xl font-bold text-primary">
-                            {formatCurrency(plan.price)}
-                          </p>
+                          {discountInfo ? (
+                            <>
+                              <p className="text-sm line-through text-muted-foreground">
+                                {formatCurrency(plan.price)}
+                              </p>
+                              <p className="text-xl font-bold text-primary">
+                                {formatCurrency(calculateDiscountedPrice(plan.price))}
+                              </p>
+                            </>
+                          ) : (
+                            <p className="text-xl font-bold text-primary">
+                              {formatCurrency(plan.price)}
+                            </p>
+                          )}
                           <p className="text-xs text-muted-foreground">/mês</p>
                         </div>
                       </div>

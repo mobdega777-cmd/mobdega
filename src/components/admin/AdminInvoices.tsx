@@ -70,6 +70,7 @@ interface Commerce {
   fantasy_name: string;
   auto_invoice_enabled: boolean | null;
   auto_invoice_day: number | null;
+  coupon_code: string | null;
   plans: { price: number } | null;
 }
 
@@ -117,7 +118,7 @@ const AdminInvoices = () => {
   const fetchCommerces = async () => {
     const { data } = await supabase
       .from('commerces')
-      .select('id, fantasy_name, auto_invoice_enabled, auto_invoice_day, plans!commerces_plan_id_fkey(price)')
+      .select('id, fantasy_name, auto_invoice_enabled, auto_invoice_day, coupon_code, plans!commerces_plan_id_fkey(price)')
       .eq('status', 'approved');
     
     setCommerces((data as Commerce[]) || []);
@@ -575,9 +576,21 @@ const AdminInvoices = () => {
                 <div className="p-4 bg-muted/50 rounded-lg">
                   <p className="font-medium text-foreground">{selectedCommerce.fantasy_name}</p>
                   {selectedCommerce.plans?.price && (
-                    <p className="text-sm text-muted-foreground">
-                      Valor do plano: R$ {selectedCommerce.plans.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </p>
+                    <>
+                      <p className="text-sm text-muted-foreground">
+                        Valor do plano: R$ {selectedCommerce.plans.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        {selectedCommerce.coupon_code && (
+                          <span className="line-through ml-1 opacity-50">
+                            (integral)
+                          </span>
+                        )}
+                      </p>
+                      {selectedCommerce.coupon_code && (
+                        <p className="text-sm text-green-600 font-medium">
+                          Cupom aplicado: {selectedCommerce.coupon_code} - Valor com desconto será calculado na fatura
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
 
