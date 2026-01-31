@@ -18,9 +18,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, Shield, AlertTriangle, KeyRound, Eye, EyeOff } from "lucide-react";
 
 interface Plan {
   id: string;
@@ -61,6 +62,9 @@ const CommerceEditModal = ({ commerce, isOpen, onClose, onSave }: CommerceEditMo
   const [formData, setFormData] = useState<Partial<Commerce>>({});
   const [plans, setPlans] = useState<Plan[]>([]);
   const [saving, setSaving] = useState(false);
+  const [resettingPassword, setResettingPassword] = useState(false);
+  const [tempPassword, setTempPassword] = useState("");
+  const [showTempPassword, setShowTempPassword] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -123,6 +127,80 @@ const CommerceEditModal = ({ commerce, isOpen, onClose, onSave }: CommerceEditMo
     }
   };
 
+  const generateTempPassword = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+    let password = '';
+    for (let i = 0; i < 10; i++) {
+      password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    setTempPassword(password);
+  };
+
+  const handleResetPassword = async () => {
+    if (!commerce || !tempPassword) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro',
+        description: 'Gere uma senha temporária primeiro.',
+      });
+      return;
+    }
+
+    // Validate password
+    if (tempPassword.length < 8) {
+      toast({
+        variant: 'destructive',
+        title: 'Senha muito curta',
+        description: 'A senha deve ter pelo menos 8 caracteres.',
+      });
+      return;
+    }
+
+    setResettingPassword(true);
+
+    try {
+      // Update user password via admin API (using service role in edge function would be ideal)
+      // For now, we'll use the auth.admin.updateUserById which requires service role
+      // Since we can't do that from frontend, we'll send a password reset email
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(commerce.email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (resetError) {
+        throw resetError;
+      }
+
+      // Mark commerce to force password change
+      const { error: updateError } = await supabase
+        .from('commerces')
+        .update({
+          force_password_change: true,
+          temp_password_set_at: new Date().toISOString(),
+        })
+        .eq('id', commerce.id);
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      toast({
+        title: 'Email de redefinição enviado!',
+        description: `Um email foi enviado para ${commerce.email} com instruções para criar uma nova senha.`,
+      });
+
+      setTempPassword('');
+    } catch (error: any) {
+      console.error('Error resetting password:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao resetar senha',
+        description: error.message || 'Ocorreu um erro inesperado.',
+      });
+    } finally {
+      setResettingPassword(false);
+    }
+  };
+
   const dayOptions = Array.from({ length: 31 }, (_, i) => i + 1);
 
   if (!commerce) return null;
@@ -135,10 +213,14 @@ const CommerceEditModal = ({ commerce, isOpen, onClose, onSave }: CommerceEditMo
         </DialogHeader>
 
         <Tabs defaultValue="dados" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="dados">Dados</TabsTrigger>
             <TabsTrigger value="endereco">Endereço</TabsTrigger>
             <TabsTrigger value="plano">Plano/Cobrança</TabsTrigger>
+            <TabsTrigger value="seguranca" className="flex items-center gap-1">
+              <Shield className="w-3 h-3" />
+              Segurança
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="dados" className="space-y-4 mt-4">
@@ -334,6 +416,54 @@ const CommerceEditModal = ({ commerce, isOpen, onClose, onSave }: CommerceEditMo
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+          </TabsContent>
+
+          {/* Security Tab */}
+          <TabsContent value="seguranca" className="space-y-4 mt-4">
+            <Alert className="border-amber-500/30 bg-amber-500/10">
+              <AlertTriangle className="h-4 w-4 text-amber-500" />
+              <AlertTitle className="text-amber-600 dark:text-amber-400">Atenção</AlertTitle>
+              <AlertDescription className="text-muted-foreground">
+                Use esta opção apenas quando o comércio solicitar recuperação de senha e não tiver acesso ao email cadastrado.
+              </AlertDescription>
+            </Alert>
+
+            <div className="space-y-4 p-4 rounded-lg border border-border bg-muted/30">
+              <div className="flex items-center gap-2 mb-2">
+                <KeyRound className="w-5 h-5 text-primary" />
+                <h4 className="font-medium">Resetar Senha do Comércio</h4>
+              </div>
+
+              <p className="text-sm text-muted-foreground">
+                Ao clicar em "Enviar Reset", um email será enviado para <strong>{commerce?.email}</strong> com um link para criar uma nova senha.
+              </p>
+
+              <div className="flex gap-2">
+                <Button 
+                  variant="destructive"
+                  onClick={handleResetPassword}
+                  disabled={resettingPassword}
+                >
+                  {resettingPassword ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Enviando...
+                    </>
+                  ) : (
+                    <>
+                      <KeyRound className="w-4 h-4 mr-2" />
+                      Enviar Reset de Senha
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            <div className="text-xs text-muted-foreground space-y-1">
+              <p>• O comércio receberá um email com link para criar nova senha</p>
+              <p>• O link expira após 24 horas</p>
+              <p>• A senha antiga continuará funcionando até que o usuário crie uma nova</p>
             </div>
           </TabsContent>
         </Tabs>

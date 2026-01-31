@@ -12,6 +12,7 @@ import CommerceDashboard from "./pages/commerce/CommerceDashboard";
 import UserDashboard from "./pages/user/UserDashboard";
 import Storefront from "./pages/Storefront";
 import Ranking from "./pages/Ranking";
+import ResetPassword from "./pages/ResetPassword";
 
 import ProtectedAdminRoute from "./components/auth/ProtectedAdminRoute";
 import ProtectedCommerceRoute from "./components/auth/ProtectedCommerceRoute";
@@ -65,6 +66,7 @@ function App() {
                 {/* Public routes */}
                 <Route path="/loja/:commerceId" element={<Storefront />} />
                 <Route path="/ranking" element={<Ranking />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>

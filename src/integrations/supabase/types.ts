@@ -422,6 +422,7 @@ export type Database = {
           document_type: string
           email: string
           fantasy_name: string
+          force_password_change: boolean | null
           id: string
           is_open: boolean | null
           logo_url: string | null
@@ -442,6 +443,7 @@ export type Database = {
           tax_regime: string | null
           tax_type: string | null
           tax_value: number | null
+          temp_password_set_at: string | null
           updated_at: string
           upgrade_request_date: string | null
           upgrade_request_status: string | null
@@ -464,6 +466,7 @@ export type Database = {
           document_type: string
           email: string
           fantasy_name: string
+          force_password_change?: boolean | null
           id?: string
           is_open?: boolean | null
           logo_url?: string | null
@@ -484,6 +487,7 @@ export type Database = {
           tax_regime?: string | null
           tax_type?: string | null
           tax_value?: number | null
+          temp_password_set_at?: string | null
           updated_at?: string
           upgrade_request_date?: string | null
           upgrade_request_status?: string | null
@@ -506,6 +510,7 @@ export type Database = {
           document_type?: string
           email?: string
           fantasy_name?: string
+          force_password_change?: boolean | null
           id?: string
           is_open?: boolean | null
           logo_url?: string | null
@@ -526,6 +531,7 @@ export type Database = {
           tax_regime?: string | null
           tax_type?: string | null
           tax_value?: number | null
+          temp_password_set_at?: string | null
           updated_at?: string
           upgrade_request_date?: string | null
           upgrade_request_status?: string | null

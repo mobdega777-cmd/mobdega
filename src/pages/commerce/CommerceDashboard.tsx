@@ -114,6 +114,7 @@ interface Commerce {
   plan_id: string | null;
   rejection_reason: string | null;
   coupon_code: string | null;
+  force_password_change: boolean | null;
 }
 
 interface PlanMenuConfig {
@@ -149,13 +150,19 @@ const CommerceDashboard = () => {
     
     const { data, error } = await supabase
       .from('commerces')
-      .select('id, fantasy_name, logo_url, status, plan_id, rejection_reason, coupon_code')
+      .select('id, fantasy_name, logo_url, status, plan_id, rejection_reason, coupon_code, force_password_change')
       .eq('owner_id', user.id)
       .maybeSingle();
     
     if (error) {
       console.error('Error fetching commerce:', error);
     } else if (data) {
+      // If force_password_change is true, redirect to reset password
+      if (data.force_password_change) {
+        navigate('/reset-password');
+        return;
+      }
+      
       setCommerce({
         id: data.id,
         fantasy_name: data.fantasy_name,
@@ -163,7 +170,8 @@ const CommerceDashboard = () => {
         status: data.status,
         plan_id: data.plan_id,
         rejection_reason: data.rejection_reason,
-        coupon_code: data.coupon_code
+        coupon_code: data.coupon_code,
+        force_password_change: data.force_password_change
       });
       
       // Fetch plan configuration if commerce has a plan
