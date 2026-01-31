@@ -398,8 +398,8 @@ const CommerceDashboard = () => {
       );
     }
 
-    // Show blocked status screen when commerce is not approved
-    if (isBlocked) {
+    // Show blocked status screen when commerce is not approved (except for training section)
+    if (isBlocked && activeSection !== "training") {
       const statusInfo = getBlockedStatusInfo();
       if (!statusInfo) return null;
       
@@ -427,6 +427,11 @@ const CommerceDashboard = () => {
           </Card>
         </div>
       );
+    }
+    
+    // Allow training section when pending
+    if (isBlocked && activeSection === "training") {
+      return <CommerceTraining isPendingApproval={isPending} />;
     }
 
     // Use stock alerts hook when commerce is active
@@ -610,7 +615,8 @@ const CommerceDashboard = () => {
             {allMenuItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeSection === item.id;
-              const isDisabled = isBlocked && item.id !== "overview";
+              // Training is accessible even when blocked (pending approval)
+              const isDisabled = isBlocked && item.id !== "overview" && item.id !== "training";
               const isLocked = !isBlocked && isMenuItemLocked(item.id);
 
               return (

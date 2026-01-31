@@ -5,10 +5,13 @@ import {
   Video, 
   Loader2,
   ExternalLink,
-  BookOpen
+  BookOpen,
+  Clock,
+  GraduationCap
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 
 interface TrainingVideo {
@@ -20,7 +23,11 @@ interface TrainingVideo {
   category: string;
 }
 
-const CommerceTraining = () => {
+interface CommerceTrainingProps {
+  isPendingApproval?: boolean;
+}
+
+const CommerceTraining = ({ isPendingApproval = false }: CommerceTrainingProps) => {
   const [videos, setVideos] = useState<TrainingVideo[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
@@ -75,6 +82,26 @@ const CommerceTraining = () => {
           Aprenda a usar todas as funcionalidades da plataforma
         </p>
       </div>
+
+      {/* Pending Approval Banner */}
+      {isPendingApproval && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <Alert className="bg-amber-500/10 border-amber-500/30">
+            <GraduationCap className="h-5 w-5 text-amber-500" />
+            <AlertTitle className="text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-2">
+              <Clock className="w-4 h-4" />
+              Aproveite enquanto aguarda a aprovação!
+            </AlertTitle>
+            <AlertDescription className="text-muted-foreground mt-2">
+              Enquanto seu cadastro está em análise, você pode aproveitar para conhecer a plataforma através dos nossos vídeos de treinamento. 
+              Assim, quando sua conta for aprovada, você já estará preparado para usar todas as funcionalidades!
+            </AlertDescription>
+          </Alert>
+        </motion.div>
+      )}
 
       {/* Categories */}
       {categories.length > 1 && (
