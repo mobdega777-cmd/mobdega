@@ -27,6 +27,30 @@ interface SystemUpdate {
 // Lista estática de atualizações do sistema - pode ser expandida para buscar do banco
 const systemUpdates: SystemUpdate[] = [
   {
+    id: "0",
+    date: "31/01/2026",
+    time: "00:15",
+    type: "create",
+    module: "Segurança",
+    description: "Nova aba de Segurança no painel admin para reset de senha temporária de comércios com exigência de troca no próximo login"
+  },
+  {
+    id: "0a",
+    date: "31/01/2026",
+    time: "00:10",
+    type: "create",
+    module: "Autenticação",
+    description: "Implementação do recurso de recuperação de senha via email para usuários e comércios"
+  },
+  {
+    id: "0b",
+    date: "31/01/2026",
+    time: "00:05",
+    type: "update",
+    module: "Treinamento",
+    description: "Seção de treinamento agora acessível durante período de aprovação, permitindo que comércios conheçam a plataforma enquanto aguardam"
+  },
+  {
     id: "1",
     date: "29/01/2026",
     time: "00:45",

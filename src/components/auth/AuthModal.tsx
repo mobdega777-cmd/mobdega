@@ -48,6 +48,9 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
   const [couponDiscount, setCouponDiscount] = useState<{ type: string; value: number; message?: string } | null>(null);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loadingPlans, setLoadingPlans] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState("");
+  const [sendingResetEmail, setSendingResetEmail] = useState(false);
   // Form states
   const [formData, setFormData] = useState({
     name: "",
@@ -234,6 +237,8 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
       plan: "basic",
       couponCode: "",
     });
+    setShowForgotPassword(false);
+    setForgotPasswordEmail("");
   };
 
   const handleClose = () => {
@@ -482,6 +487,48 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
     }
   };
 
+  const handleForgotPassword = async () => {
+    if (!forgotPasswordEmail) {
+      toast({
+        variant: "destructive",
+        title: "Email obrigatório",
+        description: "Por favor, informe seu email para recuperar a senha.",
+      });
+      return;
+    }
+
+    setSendingResetEmail(true);
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(forgotPasswordEmail, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (error) {
+        toast({
+          variant: "destructive",
+          title: "Erro ao enviar email",
+          description: error.message,
+        });
+      } else {
+        toast({
+          title: "Email enviado!",
+          description: "Verifique sua caixa de entrada para redefinir sua senha.",
+        });
+        setShowForgotPassword(false);
+        setForgotPasswordEmail("");
+      }
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Ocorreu um erro inesperado. Tente novamente.",
+      });
+    } finally {
+      setSendingResetEmail(false);
+    }
+  };
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -503,7 +550,11 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-border">
               <h2 className="font-display text-2xl font-bold text-foreground">
-                {mode === "login" ? "Bem-vindo de volta!" : "Criar conta"}
+                {showForgotPassword 
+                  ? "Recuperar senha" 
+                  : mode === "login" 
+                    ? "Bem-vindo de volta!" 
+                    : "Criar conta"}
               </h2>
               <button
                 onClick={handleClose}
@@ -514,29 +565,75 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
             </div>
 
             <div className="p-6">
-              {/* Mode Toggle */}
-              <div className="flex gap-2 p-1 bg-muted rounded-xl mb-6">
-                <button
-                  onClick={() => { setMode("login"); setStep(1); }}
-                  className={`flex-1 py-2.5 px-4 rounded-lg font-medium transition-all ${
-                    mode === "login"
-                      ? "bg-card text-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
+              {/* Forgot Password Form */}
+              {showForgotPassword ? (
+                <motion.div
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  className="space-y-5"
                 >
-                  Login
-                </button>
-                <button
-                  onClick={() => { setMode("register"); setStep(1); }}
-                  className={`flex-1 py-2.5 px-4 rounded-lg font-medium transition-all ${
-                    mode === "register"
-                      ? "bg-card text-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  Cadastro
-                </button>
-              </div>
+                  <p className="text-sm text-muted-foreground">
+                    Digite seu email cadastrado para receber o link de recuperação de senha.
+                  </p>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="forgot-email">Email</Label>
+                    <Input
+                      id="forgot-email"
+                      type="email"
+                      value={forgotPasswordEmail}
+                      onChange={(e) => setForgotPasswordEmail(e.target.value)}
+                      placeholder="seu@email.com"
+                      className="h-12"
+                    />
+                  </div>
+
+                  <Button 
+                    variant="hero" 
+                    className="w-full" 
+                    size="lg"
+                    onClick={handleForgotPassword}
+                    disabled={sendingResetEmail}
+                  >
+                    {sendingResetEmail ? <Loader2 className="w-4 h-4 animate-spin" /> : "Enviar link de recuperação"}
+                  </Button>
+
+                  <p className="text-center text-sm text-muted-foreground">
+                    Lembrou a senha?{" "}
+                    <button 
+                      type="button"
+                      onClick={() => setShowForgotPassword(false)}
+                      className="text-primary hover:underline"
+                    >
+                      Voltar ao login
+                    </button>
+                  </p>
+                </motion.div>
+              ) : (
+                <>
+                  {/* Mode Toggle */}
+                  <div className="flex gap-2 p-1 bg-muted rounded-xl mb-6">
+                    <button
+                      onClick={() => { setMode("login"); setStep(1); }}
+                      className={`flex-1 py-2.5 px-4 rounded-lg font-medium transition-all ${
+                        mode === "login"
+                          ? "bg-card text-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      Login
+                    </button>
+                    <button
+                      onClick={() => { setMode("register"); setStep(1); }}
+                      className={`flex-1 py-2.5 px-4 rounded-lg font-medium transition-all ${
+                        mode === "register"
+                          ? "bg-card text-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      Cadastro
+                    </button>
+                  </div>
 
               {/* Login Form */}
               {mode === "login" && (
@@ -623,9 +720,13 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
 
                   <p className="text-center text-sm text-muted-foreground">
                     Esqueceu sua senha?{" "}
-                    <a href="#" className="text-primary hover:underline">
+                    <button 
+                      type="button"
+                      onClick={() => setShowForgotPassword(true)}
+                      className="text-primary hover:underline"
+                    >
                       Recuperar
-                    </a>
+                    </button>
                   </p>
                 </motion.div>
               )}
@@ -1215,6 +1316,8 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
                     Seu cadastro será analisado e você receberá um email de confirmação.
                   </p>
                 </motion.div>
+              )}
+                </>
               )}
             </div>
           </motion.div>
