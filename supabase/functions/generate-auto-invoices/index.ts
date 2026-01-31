@@ -130,7 +130,7 @@ Deno.serve(async (req) => {
         .select('id')
         .eq('commerce_id', commerce.id)
         .eq('reference_month', referenceMonth)
-        .eq('type', 'subscription')
+        .eq('type', 'receivable')
         .maybeSingle();
 
       if (existingInvoice) {
@@ -165,7 +165,7 @@ Deno.serve(async (req) => {
           amount: finalAmount,
           due_date: dueDateStr,
           reference_month: referenceMonth,
-          type: 'subscription',
+          type: 'receivable',
           status: 'pending',
           notes: commerce.coupon_code 
             ? `Fatura automática. Cupom aplicado: ${commerce.coupon_code}`
