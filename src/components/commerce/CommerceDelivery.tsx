@@ -22,6 +22,7 @@ import {
   Power
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 
 interface CommerceDeliveryProps {
@@ -38,6 +39,7 @@ interface DeliveryOrder {
   notes: string | null;
   created_at: string;
   estimated_delivery: string | null;
+  payment_method: string | null;
 }
 
 const statusConfig: Record<string, { label: string; color: string; bgColor: string }> = {
@@ -55,6 +57,7 @@ const CommerceDelivery = ({ commerceId }: CommerceDeliveryProps) => {
   const [selectedOrder, setSelectedOrder] = useState<DeliveryOrder | null>(null);
   const [deliveryEnabled, setDeliveryEnabled] = useState(true);
   const [togglingDelivery, setTogglingDelivery] = useState(false);
+  const { user } = useAuth();
   const { toast } = useToast();
 
   // Fetch commerce delivery status
@@ -146,8 +149,69 @@ const CommerceDelivery = ({ commerceId }: CommerceDeliveryProps) => {
     if (error) {
       toast({ variant: "destructive", title: "Erro ao atualizar pedido", description: error.message });
     } else {
+      // Criar movimentação de caixa ao finalizar entrega
+      if (newStatus === 'delivered') {
+        const order = orders.find(o => o.id === orderId);
+        if (order) {
+          await createCashMovementForDelivery(order);
+        }
+      }
       toast({ title: "Status atualizado!" });
       fetchOrders();
+    }
+  };
+
+  // Função para criar cash_movement ao finalizar pedido de delivery
+  const createCashMovementForDelivery = async (order: DeliveryOrder) => {
+    if (!user) return;
+
+    // Buscar caixa aberto do comércio
+    const { data: openRegister } = await supabase
+      .from('cash_registers')
+      .select('id')
+      .eq('commerce_id', commerceId)
+      .eq('status', 'open')
+      .order('opened_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!openRegister) {
+      console.log('Nenhum caixa aberto para registrar movimentação de delivery');
+      return;
+    }
+
+    // Verificar se já existe movimentação para este pedido
+    const { data: existingMovement } = await supabase
+      .from('cash_movements')
+      .select('id')
+      .eq('order_id', order.id)
+      .maybeSingle();
+
+    if (existingMovement) {
+      console.log('Movimentação já existe para este pedido de delivery');
+      return;
+    }
+
+    const paymentMethod = order.payment_method || 'cash';
+    const description = `Delivery #${order.id.slice(0, 8)} - ${order.customer_name || 'Cliente'}`;
+
+    const { error } = await supabase
+      .from('cash_movements')
+      .insert({
+        cash_register_id: openRegister.id,
+        commerce_id: commerceId,
+        type: 'sale',
+        amount: Number(order.total),
+        payment_method: paymentMethod,
+        order_id: order.id,
+        description: description,
+        created_by: user.id
+      });
+
+    if (error) {
+      console.error('Erro ao criar movimentação de caixa para delivery:', error);
+    } else {
+      console.log('Movimentação de caixa criada com sucesso para delivery:', order.id);
     }
   };
 

@@ -1790,7 +1790,13 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className={`grid w-full ${(orderMode === 'table' || hasActiveTableOrder) ? 'grid-cols-3' : 'grid-cols-2'}`}>
+        <TabsList className={`grid w-full ${
+          (orderMode === 'table' || hasActiveTableOrder) 
+            ? 'grid-cols-3' 
+            : (orderMode === 'delivery' && createdOrderId) 
+              ? 'grid-cols-3' 
+              : 'grid-cols-2'
+        }`}>
           <TabsTrigger value="menu" className="gap-2">
             <ShoppingCart className="w-4 h-4" />
             Cardápio
@@ -1809,6 +1815,13 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
               {(cart.length > 0 || activeOrderItems.length > 0) && (
                 <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-ping" />
               )}
+            </TabsTrigger>
+          )}
+          {/* Aba Acompanhar para Delivery com pedido ativo */}
+          {orderMode === 'delivery' && createdOrderId && (
+            <TabsTrigger value="track" className="gap-2">
+              <Truck className="w-4 h-4" />
+              Acompanhar
             </TabsTrigger>
           )}
           <TabsTrigger value="reviews" className="gap-2">
@@ -2116,6 +2129,97 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
                 </CardContent>
               </Card>
             )}
+          </TabsContent>
+        )}
+
+        {/* Track Order Tab - Delivery */}
+        {orderMode === 'delivery' && createdOrderId && (
+          <TabsContent value="track" className="space-y-4 mt-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Truck className="w-5 h-5 text-primary" />
+                  Acompanhe seu Pedido
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Status Steps */}
+                <div className="flex items-center justify-between relative">
+                  {/* Progress Line */}
+                  <div className="absolute top-6 left-0 right-0 h-1 bg-muted">
+                    <div 
+                      className="h-full bg-primary transition-all duration-500"
+                      style={{ 
+                        width: orderStatus === 'pending' ? '0%' : 
+                               orderStatus === 'confirmed' ? '33%' : 
+                               orderStatus === 'preparing' ? '66%' : 
+                               orderStatus === 'delivering' || orderStatus === 'delivered' ? '100%' : '0%'
+                      }}
+                    />
+                  </div>
+
+                  {/* Step 1: Waiting */}
+                  <div className="flex flex-col items-center relative z-10">
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center border-2 ${
+                      orderStatus !== 'pending' ? 'bg-primary text-white border-primary' : 'bg-primary/20 text-primary border-primary animate-pulse'
+                    }`}>
+                      {orderStatus !== 'pending' ? <Check className="w-5 h-5" /> : <Clock className="w-5 h-5" />}
+                    </div>
+                    <span className="text-xs mt-2 text-center font-medium">Aguardando<br/>Aprovação</span>
+                  </div>
+
+                  {/* Step 2: Preparing */}
+                  <div className="flex flex-col items-center relative z-10">
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center border-2 ${
+                      orderStatus === 'preparing' || orderStatus === 'delivering' || orderStatus === 'delivered' 
+                        ? 'bg-primary text-white border-primary' 
+                        : orderStatus === 'confirmed' 
+                          ? 'bg-primary/20 text-primary border-primary animate-pulse'
+                          : 'bg-muted text-muted-foreground border-muted'
+                    }`}>
+                      {orderStatus === 'preparing' || orderStatus === 'delivering' || orderStatus === 'delivered' 
+                        ? <Check className="w-5 h-5" /> 
+                        : <UtensilsCrossed className="w-5 h-5" />}
+                    </div>
+                    <span className="text-xs mt-2 text-center font-medium">Preparando</span>
+                  </div>
+
+                  {/* Step 3: Ready/Delivered */}
+                  <div className="flex flex-col items-center relative z-10">
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center border-2 ${
+                      orderStatus === 'delivered' 
+                        ? 'bg-primary text-white border-primary' 
+                        : orderStatus === 'delivering' 
+                          ? 'bg-primary/20 text-primary border-primary animate-pulse'
+                          : 'bg-muted text-muted-foreground border-muted'
+                    }`}>
+                      <Check className="w-5 h-5" />
+                    </div>
+                    <span className="text-xs mt-2 text-center font-medium">Pedido<br/>Pronto</span>
+                  </div>
+                </div>
+
+                {/* Status Message */}
+                <div className="text-center p-4 bg-muted/50 rounded-lg">
+                  <p className="text-muted-foreground">
+                    {orderStatus === 'pending' && 'Aguardando confirmação do estabelecimento...'}
+                    {orderStatus === 'confirmed' && 'Pedido confirmado! Preparando...'}
+                    {orderStatus === 'preparing' && 'Seu pedido está sendo preparado!'}
+                    {orderStatus === 'delivering' && 'Pedido a caminho!'}
+                    {orderStatus === 'delivered' && 'Pedido entregue! Bom apetite!'}
+                    {orderStatus === 'cancelled' && 'Pedido cancelado'}
+                  </p>
+                </div>
+
+                {/* Order Info */}
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Pedido</span>
+                    <span className="font-mono">#{createdOrderId.slice(0, 8)}</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
         )}
 

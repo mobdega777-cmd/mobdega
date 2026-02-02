@@ -27,6 +27,22 @@ interface SystemUpdate {
 // Lista estática de atualizações do sistema - pode ser expandida para buscar do banco
 const systemUpdates: SystemUpdate[] = [
   {
+    id: "n0",
+    date: "02/02/2026",
+    time: "00:30",
+    type: "update",
+    module: "Caixa/PDV",
+    description: "Pedidos de Delivery agora são contabilizados automaticamente no Caixa/PDV ao serem finalizados, incluindo taxas"
+  },
+  {
+    id: "n01",
+    date: "02/02/2026",
+    time: "00:25",
+    type: "create",
+    module: "Delivery",
+    description: "Nova aba 'Acompanhar' na vitrine para clientes acompanharem pedidos de delivery após fechamento do modal"
+  },
+  {
     id: "n1",
     date: "01/02/2026",
     time: "10:30",
