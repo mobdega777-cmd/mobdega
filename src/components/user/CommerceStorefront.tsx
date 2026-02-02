@@ -4,7 +4,7 @@ import {
   ArrowLeft, Store, MapPin, Phone, Clock, Star, Heart,
   UtensilsCrossed, Truck, MessageCircle, ShoppingCart, ChevronRight,
   X, Plus, Minus, Send, User, CreditCard, Banknote, Smartphone, DollarSign,
-  Check, Loader2, Camera, Users, Tag
+  Check, Loader2, Camera, Users, Tag, Navigation
 } from "lucide-react";
 import { HookahIcon } from "@/components/ui/hookah-icon";
 import { Button } from "@/components/ui/button";
@@ -116,6 +116,129 @@ interface CommerceStorefrontProps {
   commerceId: string;
   onBack: () => void;
 }
+
+// Order Status Tracker Component (displayed inside Comanda)
+const OrderStatusTracker = ({ orderId }: { orderId: string }) => {
+  const [status, setStatus] = useState<string>("pending");
+
+  useEffect(() => {
+    // Fetch initial status
+    const fetchStatus = async () => {
+      const { data } = await supabase
+        .from('orders')
+        .select('status')
+        .eq('id', orderId)
+        .single();
+      if (data) setStatus(data.status);
+    };
+    fetchStatus();
+
+    // Subscribe to real-time updates
+    const channel = supabase
+      .channel(`order-status-tracker-${orderId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'orders',
+          filter: `id=eq.${orderId}`
+        },
+        (payload) => {
+          setStatus(payload.new.status as string);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [orderId]);
+
+  const getStatusStep = () => {
+    switch (status) {
+      case 'pending': return 0;
+      case 'confirmed': return 1;
+      case 'preparing': return 1;
+      case 'delivering': return 2;
+      case 'delivered': return 2;
+      default: return 0;
+    }
+  };
+
+  const getStatusMessage = () => {
+    switch (status) {
+      case 'pending': return 'Aguardando confirmação...';
+      case 'confirmed': return 'Pedido confirmado!';
+      case 'preparing': return 'Preparando seu pedido...';
+      case 'delivering': return 'Pedido a caminho!';
+      case 'delivered': return 'Pedido entregue!';
+      case 'cancelled': return 'Pedido cancelado';
+      default: return 'Aguardando...';
+    }
+  };
+
+  if (status === 'cancelled') {
+    return (
+      <div className="mt-4 p-4 bg-red-500/10 border border-red-500/30 rounded-lg text-center">
+        <X className="w-8 h-8 mx-auto text-red-500 mb-2" />
+        <p className="text-sm font-medium text-red-600">Pedido Cancelado</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-4 p-4 bg-muted/50 rounded-lg">
+      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">
+        Acompanhe seu Pedido
+      </p>
+      {/* Mini Status Steps */}
+      <div className="flex items-center justify-between relative">
+        {/* Progress Line */}
+        <div className="absolute top-4 left-0 right-0 h-1 bg-muted">
+          <div 
+            className="h-full bg-primary transition-all duration-500"
+            style={{ width: `${getStatusStep() * 50}%` }}
+          />
+        </div>
+
+        {/* Step 1: Waiting */}
+        <div className="flex flex-col items-center relative z-10">
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+            getStatusStep() >= 0 ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'
+          }`}>
+            {getStatusStep() > 0 ? <Check className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
+          </div>
+          <span className="text-[10px] mt-1 text-center text-muted-foreground">Aguardando</span>
+        </div>
+
+        {/* Step 2: Preparing */}
+        <div className="flex flex-col items-center relative z-10">
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+            getStatusStep() >= 1 ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'
+          }`}>
+            {getStatusStep() > 1 ? <Check className="w-4 h-4" /> : <UtensilsCrossed className="w-4 h-4" />}
+          </div>
+          <span className="text-[10px] mt-1 text-center text-muted-foreground">Preparando</span>
+        </div>
+
+        {/* Step 3: Ready */}
+        <div className="flex flex-col items-center relative z-10">
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+            getStatusStep() >= 2 ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'
+          }`}>
+            <Check className="w-4 h-4" />
+          </div>
+          <span className="text-[10px] mt-1 text-center text-muted-foreground">Pronto</span>
+        </div>
+      </div>
+
+      <p className="text-center text-sm text-muted-foreground mt-3">
+        {getStatusMessage()}
+      </p>
+    </div>
+  );
+};
 
 const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => {
   const { user } = useAuth();
@@ -1565,6 +1688,25 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
           )}
         </div>
         <div className="flex items-center gap-2">
+          {/* Map Button - Opens Google Maps */}
+          {commerce.address && commerce.city && (
+            <Button 
+              variant="outline" 
+              size="icon"
+              className="text-blue-600 border-blue-600 hover:bg-blue-50"
+              onClick={() => {
+                const addressParts = [
+                  commerce.address,
+                  commerce.neighborhood,
+                  commerce.city
+                ].filter(Boolean).join(', ');
+                const query = encodeURIComponent(addressParts);
+                window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank');
+              }}
+            >
+              <Navigation className="w-5 h-5" />
+            </Button>
+          )}
           {/* Photos Button */}
           {photos.length > 0 && (
             <Button 
@@ -1966,6 +2108,11 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
                       </Button>
                     )}
                   </div>
+
+                  {/* Order Status Tracker inside Comanda */}
+                  {activeOrderId && (
+                    <OrderStatusTracker orderId={activeOrderId} />
+                  )}
                 </CardContent>
               </Card>
             )}
