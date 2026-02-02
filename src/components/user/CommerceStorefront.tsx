@@ -531,9 +531,10 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
       });
     }
 
-    // Check for active table order for this user at this commerce
+    // Check for active orders for this user at this commerce
     if (user) {
       await checkActiveTableOrder();
+      await checkActiveDeliveryOrder();
     }
 
     // Fetch categories
@@ -678,6 +679,29 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
     setLoading(false);
   };
 
+  // Check and fetch active delivery order for this user
+  const checkActiveDeliveryOrder = async () => {
+    if (!user) return;
+
+    // Find active delivery orders (pending/confirmed/preparing/delivering) for this user at this commerce
+    const { data: activeDeliveryOrders } = await supabase
+      .from('orders')
+      .select('id, status')
+      .eq('user_id', user.id)
+      .eq('commerce_id', commerceId)
+      .eq('order_type', 'delivery')
+      .in('status', ['pending', 'confirmed', 'preparing', 'delivering'])
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (activeDeliveryOrders && activeDeliveryOrders.length > 0) {
+      const activeOrder = activeDeliveryOrders[0];
+      setCreatedOrderId(activeOrder.id);
+      setOrderStatus(activeOrder.status);
+      setOrderMode('delivery');
+    }
+  };
+
   // Check and fetch active table order for this user
   const checkActiveTableOrder = async () => {
     if (!user) return;
@@ -820,12 +844,48 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
     };
   }, [user, selectedTable]);
 
-  // Re-check active order when user changes or loading completes
+  // Re-check active orders when user changes or loading completes
   useEffect(() => {
     if (user && !loading) {
       checkActiveTableOrder();
+      checkActiveDeliveryOrder();
     }
   }, [user, loading]);
+
+  // Realtime subscription for active delivery order status updates
+  useEffect(() => {
+    if (!user || !createdOrderId || orderMode !== 'delivery') return;
+
+    const channel = supabase
+      .channel(`delivery-order-status-${createdOrderId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'orders',
+          filter: `id=eq.${createdOrderId}`
+        },
+        (payload) => {
+          const newStatus = payload.new.status as string;
+          setOrderStatus(newStatus);
+          // Clear tracking if order is delivered or cancelled
+          if (newStatus === 'delivered' || newStatus === 'cancelled') {
+            // Keep visible for a bit, then clear after a few seconds
+            setTimeout(() => {
+              if (newStatus === 'delivered' || newStatus === 'cancelled') {
+                setCreatedOrderId(null);
+              }
+            }, 30000); // Keep visible for 30s after completion
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, createdOrderId, orderMode]);
 
   const toggleFavorite = async () => {
     // Require authentication for favorites
