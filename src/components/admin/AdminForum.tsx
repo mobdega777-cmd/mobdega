@@ -69,6 +69,7 @@ interface ForumTopic {
   commerce_id: string | null;
   is_pinned: boolean;
   is_closed: boolean;
+  is_solved: boolean;
   views_count: number;
   replies_count: number;
   likes_count: number;
@@ -291,15 +292,16 @@ const AdminForum = () => {
     toast({ title: "Tópico excluído" });
   };
 
-  const handleMarkAsSolution = async (replyId: string) => {
+  const handleMarkAsSolution = async (topicId: string) => {
     await supabase
-      .from('forum_replies')
-      .update({ is_solution: true })
-      .eq('id', replyId);
-    if (selectedTopic) {
-      fetchReplies(selectedTopic.id);
+      .from('forum_topics')
+      .update({ is_solved: true, is_closed: true })
+      .eq('id', topicId);
+    fetchTopics();
+    if (selectedTopic?.id === topicId) {
+      setSelectedTopic({ ...selectedTopic, is_solved: true, is_closed: true });
     }
-    toast({ title: "Marcado como solução" });
+    toast({ title: "Tópico marcado como solucionado" });
   };
 
   const handleVote = async (topicId: string, voteType: 'like' | 'dislike', e: React.MouseEvent) => {
@@ -408,6 +410,15 @@ const AdminForum = () => {
                   </>
                 )}
               </DropdownMenuItem>
+              {!selectedTopic.is_solved && (
+                <DropdownMenuItem 
+                  onClick={() => handleMarkAsSolution(selectedTopic.id)}
+                  className="text-green-600"
+                >
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                  Marcar como Solução
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem 
                 onClick={() => handleDeleteTopic(selectedTopic.id)}
                 className="text-destructive"
@@ -433,8 +444,14 @@ const AdminForum = () => {
                   {selectedTopic.is_pinned && (
                     <Pin className="w-4 h-4 text-primary" />
                   )}
-                  {selectedTopic.is_closed && (
+                  {selectedTopic.is_closed && !selectedTopic.is_solved && (
                     <Lock className="w-4 h-4 text-red-500" />
+                  )}
+                  {selectedTopic.is_solved && (
+                    <Badge className="bg-green-500 gap-1">
+                      <CheckCircle className="w-3 h-3" />
+                      Solucionado
+                    </Badge>
                   )}
                   <CardTitle className="text-xl">{selectedTopic.title}</CardTitle>
                 </div>
@@ -506,7 +523,7 @@ const AdminForum = () => {
           ) : (
             <div className="space-y-3">
               {replies.map((reply) => (
-                <Card key={reply.id} className={reply.is_solution ? 'border-green-500 bg-green-500/5' : ''}>
+                <Card key={reply.id}>
                   <CardContent className="p-4">
                     <div className="flex items-start gap-3">
                       <Avatar className="w-10 h-10">
@@ -516,33 +533,14 @@ const AdminForum = () => {
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-medium">{reply.author_name}</span>
-                            {reply.author_type === 'admin' && (
-                              <Badge variant="default" className="text-xs">Admin</Badge>
-                            )}
-                            {reply.is_solution && (
-                              <Badge className="bg-green-500 gap-1">
-                                <CheckCircle className="w-3 h-3" />
-                                Solução
-                              </Badge>
-                            )}
-                            <span className="text-xs text-muted-foreground">
-                              {formatDistanceToNow(new Date(reply.created_at), { addSuffix: true, locale: ptBR })}
-                            </span>
-                          </div>
-                          {!reply.is_solution && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleMarkAsSolution(reply.id)}
-                              className="text-green-600 hover:text-green-700"
-                            >
-                              <CheckCircle className="w-4 h-4 mr-1" />
-                              Marcar Solução
-                            </Button>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-medium">{reply.author_name}</span>
+                          {reply.author_type === 'admin' && (
+                            <Badge variant="default" className="text-xs">Admin</Badge>
                           )}
+                          <span className="text-xs text-muted-foreground">
+                            {formatDistanceToNow(new Date(reply.created_at), { addSuffix: true, locale: ptBR })}
+                          </span>
                         </div>
                         <p className="whitespace-pre-wrap text-sm">{reply.content}</p>
                       </div>

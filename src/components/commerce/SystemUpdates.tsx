@@ -27,6 +27,38 @@ interface SystemUpdate {
 // Lista estática de atualizações do sistema - pode ser expandida para buscar do banco
 const systemUpdates: SystemUpdate[] = [
   {
+    id: "n1",
+    date: "01/02/2026",
+    time: "10:30",
+    type: "create",
+    module: "Vitrine",
+    description: "Novo botão de Mapa na vitrine do cliente para abrir localização do estabelecimento no Google Maps"
+  },
+  {
+    id: "n2",
+    date: "01/02/2026",
+    time: "10:25",
+    type: "update",
+    module: "Comanda",
+    description: "Tracker de status do pedido agora exibido diretamente na aba Comanda para acompanhamento contínuo"
+  },
+  {
+    id: "n3",
+    date: "01/02/2026",
+    time: "10:20",
+    type: "update",
+    module: "Fórum",
+    description: "Botão 'Marcar como Solução' movido para nível do tópico - indica que a discussão foi resolvida"
+  },
+  {
+    id: "n4",
+    date: "01/02/2026",
+    time: "10:15",
+    type: "update",
+    module: "Página Inicial",
+    description: "Cards de comércios na landing page agora clicáveis, abrindo diretamente a vitrine pública da loja"
+  },
+  {
     id: "0",
     date: "31/01/2026",
     time: "00:15",

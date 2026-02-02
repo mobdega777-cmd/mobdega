@@ -914,6 +914,7 @@ export type Database = {
           id: string
           is_closed: boolean | null
           is_pinned: boolean | null
+          is_solved: boolean | null
           last_reply_at: string | null
           likes_count: number | null
           replies_count: number | null
@@ -934,6 +935,7 @@ export type Database = {
           id?: string
           is_closed?: boolean | null
           is_pinned?: boolean | null
+          is_solved?: boolean | null
           last_reply_at?: string | null
           likes_count?: number | null
           replies_count?: number | null
@@ -954,6 +956,7 @@ export type Database = {
           id?: string
           is_closed?: boolean | null
           is_pinned?: boolean | null
+          is_solved?: boolean | null
           last_reply_at?: string | null
           likes_count?: number | null
           replies_count?: number | null

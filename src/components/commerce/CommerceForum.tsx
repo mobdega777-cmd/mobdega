@@ -60,6 +60,7 @@ interface ForumTopic {
   commerce_id: string | null;
   is_pinned: boolean;
   is_closed: boolean;
+  is_solved: boolean;
   views_count: number;
   replies_count: number;
   likes_count: number;
@@ -350,6 +351,12 @@ const CommerceForum = ({ commerceId, commerceName, commerceLogo }: CommerceForum
                 <div className="flex items-center gap-2 flex-wrap">
                   {selectedTopic.is_pinned && (
                     <Pin className="w-4 h-4 text-primary" />
+                  )}
+                  {selectedTopic.is_solved && (
+                    <Badge className="bg-green-500 gap-1">
+                      <CheckCircle className="w-3 h-3" />
+                      Solucionado
+                    </Badge>
                   )}
                   <CardTitle className="text-xl">{selectedTopic.title}</CardTitle>
                 </div>
