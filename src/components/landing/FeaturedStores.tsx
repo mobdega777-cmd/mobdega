@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { MapPin, Star, Clock, Search, Loader2, Phone } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -91,6 +92,7 @@ interface Commerce {
 }
 
 const FeaturedStores = () => {
+  const navigate = useNavigate();
   const [stores, setStores] = useState<Commerce[]>([]);
   const [loading, setLoading] = useState(true);
   const [userCep, setUserCep] = useState("");
@@ -340,6 +342,7 @@ const FeaturedStores = () => {
                 transition={{ duration: 0.5, delay: index * 0.1 }}
                 whileHover={{ y: -8 }}
                 className="bg-card rounded-xl overflow-hidden shadow-card hover:shadow-elevated transition-all duration-300 cursor-pointer group flex-shrink-0 w-[160px] sm:w-[200px] md:w-[240px] snap-start"
+                onClick={() => navigate(`/loja/${store.id}`)}
               >
                 {/* Store Cover Image */}
                 <div className="relative h-20 sm:h-24 overflow-hidden bg-gradient-to-br from-primary/20 to-secondary/20">
