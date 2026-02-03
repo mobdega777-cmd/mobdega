@@ -27,16 +27,20 @@ import {
   BookOpen,
   Trophy,
   AlertTriangleIcon,
-  ArrowUp
+  ArrowUp,
+  User,
+  Shield
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import logoMobdega from "@/assets/logo-mobdega.png";
 import { useStockAlerts } from "@/hooks/useStockAlerts";
+import ManagementPasswordModal from "@/components/commerce/ManagementPasswordModal";
 
 // Commerce sections
 import CommerceOverview from "@/components/commerce/CommerceOverview";
@@ -115,6 +119,8 @@ interface Commerce {
   rejection_reason: string | null;
   coupon_code: string | null;
   force_password_change: boolean | null;
+  employee_visible_menu_items: string[] | null;
+  management_password: string | null;
 }
 
 interface PlanMenuConfig {
@@ -137,6 +143,8 @@ const CommerceDashboard = () => {
   const [pendingDeliveryOrdersCount, setPendingDeliveryOrdersCount] = useState(0);
   const [billRequestsCount, setBillRequestsCount] = useState(0);
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
+  const [isEmployeeMode, setIsEmployeeMode] = useState(true); // Start in employee mode
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
 
@@ -150,7 +158,7 @@ const CommerceDashboard = () => {
     
     const { data, error } = await supabase
       .from('commerces')
-      .select('id, fantasy_name, logo_url, status, plan_id, rejection_reason, coupon_code, force_password_change')
+      .select('id, fantasy_name, logo_url, status, plan_id, rejection_reason, coupon_code, force_password_change, employee_visible_menu_items, management_password')
       .eq('owner_id', user.id)
       .maybeSingle();
     
@@ -171,7 +179,9 @@ const CommerceDashboard = () => {
         plan_id: data.plan_id,
         rejection_reason: data.rejection_reason,
         coupon_code: data.coupon_code,
-        force_password_change: data.force_password_change
+        force_password_change: data.force_password_change,
+        employee_visible_menu_items: data.employee_visible_menu_items as string[] | null,
+        management_password: data.management_password
       });
       
       // Fetch plan configuration if commerce has a plan
@@ -353,8 +363,41 @@ const CommerceDashboard = () => {
     return !planConfig.allowed_menu_items.includes(itemId);
   };
 
-  // All menu items (not filtered, will show locked ones)
-  const allMenuItems = menuItems;
+  // Check if menu item is hidden by employee mode
+  const isMenuItemHiddenByEmployeeMode = (itemId: string) => {
+    if (!isEmployeeMode) return false; // Management mode shows all
+    if (!commerce?.employee_visible_menu_items) return false; // No config = show all
+    return !commerce.employee_visible_menu_items.includes(itemId);
+  };
+
+  // Handle toggle between employee and management modes
+  const handleModeToggle = (checked: boolean) => {
+    if (!checked) {
+      // Switching to employee mode - no password needed
+      setIsEmployeeMode(true);
+    } else {
+      // Switching to management mode - check if password is set
+      if (commerce?.management_password) {
+        setShowPasswordModal(true);
+      } else {
+        // No password set, allow direct access
+        setIsEmployeeMode(false);
+      }
+    }
+  };
+
+  const handlePasswordSuccess = () => {
+    setShowPasswordModal(false);
+    setIsEmployeeMode(false);
+  };
+
+  // Get menu items filtered by employee mode
+  const getVisibleMenuItems = () => {
+    if (!isEmployeeMode) return menuItems;
+    return menuItems.filter(item => !isMenuItemHiddenByEmployeeMode(item.id));
+  };
+
+  const visibleMenuItems = getVisibleMenuItems();
 
   const getBlockedStatusInfo = () => {
     if (isPending) {
@@ -620,7 +663,7 @@ const CommerceDashboard = () => {
 
           {/* Navigation */}
           <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-            {allMenuItems.map((item) => {
+            {visibleMenuItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeSection === item.id;
               // Training is accessible even when blocked (pending approval)
@@ -677,12 +720,33 @@ const CommerceDashboard = () => {
             })}
           </nav>
 
-          {/* Logout */}
+          {/* Employee/Management Toggle */}
           <div className="p-4 border-t border-border/50">
+            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/20">
+              <div className="flex items-center gap-2">
+                {isEmployeeMode ? (
+                  <User className="w-4 h-4 text-primary-foreground/70" />
+                ) : (
+                  <Shield className="w-4 h-4 text-primary" />
+                )}
+                <span className="text-xs font-medium text-primary-foreground/80">
+                  {isEmployeeMode ? "Funcionário" : "Gestão"}
+                </span>
+              </div>
+              <Switch
+                checked={!isEmployeeMode}
+                onCheckedChange={handleModeToggle}
+                className="scale-75"
+              />
+            </div>
+          </div>
+
+          {/* Logout */}
+          <div className="px-4 pb-4">
             <Button
               variant="ghost"
               onClick={handleLogout}
-              className="w-full justify-start text-red-400 hover:text-red-300 hover:bg-red-500/10"
+              className="w-full justify-start text-destructive/80 hover:text-destructive hover:bg-destructive/10"
             >
               <LogOut className="w-5 h-5" />
               <span className="ml-3">Sair</span>
@@ -715,6 +779,14 @@ const CommerceDashboard = () => {
           couponCode={commerce.coupon_code}
         />
       )}
+
+      {/* Management Password Modal */}
+      <ManagementPasswordModal
+        isOpen={showPasswordModal}
+        onClose={() => setShowPasswordModal(false)}
+        onSuccess={handlePasswordSuccess}
+        correctPassword={commerce?.management_password || ""}
+      />
     </div>
   );
 };

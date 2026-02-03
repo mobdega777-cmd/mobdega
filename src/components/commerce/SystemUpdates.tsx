@@ -27,6 +27,14 @@ interface SystemUpdate {
 // Lista estática de atualizações do sistema - pode ser expandida para buscar do banco
 const systemUpdates: SystemUpdate[] = [
   {
+    id: "emp1",
+    date: "03/02/2026",
+    time: "14:00",
+    type: "create",
+    module: "Configurações",
+    description: "Novo sistema de Modo Funcionário/Gestão: configure quais itens do menu são visíveis para funcionários e defina senha de gestão"
+  },
+  {
     id: "n0",
     date: "02/02/2026",
     time: "00:30",
