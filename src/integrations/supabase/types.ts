@@ -421,11 +421,13 @@ export type Database = {
           document: string
           document_type: string
           email: string
+          employee_visible_menu_items: string[] | null
           fantasy_name: string
           force_password_change: boolean | null
           id: string
           is_open: boolean | null
           logo_url: string | null
+          management_password: string | null
           neighborhood: string | null
           opening_hours: Json | null
           owner_id: string
@@ -465,11 +467,13 @@ export type Database = {
           document: string
           document_type: string
           email: string
+          employee_visible_menu_items?: string[] | null
           fantasy_name: string
           force_password_change?: boolean | null
           id?: string
           is_open?: boolean | null
           logo_url?: string | null
+          management_password?: string | null
           neighborhood?: string | null
           opening_hours?: Json | null
           owner_id: string
@@ -509,11 +513,13 @@ export type Database = {
           document?: string
           document_type?: string
           email?: string
+          employee_visible_menu_items?: string[] | null
           fantasy_name?: string
           force_password_change?: boolean | null
           id?: string
           is_open?: boolean | null
           logo_url?: string | null
+          management_password?: string | null
           neighborhood?: string | null
           opening_hours?: Json | null
           owner_id?: string

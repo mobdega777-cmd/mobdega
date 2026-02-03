@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import EmployeeSettingsSection from "./EmployeeSettingsSection";
 
 interface CommerceSettingsProps {
   commerce: {
@@ -587,6 +588,9 @@ const CommerceSettings = ({ commerce }: CommerceSettingsProps) => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Employee Settings Section */}
+        <EmployeeSettingsSection commerceId={commerce.id} />
 
         <div className="flex justify-end">
           <Button type="submit" disabled={saving} className="gap-2">
