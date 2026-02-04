@@ -474,7 +474,7 @@ const CommerceRanking = ({ currentCommerceId }: CommerceRankingProps) => {
           >
             <Card className="w-full lg:w-auto border border-primary/30 bg-gradient-to-br from-primary/5 to-primary/10">
               <CardContent className="p-3">
-                <p className="text-xs text-muted-foreground mb-2 font-medium">Suas Posições</p>
+                <p className="text-xs text-muted-foreground mb-2 font-medium">Suas premiações até o momento</p>
                 <div className="space-y-1.5 text-sm">
                   {/* Linha: Divisão */}
                   <div className="flex items-center justify-between gap-4">
