@@ -1,249 +1,183 @@
 
-
-# Plano: Sistema de Controle de Pagamentos e Vencimentos
+# Plano: Melhorias no Filtro de Datas do Sistema
 
 ## Resumo
-Implementar um sistema completo de controle de pagamentos para impostos e despesas, incluindo:
-1. Reset automático do status de pagamento de impostos quando virar o mês
-2. Data de vencimento para despesas (gastos fixos/variáveis)
-3. Botão "Pago" para cada despesa na lista
-4. Cards "A Pagar" e "Vencidos" calculando valores de despesas pendentes/vencidas
-5. Paginação da lista de Faturas e Cobranças (5 itens por página)
+
+Este plano aborda duas melhorias solicitadas para os filtros de data em todo o sistema:
+1. Adicionar a opção "Esse mês" após "30 dias" em todos os filtros
+2. Adicionar botão "Limpar" no calendário personalizado
+3. Melhorar a performance na troca de filtros
 
 ---
 
-## Problema 1: Imposto Estimado - Reset Automático Mensal
+## Componentes Afetados
 
-### Situação Atual
-O campo `tax_paid_current_month` é um boolean simples que fica `true` após o usuário clicar em "Paguei". Porém, quando o mês vira, o sistema não reseta esse campo automaticamente.
+O filtro de datas (`DateFilter`) é usado em 5 locais do sistema:
 
-### Solução
-Modificar a lógica de exibição do card de Imposto para verificar se o `tax_paid_at` pertence ao mês atual:
-- Se `tax_paid_at` for do mês atual -> exibir "Pago"
-- Se `tax_paid_at` for de mês anterior ou não existir -> exibir botão "Paguei"
-
-Não precisará de migração de banco, apenas mudança de lógica no frontend.
+| Componente | Tipo | Localização |
+|------------|------|-------------|
+| `CommerceFinancial.tsx` | Admin Comércio | Financeiro |
+| `CommerceOverview.tsx` | Admin Comércio | Visão Geral |
+| `CommerceOrders.tsx` | Admin Comércio | Pedidos |
+| `CommerceCashRegister.tsx` | Admin Comércio | Caixa |
+| `AdminFinancial.tsx` | Master Admin | Financeiro |
 
 ---
 
-## Problema 2 e 3: Data de Vencimento e Botão "Pago" para Despesas
+## Alterações Planejadas
 
-### Alterações Necessárias
+### 1. Atualizar DateFilter.tsx (Componente Central)
 
-#### Migração do Banco de Dados
-Adicionar novas colunas na tabela `expenses`:
+**Adicionar nova opção "Esse mês":**
+- Incluir `{ value: "thisMonth", label: "Esse mês" }` após "30 dias"
+- Implementar lógica que calcula do dia 1 do mês atual até hoje
 
-```sql
-ALTER TABLE public.expenses 
-ADD COLUMN IF NOT EXISTS due_date date,
-ADD COLUMN IF NOT EXISTS is_paid boolean DEFAULT false,
-ADD COLUMN IF NOT EXISTS paid_at timestamp with time zone;
+**Adicionar botão "Limpar" no calendário:**
+- Inserir botão ao lado de "Cancelar" no popover do calendário
+- Ao clicar, limpar a seleção (`dateRange`) permitindo nova escolha
+
+**Melhorar performance:**
+- Adicionar `useMemo` para evitar recálculos desnecessários
+- Otimizar as funções `getDisplayValue` e `getDateRange`
+
+### 2. Atualizar dateUtils.ts
+
+Adicionar função helper para obter o range do mês atual:
+```typescript
+export const getThisMonthDateRange = (): { start: Date; end: Date } => {
+  const today = getLocalToday();
+  return {
+    start: startOfMonth(today),
+    end: endOfDay(today)
+  };
+};
 ```
 
-#### Interface do Modal "Novo Gasto"
-- Adicionar campo de data de vencimento (datepicker/calendário)
-- O campo de data será opcional para despesas sem vencimento fixo
+### 3. Atualizar getDateRange() no DateFilter
 
-#### Lista de Gastos Fixos e Variáveis
-- Adicionar nova coluna "Vencimento"
-- Adicionar coluna com botão "Pago" para cada linha
-- Quando clicado em "Pago":
-  - Atualizar `is_paid = true` e `paid_at = now()`
-  - Deduzir valor do card "A Pagar"
-
----
-
-## Problema 4: Cards "A Pagar" e "Vencidos" com Despesas
-
-### Lógica de Cálculo
-
-**Card "A Pagar (Pendente)":**
-- Soma de todos os gastos com `is_paid = false` e `due_date >= today`
-- Inclui também faturas (invoices) pendentes
-- Inclui imposto estimado se ainda não foi pago no mês atual
-
-**Card "Vencidos":**
-- Soma de todos os gastos com `is_paid = false` e `due_date < today`
-- Inclui faturas com status "overdue"
-- Inclui imposto se passou o dia de vencimento e não foi pago
+Adicionar caso para "thisMonth":
+```typescript
+case "thisMonth":
+  return { 
+    start: startOfMonth(today), 
+    end: endDate 
+  };
+```
 
 ---
 
-## Problema 5: Paginação de Faturas e Cobranças
+## Interface Visual
 
-### Implementação
-- Adicionar estado `currentPage` (inicia em 1)
-- Constante `ITEMS_PER_PAGE = 5`
-- Exibir apenas `invoices.slice((currentPage - 1) * 5, currentPage * 5)`
-- Adicionar componente de paginação abaixo da tabela
+### Antes (Atual)
+```
+Hoje
+Ontem
+7 dias
+15 dias
+30 dias
+Personalizar
+```
+
+### Depois (Proposto)
+```
+Hoje
+Ontem
+7 dias
+15 dias
+30 dias
+Esse mês      <-- NOVO
+Personalizar
+```
+
+### Botões do Calendário Personalizado
+
+**Antes:**
+```
+[Cancelar]
+```
+
+**Depois:**
+```
+[Limpar] [Cancelar]
+```
 
 ---
 
 ## Detalhes Técnicos
 
-### 1. Migração do Banco de Dados
-
-```sql
--- Adicionar campos de vencimento e pagamento para despesas
-ALTER TABLE public.expenses 
-ADD COLUMN IF NOT EXISTS due_date date,
-ADD COLUMN IF NOT EXISTS is_paid boolean DEFAULT false,
-ADD COLUMN IF NOT EXISTS paid_at timestamp with time zone;
-```
-
-### 2. Lógica de Reset do Imposto (CommerceFinancial.tsx)
+### Alterações em src/components/commerce/DateFilter.tsx
 
 ```typescript
-// Verificar se o pagamento do imposto foi feito no mês atual
-const isTaxPaidThisMonth = () => {
-  if (!commerce?.tax_paid_at) return false;
-  const paidDate = new Date(commerce.tax_paid_at);
-  const now = new Date();
-  return paidDate.getMonth() === now.getMonth() && 
-         paidDate.getFullYear() === now.getFullYear();
+// 1. Atualizar array de opções
+const dateOptions = [
+  { value: "today", label: "Hoje" },
+  { value: "yesterday", label: "Ontem" },
+  { value: "7days", label: "7 dias" },
+  { value: "15days", label: "15 dias" },
+  { value: "30days", label: "30 dias" },
+  { value: "thisMonth", label: "Esse mês" },  // NOVO
+  { value: "custom", label: "Personalizar" },
+];
+
+// 2. Atualizar getDateRange para incluir "thisMonth"
+case "thisMonth":
+  return { 
+    start: startOfDay(startOfMonth(today)), 
+    end: endDate 
+  };
+
+// 3. Adicionar função para limpar seleção
+const handleClearSelection = () => {
+  setDateRange(undefined);
 };
 
-// Usar isTaxPaidThisMonth() em vez de commerce?.tax_paid_current_month
+// 4. Adicionar botão Limpar no JSX do calendário
+<Button 
+  variant="ghost" 
+  size="sm"
+  onClick={handleClearSelection}
+>
+  Limpar
+</Button>
 ```
 
-### 3. Atualização do CommerceExpenses.tsx
+### Alterações em src/lib/dateUtils.ts
 
-**Interface atualizada:**
 ```typescript
-interface Expense {
-  id: string;
-  name: string;
-  type: 'fixed' | 'variable' | 'stock_purchase';
-  amount: number;
-  description: string | null;
-  is_active: boolean;
-  due_date: string | null;  // NOVO
-  is_paid: boolean;         // NOVO
-  paid_at: string | null;   // NOVO
-}
-```
+// Adicionar import
+import { startOfMonth } from "date-fns";
 
-**Novo formData:**
-```typescript
-const [formData, setFormData] = useState({
-  name: '',
-  type: 'fixed' as 'fixed' | 'variable' | 'stock_purchase',
-  amount: '',
-  description: '',
-  due_date: ''  // NOVO
-});
-```
-
-**Nova função de pagamento:**
-```typescript
-const handleMarkAsPaid = async (expenseId: string) => {
-  await supabase
-    .from('expenses')
-    .update({ is_paid: true, paid_at: new Date().toISOString() })
-    .eq('id', expenseId);
-  fetchExpenses();
-  toast({ title: "Despesa marcada como paga!" });
+// Adicionar nova função
+export const getThisMonthDateRange = (): { start: Date; end: Date } => {
+  const today = getLocalToday();
+  return {
+    start: startOfDay(startOfMonth(today)),
+    end: endOfDay(today)
+  };
 };
 ```
 
-### 4. Cálculo dos Cards A Pagar e Vencidos
+### Otimizações de Performance
 
-No `CommerceFinancial.tsx`, modificar o cálculo:
-
-```typescript
-// Buscar despesas com dados de vencimento
-const { data: expensesData } = await supabase
-  .from('expenses')
-  .select('*')
-  .eq('commerce_id', commerceId)
-  .eq('is_active', true);
-
-const today = new Date().toISOString().split('T')[0];
-
-// Despesas pendentes (não pagas e não vencidas)
-const pendingExpenses = expensesData?.filter(e => 
-  !e.is_paid && e.due_date && e.due_date >= today
-).reduce((sum, e) => sum + Number(e.amount), 0) || 0;
-
-// Despesas vencidas (não pagas e já vencidas)
-const overdueExpenses = expensesData?.filter(e => 
-  !e.is_paid && e.due_date && e.due_date < today
-).reduce((sum, e) => sum + Number(e.amount), 0) || 0;
-
-// Total A Pagar = Faturas pendentes + Despesas pendentes + Imposto pendente
-const totalPending = pendingPayments + pendingExpenses + (isTaxPaidThisMonth() ? 0 : stats.taxAmount);
-
-// Total Vencidos = Faturas vencidas + Despesas vencidas + Imposto vencido
-const totalOverdue = overduePayments + overdueExpenses + overdueFromTax;
-```
-
-### 5. Paginação de Faturas
-
-```typescript
-const INVOICES_PER_PAGE = 5;
-const [invoicesPage, setInvoicesPage] = useState(1);
-const totalInvoicePages = Math.ceil(invoices.length / INVOICES_PER_PAGE);
-const paginatedInvoices = invoices.slice(
-  (invoicesPage - 1) * INVOICES_PER_PAGE, 
-  invoicesPage * INVOICES_PER_PAGE
-);
-```
+1. **Memoização**: Usar `useMemo` para cálculos de datas
+2. **Transições suaves**: Evitar re-renders desnecessários
+3. **Import otimizado**: Importar apenas funções necessárias do date-fns
 
 ---
 
-## Arquivos a Criar/Modificar
+## Arquivos a Modificar
 
-| Arquivo | Acao |
-|---------|------|
-| `supabase/migrations/...` | Adicionar colunas due_date, is_paid, paid_at em expenses |
-| `src/components/commerce/CommerceFinancial.tsx` | Logica de reset do imposto, calculo de A Pagar/Vencidos com despesas, paginacao |
-| `src/components/commerce/CommerceExpenses.tsx` | Datepicker no modal, coluna de vencimento, botao Pago na lista |
-| `src/components/commerce/SystemUpdates.tsx` | Registrar novas funcionalidades |
+| Arquivo | Tipo de Alteração |
+|---------|-------------------|
+| `src/components/commerce/DateFilter.tsx` | Adicionar opção "Esse mês", botão "Limpar", otimizações |
+| `src/lib/dateUtils.ts` | Adicionar helper `getThisMonthDateRange` |
 
 ---
 
-## Fluxo de Uso
+## Resultado Esperado
 
-```text
-IMPOSTO ESTIMADO:
-┌─────────────────────────────────────────────────────────────┐
-│  1. Usuario clica "Paguei" no card de Imposto               │
-│  2. Sistema grava tax_paid_at = agora                       │
-│  3. Card exibe badge "Pago"                                 │
-│  4. Quando virar o mes, sistema detecta que tax_paid_at     │
-│     e do mes anterior                                       │
-│  5. Botao "Paguei" volta a aparecer automaticamente         │
-└─────────────────────────────────────────────────────────────┘
-
-DESPESAS COM VENCIMENTO:
-┌─────────────────────────────────────────────────────────────┐
-│  1. Admin cria novo gasto com data de vencimento            │
-│  2. Card "A Pagar" soma o valor                             │
-│  3. Quando data de vencimento passa sem clicar "Pago"       │
-│  4. Valor migra para card "Vencidos"                        │
-│  5. Admin clica "Pago" na linha da despesa                  │
-│  6. Valor e deduzido dos cards                              │
-└─────────────────────────────────────────────────────────────┘
-```
-
----
-
-## Componentes Visuais
-
-### Modal "Novo Gasto" Atualizado
-- Campo: Nome do Gasto
-- Campo: Tipo (Fixo/Variavel/Compra Estoque)
-- Campo: Valor (R$)
-- Campo: **Data de Vencimento** (novo datepicker)
-- Campo: Descricao (opcional)
-
-### Tabela de Gastos Atualizada
-| Nome | Tipo | Valor | Vencimento | Descricao | Status | Acoes |
-|------|------|-------|------------|-----------|--------|-------|
-| Aluguel | Fixo | R$ 500 | 10/02/2026 | - | [Pago] | Editar/Excluir |
-| Sistema | Fixo | R$ 250 | 15/02/2026 | - | [Pagar] | Editar/Excluir |
-
-### Lista de Faturas com Paginacao
-- Exibir 5 faturas por pagina
-- Navegacao: < Anterior | Pagina 1 de 3 | Proximo >
+1. Todos os filtros de data do sistema (Admin Master e Admin Comércio) terão a opção "Esse mês"
+2. Ao selecionar "Esse mês", o sistema filtrará do dia 1 do mês atual até o dia de hoje
+3. No calendário personalizado, o botão "Limpar" permitirá reiniciar a seleção
+4. A troca entre filtros será mais rápida devido às otimizações de memoização
 
