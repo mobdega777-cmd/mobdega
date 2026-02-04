@@ -16,7 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { fetchAddressByCep, formatCep } from "@/lib/viaCepService";
+import { fetchAddressByCep, formatCep, getCepProximityScore } from "@/lib/viaCepService";
 import { format, formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import logoMobdega from "@/assets/logo-mobdega.png";
@@ -79,6 +79,7 @@ interface Commerce {
   cover_url: string | null;
   city: string | null;
   neighborhood: string | null;
+  cep: string | null;
   is_open: boolean | null;
   opening_hours: OpeningHours | null;
   whatsapp: string | null;
@@ -173,11 +174,34 @@ const UserDashboard = () => {
     if (!user) return;
     setLoading(true);
     
+    // Fetch profile first to get the user's CEP for commerce sorting
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    
+    if (profileData) {
+      setProfile(profileData as Profile);
+      setFormData({
+        full_name: profileData.full_name || "",
+        phone: profileData.phone || "",
+        cep: profileData.cep || "",
+        city: profileData.city || "",
+        neighborhood: profileData.neighborhood || "",
+        address: profileData.address || "",
+        address_number: profileData.address_number || "",
+        complement: profileData.complement || "",
+        bio: profileData.bio || "",
+        birthday: profileData.birthday || "",
+      });
+    }
+    
+    // Now fetch commerces with the user's CEP for sorting
     await Promise.all([
-      fetchProfile(),
       fetchOrders(),
       fetchFavorites(),
-      fetchCommerces(),
+      fetchCommerces(profileData?.cep),
     ]);
     
     setLoading(false);
@@ -299,7 +323,7 @@ const UserDashboard = () => {
     setFavorites([]);
   };
 
-  const fetchCommerces = async () => {
+  const fetchCommerces = async (userCep?: string | null) => {
     // Use secure RPC function (bypasses RLS safely, returns only public fields)
     const { data, error } = await supabase
       .rpc('get_public_commerces', { p_limit: 50 });
@@ -331,6 +355,7 @@ const UserDashboard = () => {
             cover_url: commerce.cover_url,
             city: commerce.city,
             neighborhood: commerce.neighborhood,
+            cep: commerce.cep,
             is_open: commerce.is_open,
             opening_hours: commerce.opening_hours as unknown as OpeningHours,
             whatsapp: commerce.whatsapp,
@@ -339,6 +364,19 @@ const UserDashboard = () => {
           } as Commerce;
         })
     );
+    
+    // Ordenar por proximidade ao CEP do usuário
+    if (userCep) {
+      commercesWithRatings.sort((a, b) => {
+        if (!a.cep && !b.cep) return 0;
+        if (!a.cep) return 1;
+        if (!b.cep) return -1;
+        
+        const scoreA = getCepProximityScore(userCep, a.cep);
+        const scoreB = getCepProximityScore(userCep, b.cep);
+        return scoreA - scoreB;
+      });
+    }
     
     setCommerces(commercesWithRatings);
   };
