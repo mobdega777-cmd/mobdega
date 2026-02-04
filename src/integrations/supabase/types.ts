@@ -1962,8 +1962,10 @@ export type Database = {
           city: string
           cover_url: string
           delivery_enabled: boolean
+          facebook_url: string
           fantasy_name: string
           id: string
+          instagram_url: string
           is_open: boolean
           logo_url: string
           neighborhood: string

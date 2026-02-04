@@ -4,7 +4,7 @@ import {
   ArrowLeft, Store, MapPin, Phone, Clock, Star, Heart,
   UtensilsCrossed, Truck, MessageCircle, ShoppingCart, ChevronRight,
   X, Plus, Minus, Send, User, CreditCard, Banknote, Smartphone, DollarSign,
-  Check, Loader2, Camera, Users, Tag, Navigation
+  Check, Loader2, Camera, Users, Tag, Navigation, Instagram, Facebook
 } from "lucide-react";
 import { HookahIcon } from "@/components/ui/hookah-icon";
 import { Button } from "@/components/ui/button";
@@ -40,6 +40,8 @@ interface Commerce {
   opening_hours: Record<string, { open: string; close: string; enabled: boolean }> | null;
   table_payment_required: boolean;
   plan_id: string | null;
+  instagram_url: string | null;
+  facebook_url: string | null;
 }
 
 interface Category {
@@ -527,7 +529,9 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
         delivery_enabled: c.delivery_enabled,
         opening_hours: c.opening_hours as Record<string, { open: string; close: string; enabled: boolean }> | null,
         table_payment_required: c.table_payment_required ?? true,
-        plan_id: null
+        plan_id: null,
+        instagram_url: c.instagram_url,
+        facebook_url: c.facebook_url
       });
     }
 
@@ -1735,8 +1739,8 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
 
       {/* Status and Stats */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Badge className={`${commerce.is_open ? 'bg-green-500' : 'bg-red-500'} text-white border-0`}>
+        <div className="flex flex-col gap-1">
+          <Badge className={`${commerce.is_open ? 'bg-green-500' : 'bg-red-500'} text-white border-0 w-fit`}>
             {commerce.is_open ? 'Aberto' : 'Fechado'}
           </Badge>
           {averageRating && (
@@ -1748,6 +1752,28 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
           )}
         </div>
         <div className="flex items-center gap-2">
+          {/* Instagram Button */}
+          {commerce.instagram_url && (
+            <Button 
+              variant="outline" 
+              size="icon"
+              className="text-pink-600 border-pink-600 hover:bg-pink-50"
+              onClick={() => window.open(commerce.instagram_url!, '_blank')}
+            >
+              <Instagram className="w-5 h-5" />
+            </Button>
+          )}
+          {/* Facebook Button */}
+          {commerce.facebook_url && (
+            <Button 
+              variant="outline" 
+              size="icon"
+              className="text-blue-700 border-blue-700 hover:bg-blue-50"
+              onClick={() => window.open(commerce.facebook_url!, '_blank')}
+            >
+              <Facebook className="w-5 h-5" />
+            </Button>
+          )}
           {/* Map Button - Opens Google Maps */}
           {commerce.address && commerce.city && (
             <Button 
