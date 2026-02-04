@@ -15,7 +15,9 @@ import {
   Upload,
   X,
   Camera,
-  MessageCircle
+  MessageCircle,
+  Instagram,
+  Facebook
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -46,6 +48,8 @@ interface CommerceData {
   logo_url: string | null;
   cover_url: string | null;
   whatsapp: string | null;
+  instagram_url: string | null;
+  facebook_url: string | null;
   status: string;
 }
 
@@ -75,6 +79,8 @@ const CommerceSettings = ({ commerce }: CommerceSettingsProps) => {
     logo_url: "",
     cover_url: "",
     whatsapp: "",
+    instagram_url: "",
+    facebook_url: "",
   });
 
   useEffect(() => {
@@ -103,6 +109,8 @@ const CommerceSettings = ({ commerce }: CommerceSettingsProps) => {
           logo_url: data.logo_url || "",
           cover_url: data.cover_url || "",
           whatsapp: data.whatsapp || "",
+          instagram_url: data.instagram_url || "",
+          facebook_url: data.facebook_url || "",
         });
         setLogoPreview(data.logo_url || null);
         setCoverPreview(data.cover_url || null);
@@ -209,6 +217,8 @@ const CommerceSettings = ({ commerce }: CommerceSettingsProps) => {
         logo_url: formData.logo_url || null,
         cover_url: formData.cover_url || null,
         whatsapp: formData.whatsapp || null,
+        instagram_url: formData.instagram_url || null,
+        facebook_url: formData.facebook_url || null,
       })
       .eq('id', commerce.id);
 
@@ -499,6 +509,33 @@ const CommerceSettings = ({ commerce }: CommerceSettingsProps) => {
                   value={formData.whatsapp}
                   onChange={(e) => setFormData({ ...formData, whatsapp: e.target.value })}
                   placeholder="Ex: 11999998888"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="instagram_url" className="flex items-center gap-2">
+                  <Instagram className="w-4 h-4 text-pink-600" />
+                  Perfil do Instagram
+                </Label>
+                <Input
+                  id="instagram_url"
+                  value={formData.instagram_url}
+                  onChange={(e) => setFormData({ ...formData, instagram_url: e.target.value })}
+                  placeholder="https://instagram.com/seu_perfil"
+                />
+              </div>
+              <div>
+                <Label htmlFor="facebook_url" className="flex items-center gap-2">
+                  <Facebook className="w-4 h-4 text-blue-700" />
+                  Perfil do Facebook
+                </Label>
+                <Input
+                  id="facebook_url"
+                  value={formData.facebook_url}
+                  onChange={(e) => setFormData({ ...formData, facebook_url: e.target.value })}
+                  placeholder="https://facebook.com/seu_perfil"
                 />
               </div>
             </div>
