@@ -27,6 +27,30 @@ interface SystemUpdate {
 // Lista estática de atualizações do sistema - pode ser expandida para buscar do banco
 const systemUpdates: SystemUpdate[] = [
   {
+    id: "pag1",
+    date: "04/02/2026",
+    time: "10:00",
+    type: "create",
+    module: "Financeiro",
+    description: "Novo sistema de controle de pagamentos: despesas com data de vencimento, botão 'Pago' para marcar quitação e cálculo automático nos cards A Pagar/Vencidos"
+  },
+  {
+    id: "pag2",
+    date: "04/02/2026",
+    time: "09:55",
+    type: "update",
+    module: "Impostos",
+    description: "Reset automático mensal do imposto: sistema agora verifica se pagamento foi feito no mês atual, exibindo botão 'Paguei' ao virar o mês"
+  },
+  {
+    id: "pag3",
+    date: "04/02/2026",
+    time: "09:50",
+    type: "update",
+    module: "Financeiro",
+    description: "Paginação implementada na lista de Faturas e Cobranças (5 itens por página) para melhor navegação"
+  },
+  {
     id: "emp1",
     date: "03/02/2026",
     time: "14:00",

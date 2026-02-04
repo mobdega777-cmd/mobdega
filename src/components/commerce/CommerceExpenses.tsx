@@ -25,12 +25,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, Edit, Receipt, TrendingDown, DollarSign, Wallet, Package } from "lucide-react";
+import { Plus, Trash2, Edit, Receipt, TrendingDown, DollarSign, Wallet, Package, CalendarIcon, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { HelpTooltip } from "@/components/ui/help-tooltip";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 
 interface CommerceExpensesProps {
   commerceId: string;
@@ -47,6 +56,9 @@ interface Expense {
   amount: number;
   description: string | null;
   is_active: boolean;
+  due_date: string | null;
+  is_paid: boolean;
+  paid_at: string | null;
 }
 
 const CommerceExpenses = ({ commerceId, monthlyRevenue, operatorFees = 0, productCost = 0, stockPurchasesTotal = 0 }: CommerceExpensesProps) => {
@@ -60,7 +72,8 @@ const CommerceExpenses = ({ commerceId, monthlyRevenue, operatorFees = 0, produc
     name: '',
     type: 'fixed' as 'fixed' | 'variable' | 'stock_purchase',
     amount: '',
-    description: ''
+    description: '',
+    due_date: null as Date | null
   });
 
   const fetchExpenses = async () => {
@@ -92,7 +105,8 @@ const CommerceExpenses = ({ commerceId, monthlyRevenue, operatorFees = 0, produc
       name: formData.name,
       type: formData.type,
       amount: parseFloat(formData.amount),
-      description: formData.description || null
+      description: formData.description || null,
+      due_date: formData.due_date ? format(formData.due_date, 'yyyy-MM-dd') : null
     };
 
     if (editingExpense) {
@@ -142,15 +156,30 @@ const CommerceExpenses = ({ commerceId, monthlyRevenue, operatorFees = 0, produc
       name: expense.name,
       type: expense.type,
       amount: expense.amount.toString(),
-      description: expense.description || ''
+      description: expense.description || '',
+      due_date: expense.due_date ? new Date(expense.due_date + 'T12:00:00') : null
     });
     setIsDialogOpen(true);
   };
 
   const resetForm = () => {
-    setFormData({ name: '', type: 'fixed', amount: '', description: '' });
+    setFormData({ name: '', type: 'fixed', amount: '', description: '', due_date: null });
     setEditingExpense(null);
     setIsDialogOpen(false);
+  };
+
+  const handleMarkAsPaid = async (expenseId: string) => {
+    const { error } = await supabase
+      .from('expenses')
+      .update({ is_paid: true, paid_at: new Date().toISOString() })
+      .eq('id', expenseId);
+
+    if (!error) {
+      toast({ title: "Despesa marcada como paga!" });
+      fetchExpenses();
+    } else {
+      toast({ variant: "destructive", title: "Erro ao marcar como pago" });
+    }
   };
 
   const fixedExpenses = expenses.filter(e => e.type === 'fixed');
@@ -343,38 +372,72 @@ const CommerceExpenses = ({ commerceId, monthlyRevenue, operatorFees = 0, produc
                   <TableHead>Nome</TableHead>
                   <TableHead>Tipo</TableHead>
                   <TableHead>Valor</TableHead>
+                  <TableHead>Vencimento</TableHead>
                   <TableHead>Descrição</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {expenses.map((expense) => (
-                  <TableRow key={expense.id}>
-                    <TableCell className="font-medium">{expense.name}</TableCell>
-                    <TableCell>
-                      <Badge variant={expense.type === 'fixed' ? 'default' : expense.type === 'stock_purchase' ? 'outline' : 'secondary'}
-                        className={expense.type === 'stock_purchase' ? 'bg-cyan-500/10 text-cyan-600 border-cyan-500/30' : ''}>
-                        {expense.type === 'fixed' ? 'Fixo' : expense.type === 'stock_purchase' ? 'Compra Estoque' : 'Variável'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-red-600 font-medium">
-                      {formatCurrency(expense.amount)}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
-                      {expense.description || '-'}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button variant="ghost" size="icon" onClick={() => handleEdit(expense)}>
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDelete(expense.id)}>
-                          <Trash2 className="w-4 h-4 text-red-500" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {expenses.map((expense) => {
+                  const today = new Date().toISOString().split('T')[0];
+                  const isOverdue = expense.due_date && !expense.is_paid && expense.due_date < today;
+                  const isPending = expense.due_date && !expense.is_paid && expense.due_date >= today;
+                  
+                  return (
+                    <TableRow key={expense.id} className={isOverdue ? 'bg-red-500/5' : ''}>
+                      <TableCell className="font-medium">{expense.name}</TableCell>
+                      <TableCell>
+                        <Badge variant={expense.type === 'fixed' ? 'default' : expense.type === 'stock_purchase' ? 'outline' : 'secondary'}
+                          className={expense.type === 'stock_purchase' ? 'bg-cyan-500/10 text-cyan-600 border-cyan-500/30' : ''}>
+                          {expense.type === 'fixed' ? 'Fixo' : expense.type === 'stock_purchase' ? 'Compra Estoque' : 'Variável'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-red-600 font-medium">
+                        {formatCurrency(expense.amount)}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {expense.due_date ? (
+                          <span className={isOverdue ? 'text-red-500 font-medium' : 'text-muted-foreground'}>
+                            {format(new Date(expense.due_date + 'T12:00:00'), 'dd/MM/yyyy')}
+                          </span>
+                        ) : '-'}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-sm">
+                        {expense.description || '-'}
+                      </TableCell>
+                      <TableCell>
+                        {expense.is_paid ? (
+                          <Badge className="bg-green-500/20 text-green-600">
+                            <Check className="w-3 h-3 mr-1" />
+                            Pago
+                          </Badge>
+                        ) : expense.due_date ? (
+                          <Button 
+                            size="sm" 
+                            variant={isOverdue ? "destructive" : "outline"}
+                            onClick={() => handleMarkAsPaid(expense.id)}
+                            className="h-7 text-xs"
+                          >
+                            {isOverdue ? 'Pagar (Vencido)' : 'Pagar'}
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Sem vencimento</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button variant="ghost" size="icon" onClick={() => handleEdit(expense)}>
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleDelete(expense.id)}>
+                            <Trash2 className="w-4 h-4 text-red-500" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           )}
@@ -427,6 +490,38 @@ const CommerceExpenses = ({ commerceId, monthlyRevenue, operatorFees = 0, produc
                 onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
                 placeholder="0.00"
               />
+            </div>
+
+            <div>
+              <Label>Data de Vencimento (opcional)</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !formData.due_date && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {formData.due_date ? (
+                      format(formData.due_date, "dd/MM/yyyy", { locale: ptBR })
+                    ) : (
+                      <span>Selecione uma data</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={formData.due_date || undefined}
+                    onSelect={(date) => setFormData({ ...formData, due_date: date || null })}
+                    initialFocus
+                    className={cn("p-3 pointer-events-auto")}
+                    locale={ptBR}
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
 
             <div>

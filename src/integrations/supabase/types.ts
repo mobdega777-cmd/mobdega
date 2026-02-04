@@ -671,9 +671,12 @@ export type Database = {
           commerce_id: string
           created_at: string
           description: string | null
+          due_date: string | null
           id: string
           is_active: boolean
+          is_paid: boolean | null
           name: string
+          paid_at: string | null
           type: string
           updated_at: string
         }
@@ -682,9 +685,12 @@ export type Database = {
           commerce_id: string
           created_at?: string
           description?: string | null
+          due_date?: string | null
           id?: string
           is_active?: boolean
+          is_paid?: boolean | null
           name: string
+          paid_at?: string | null
           type: string
           updated_at?: string
         }
@@ -693,9 +699,12 @@ export type Database = {
           commerce_id?: string
           created_at?: string
           description?: string | null
+          due_date?: string | null
           id?: string
           is_active?: boolean
+          is_paid?: boolean | null
           name?: string
+          paid_at?: string | null
           type?: string
           updated_at?: string
         }
