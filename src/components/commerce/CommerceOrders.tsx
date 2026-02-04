@@ -414,14 +414,6 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
     currentPage * ITEMS_PER_PAGE
   );
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       <div className="min-w-0">
@@ -458,7 +450,11 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
           </div>
         </CardHeader>
         <CardContent>
-          {paginatedOrders.length === 0 ? (
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+            </div>
+          ) : paginatedOrders.length === 0 ? (
             <div className="text-center py-12">
               <ShoppingCart className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
               <p className="text-muted-foreground">Nenhum pedido encontrado</p>

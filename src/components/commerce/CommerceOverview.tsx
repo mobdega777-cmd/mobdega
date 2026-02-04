@@ -207,8 +207,6 @@ const CommerceOverview = ({ commerce }: CommerceOverviewProps) => {
     { title: "Total de Produtos", value: stats.totalProducts, icon: Package, color: "text-purple-500", bgColor: "bg-purple-500/10", tooltip: "Quantidade de produtos cadastrados no seu cardápio." },
   ];
 
-  if (loading) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div></div>;
-
   return (
     <div className="space-y-4 md:space-y-6">
       <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-4">
