@@ -1,183 +1,144 @@
 
-# Plano: Melhorias no Filtro de Datas do Sistema
+# Plano: Eliminar Delay Visual na Troca de Filtros de Data
 
-## Resumo
+## Problema Identificado
 
-Este plano aborda duas melhorias solicitadas para os filtros de data em todo o sistema:
-1. Adicionar a opção "Esse mês" após "30 dias" em todos os filtros
-2. Adicionar botão "Limpar" no calendário personalizado
-3. Melhorar a performance na troca de filtros
+Quando o usuário troca o filtro de data (ex: "30 dias" para "Esse mês"), os **dados antigos continuam sendo exibidos** enquanto os novos dados são carregados. Isso causa um "flash" visual de valores incorretos ou negativos, conforme demonstrado nas imagens.
 
----
-
-## Componentes Afetados
-
-O filtro de datas (`DateFilter`) é usado em 5 locais do sistema:
-
-| Componente | Tipo | Localização |
-|------------|------|-------------|
-| `CommerceFinancial.tsx` | Admin Comércio | Financeiro |
-| `CommerceOverview.tsx` | Admin Comércio | Visão Geral |
-| `CommerceOrders.tsx` | Admin Comércio | Pedidos |
-| `CommerceCashRegister.tsx` | Admin Comércio | Caixa |
-| `AdminFinancial.tsx` | Master Admin | Financeiro |
+**Causa raiz técnica:**
+- O estado de `loading` não é resetado para `true` quando o filtro muda
+- Os valores nos cards não são limpos durante a transição
+- O `useEffect` chama `fetchData()` mas não indica visualmente que está carregando
 
 ---
 
-## Alterações Planejadas
+## Solução Proposta
 
-### 1. Atualizar DateFilter.tsx (Componente Central)
+Implementar **loading instantâneo** quando o filtro de data mudar, garantindo que:
+1. Os cards mostrem um skeleton/loading imediatamente ao trocar filtro
+2. Os dados antigos não apareçam durante a transição
+3. A experiência seja fluida e sem "flashes" de valores incorretos
 
-**Adicionar nova opção "Esse mês":**
-- Incluir `{ value: "thisMonth", label: "Esse mês" }` após "30 dias"
-- Implementar lógica que calcula do dia 1 do mês atual até hoje
+---
 
-**Adicionar botão "Limpar" no calendário:**
-- Inserir botão ao lado de "Cancelar" no popover do calendário
-- Ao clicar, limpar a seleção (`dateRange`) permitindo nova escolha
+## Componentes a Modificar
 
-**Melhorar performance:**
-- Adicionar `useMemo` para evitar recálculos desnecessários
-- Otimizar as funções `getDisplayValue` e `getDateRange`
+| Componente | Localização |
+|------------|-------------|
+| `CommerceFinancial.tsx` | Admin Comércio - Financeiro |
+| `CommerceOverview.tsx` | Admin Comércio - Visão Geral |
+| `CommerceOrders.tsx` | Admin Comércio - Pedidos |
 
-### 2. Atualizar dateUtils.ts
+---
 
-Adicionar função helper para obter o range do mês atual:
+## Alterações Técnicas
+
+### 1. CommerceFinancial.tsx
+
+**Problema atual (linha 149-151, 400-402):**
 ```typescript
-export const getThisMonthDateRange = (): { start: Date; end: Date } => {
-  const today = getLocalToday();
-  return {
-    start: startOfMonth(today),
-    end: endOfDay(today)
-  };
-};
-```
-
-### 3. Atualizar getDateRange() no DateFilter
-
-Adicionar caso para "thisMonth":
-```typescript
-case "thisMonth":
-  return { 
-    start: startOfMonth(today), 
-    end: endDate 
-  };
-```
-
----
-
-## Interface Visual
-
-### Antes (Atual)
-```
-Hoje
-Ontem
-7 dias
-15 dias
-30 dias
-Personalizar
-```
-
-### Depois (Proposto)
-```
-Hoje
-Ontem
-7 dias
-15 dias
-30 dias
-Esse mês      <-- NOVO
-Personalizar
-```
-
-### Botões do Calendário Personalizado
-
-**Antes:**
-```
-[Cancelar]
-```
-
-**Depois:**
-```
-[Limpar] [Cancelar]
-```
-
----
-
-## Detalhes Técnicos
-
-### Alterações em src/components/commerce/DateFilter.tsx
-
-```typescript
-// 1. Atualizar array de opções
-const dateOptions = [
-  { value: "today", label: "Hoje" },
-  { value: "yesterday", label: "Ontem" },
-  { value: "7days", label: "7 dias" },
-  { value: "15days", label: "15 dias" },
-  { value: "30days", label: "30 dias" },
-  { value: "thisMonth", label: "Esse mês" },  // NOVO
-  { value: "custom", label: "Personalizar" },
-];
-
-// 2. Atualizar getDateRange para incluir "thisMonth"
-case "thisMonth":
-  return { 
-    start: startOfDay(startOfMonth(today)), 
-    end: endDate 
-  };
-
-// 3. Adicionar função para limpar seleção
-const handleClearSelection = () => {
-  setDateRange(undefined);
+const handleDateChange = (start: Date, end: Date) => {
+  setDateFilter({ start, end });
+  // loading não é resetado!
 };
 
-// 4. Adicionar botão Limpar no JSX do calendário
-<Button 
-  variant="ghost" 
-  size="sm"
-  onClick={handleClearSelection}
->
-  Limpar
-</Button>
+useEffect(() => {
+  fetchData(); // dados antigos continuam visíveis
+}, [commerceId, dateFilter]);
 ```
 
-### Alterações em src/lib/dateUtils.ts
+**Solução:**
+```typescript
+const handleDateChange = (start: Date, end: Date) => {
+  setLoading(true); // Mostra loading IMEDIATAMENTE
+  setDateFilter({ start, end });
+};
+
+// Alternativa: resetar loading no início do useEffect
+useEffect(() => {
+  setLoading(true);
+  fetchData();
+}, [commerceId, dateFilter]);
+```
+
+**Adicionar skeleton nos cards durante loading:**
+- Quando `loading === true`, exibir componentes `Skeleton` nos valores dos cards
+- Isso elimina completamente o flash de dados antigos
+
+### 2. CommerceOverview.tsx
+
+**Problema atual (linha 106-164):**
+- O `loading` não é resetado quando `dateFilter` muda
+- Linha 207: O spinner só aparece no carregamento inicial
+
+**Solução:**
+```typescript
+useEffect(() => {
+  const fetchStats = async () => {
+    setLoading(true); // ADICIONAR: Reset loading ao iniciar
+    // ... resto do código
+  };
+  fetchStats();
+}, [commerce.id, dateFilter]);
+```
+
+### 3. CommerceOrders.tsx
+
+Aplicar o mesmo padrão de reset de loading no useEffect.
+
+---
+
+## Implementação Visual
+
+### Skeleton para Cards Financeiros
+
+Em vez de mostrar valores antigos durante o loading, exibir:
 
 ```typescript
-// Adicionar import
-import { startOfMonth } from "date-fns";
-
-// Adicionar nova função
-export const getThisMonthDateRange = (): { start: Date; end: Date } => {
-  const today = getLocalToday();
-  return {
-    start: startOfDay(startOfMonth(today)),
-    end: endOfDay(today)
-  };
-};
+{loading ? (
+  <Skeleton className="h-8 w-24" />
+) : (
+  <span className="text-2xl font-bold">{formatCurrency(stats.monthlyRevenue)}</span>
+)}
 ```
 
-### Otimizações de Performance
+---
 
-1. **Memoização**: Usar `useMemo` para cálculos de datas
-2. **Transições suaves**: Evitar re-renders desnecessários
-3. **Import otimizado**: Importar apenas funções necessárias do date-fns
+## Fluxo Antes vs Depois
+
+**Antes (problema atual):**
+```
+1. Usuário clica "Esse mês"
+2. Estado dateFilter atualiza
+3. fetchData() começa (assíncrono)
+4. DADOS ANTIGOS continuam visíveis (FLASH!)
+5. Dados novos chegam e substituem
+```
+
+**Depois (solução):**
+```
+1. Usuário clica "Esse mês"
+2. loading = true (IMEDIATO)
+3. Cards mostram Skeleton
+4. fetchData() busca dados
+5. Dados novos substituem skeleton
+```
 
 ---
 
 ## Arquivos a Modificar
 
-| Arquivo | Tipo de Alteração |
-|---------|-------------------|
-| `src/components/commerce/DateFilter.tsx` | Adicionar opção "Esse mês", botão "Limpar", otimizações |
-| `src/lib/dateUtils.ts` | Adicionar helper `getThisMonthDateRange` |
+| Arquivo | Alteração |
+|---------|-----------|
+| `src/components/commerce/CommerceFinancial.tsx` | Resetar loading no handleDateChange ou useEffect, adicionar skeletons nos cards |
+| `src/components/commerce/CommerceOverview.tsx` | Resetar loading no início do fetchStats |
+| `src/components/commerce/CommerceOrders.tsx` | Resetar loading quando filtro mudar |
 
 ---
 
 ## Resultado Esperado
 
-1. Todos os filtros de data do sistema (Admin Master e Admin Comércio) terão a opção "Esse mês"
-2. Ao selecionar "Esse mês", o sistema filtrará do dia 1 do mês atual até o dia de hoje
-3. No calendário personalizado, o botão "Limpar" permitirá reiniciar a seleção
-4. A troca entre filtros será mais rápida devido às otimizações de memoização
-
+1. **Transição instantânea**: Ao trocar filtro, cards exibem skeleton imediatamente
+2. **Sem flash de dados antigos**: Usuário não vê valores negativos ou incorretos
+3. **Feedback visual claro**: Loading indica que novos dados estão sendo buscados
+4. **Experiência profissional**: Análise de dados confiável sem confusão visual
