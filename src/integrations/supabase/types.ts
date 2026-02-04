@@ -359,6 +359,61 @@ export type Database = {
           },
         ]
       }
+      commerce_notifications: {
+        Row: {
+          commerce_id: string
+          created_at: string
+          id: string
+          invoice_id: string | null
+          is_read: boolean | null
+          message: string
+          title: string
+          type: string
+        }
+        Insert: {
+          commerce_id: string
+          created_at?: string
+          id?: string
+          invoice_id?: string | null
+          is_read?: boolean | null
+          message: string
+          title: string
+          type: string
+        }
+        Update: {
+          commerce_id?: string
+          created_at?: string
+          id?: string
+          invoice_id?: string | null
+          is_read?: boolean | null
+          message?: string
+          title?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commerce_notifications_commerce_id_fkey"
+            columns: ["commerce_id"]
+            isOneToOne: false
+            referencedRelation: "commerces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_notifications_commerce_id_fkey"
+            columns: ["commerce_id"]
+            isOneToOne: false
+            referencedRelation: "commerces_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commerce_notifications_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       commerce_photos: {
         Row: {
           caption: string | null
