@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { 
   Play, 
@@ -11,7 +11,9 @@ import {
   X,
   BookOpen,
   Eye,
-  EyeOff
+  EyeOff,
+  Upload,
+  Link
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,7 +22,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -50,6 +54,10 @@ const AdminTraining = () => {
     is_active: true
   });
   const [saving, setSaving] = useState(false);
+  const [videoInputMode, setVideoInputMode] = useState<"url" | "upload">("url");
+  const [uploadingVideo, setUploadingVideo] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchVideos();
@@ -173,6 +181,75 @@ const AdminTraining = () => {
       category: "geral",
       is_active: true
     });
+    setVideoInputMode("url");
+    setUploadProgress(0);
+  };
+
+  const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const allowedTypes = ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime'];
+    if (!allowedTypes.includes(file.type)) {
+      toast({ 
+        variant: "destructive", 
+        title: "Formato inválido", 
+        description: "Use MP4, WebM, OGG ou MOV" 
+      });
+      return;
+    }
+
+    // Validate file size (max 100MB)
+    const maxSize = 100 * 1024 * 1024;
+    if (file.size > maxSize) {
+      toast({ 
+        variant: "destructive", 
+        title: "Arquivo muito grande", 
+        description: "O tamanho máximo é 100MB" 
+      });
+      return;
+    }
+
+    setUploadingVideo(true);
+    setUploadProgress(10);
+
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const filePath = `training-videos/${fileName}`;
+
+      setUploadProgress(30);
+
+      const { error: uploadError } = await supabase.storage
+        .from('training-videos')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      setUploadProgress(80);
+
+      const { data: publicUrlData } = supabase.storage
+        .from('training-videos')
+        .getPublicUrl(filePath);
+
+      setFormData({ ...formData, video_url: publicUrlData.publicUrl });
+      setUploadProgress(100);
+      
+      toast({ title: "Vídeo enviado com sucesso!" });
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      toast({ 
+        variant: "destructive", 
+        title: "Erro no upload", 
+        description: error.message 
+      });
+    } finally {
+      setUploadingVideo(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
   };
 
   const getYouTubeId = (url: string): string | null => {
@@ -281,73 +358,146 @@ const AdminTraining = () => {
 
       {/* Add/Edit Modal */}
       <Dialog open={showAddModal} onOpenChange={(open) => { setShowAddModal(open); if (!open) setEditingVideo(null); }}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
+        <DialogContent className="max-w-lg max-h-[90vh] flex flex-col p-0">
+          <DialogHeader className="p-6 pb-0">
             <DialogTitle>{editingVideo ? 'Editar Vídeo' : 'Adicionar Vídeo'}</DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Título *</Label>
-              <Input
-                placeholder="Ex: Como cadastrar produtos"
-                value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              />
-            </div>
+          <ScrollArea className="flex-1 px-6">
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Título *</Label>
+                <Input
+                  placeholder="Ex: Como cadastrar produtos"
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                />
+              </div>
 
-            <div className="space-y-2">
-              <Label>URL do Vídeo (YouTube) *</Label>
-              <Input
-                placeholder="https://youtube.com/watch?v=..."
-                value={formData.video_url}
-                onChange={(e) => setFormData({ ...formData, video_url: e.target.value })}
-              />
-            </div>
+              {/* Video Input Mode Tabs */}
+              <div className="space-y-2">
+                <Label>Vídeo *</Label>
+                <Tabs value={videoInputMode} onValueChange={(v) => setVideoInputMode(v as "url" | "upload")}>
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="url" className="gap-2">
+                      <Link className="w-4 h-4" />
+                      URL (YouTube)
+                    </TabsTrigger>
+                    <TabsTrigger value="upload" className="gap-2">
+                      <Upload className="w-4 h-4" />
+                      Upload
+                    </TabsTrigger>
+                  </TabsList>
+                  
+                  <TabsContent value="url" className="mt-3">
+                    <Input
+                      placeholder="https://youtube.com/watch?v=..."
+                      value={formData.video_url}
+                      onChange={(e) => setFormData({ ...formData, video_url: e.target.value })}
+                    />
+                  </TabsContent>
+                  
+                  <TabsContent value="upload" className="mt-3 space-y-3">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="video/mp4,video/webm,video/ogg,video/quicktime"
+                      onChange={handleVideoUpload}
+                      className="hidden"
+                    />
+                    
+                    {formData.video_url && videoInputMode === "upload" ? (
+                      <div className="space-y-2">
+                        <div className="p-3 bg-muted rounded-lg flex items-center gap-3">
+                          <Video className="w-8 h-8 text-primary" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">Vídeo enviado</p>
+                            <p className="text-xs text-muted-foreground truncate">{formData.video_url}</p>
+                          </div>
+                          <Button 
+                            size="sm" 
+                            variant="ghost"
+                            onClick={() => setFormData({ ...formData, video_url: "" })}
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full h-24 border-dashed flex flex-col gap-2"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploadingVideo}
+                      >
+                        {uploadingVideo ? (
+                          <>
+                            <Loader2 className="w-6 h-6 animate-spin" />
+                            <span className="text-sm">Enviando... {uploadProgress}%</span>
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="w-6 h-6" />
+                            <span className="text-sm">Clique para enviar vídeo</span>
+                            <span className="text-xs text-muted-foreground">MP4, WebM, OGG ou MOV (máx. 100MB)</span>
+                          </>
+                        )}
+                      </Button>
+                    )}
+                  </TabsContent>
+                </Tabs>
+              </div>
 
-            <div className="space-y-2">
-              <Label>URL da Thumbnail (opcional)</Label>
-              <Input
-                placeholder="https://..."
-                value={formData.thumbnail_url}
-                onChange={(e) => setFormData({ ...formData, thumbnail_url: e.target.value })}
-              />
-              <p className="text-xs text-muted-foreground">Se não informado, será usada a thumbnail do YouTube</p>
-            </div>
+              <div className="space-y-2">
+                <Label>URL da Thumbnail (opcional)</Label>
+                <Input
+                  placeholder="https://..."
+                  value={formData.thumbnail_url}
+                  onChange={(e) => setFormData({ ...formData, thumbnail_url: e.target.value })}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {videoInputMode === "url" 
+                    ? "Se não informado, será usada a thumbnail do YouTube" 
+                    : "Recomendado para vídeos enviados"
+                  }
+                </p>
+              </div>
 
-            <div className="space-y-2">
-              <Label>Categoria</Label>
-              <Input
-                placeholder="Ex: geral, pedidos, financeiro"
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-              />
-            </div>
+              <div className="space-y-2">
+                <Label>Categoria</Label>
+                <Input
+                  placeholder="Ex: geral, pedidos, financeiro"
+                  value={formData.category}
+                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                />
+              </div>
 
-            <div className="space-y-2">
-              <Label>Descrição</Label>
-              <Textarea
-                placeholder="Descrição do vídeo..."
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                rows={3}
-              />
-            </div>
+              <div className="space-y-2">
+                <Label>Descrição</Label>
+                <Textarea
+                  placeholder="Descrição do vídeo..."
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  rows={3}
+                />
+              </div>
 
-            <div className="flex items-center justify-between">
-              <Label>Vídeo Ativo</Label>
-              <Switch
-                checked={formData.is_active}
-                onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
-              />
+              <div className="flex items-center justify-between">
+                <Label>Vídeo Ativo</Label>
+                <Switch
+                  checked={formData.is_active}
+                  onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
+                />
+              </div>
             </div>
-          </div>
+          </ScrollArea>
 
-          <DialogFooter>
+          <DialogFooter className="p-6 pt-4 border-t">
             <Button variant="outline" onClick={() => setShowAddModal(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleSave} disabled={saving} className="gap-2">
+            <Button onClick={handleSave} disabled={saving || uploadingVideo} className="gap-2">
               {saving && <Loader2 className="w-4 h-4 animate-spin" />}
               <Save className="w-4 h-4" />
               Salvar
