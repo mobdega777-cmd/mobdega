@@ -63,6 +63,7 @@ import CommerceRanking from "@/components/commerce/CommerceRanking";
 import CommerceCoupons from "@/components/commerce/CommerceCoupons";
 import CommerceForum from "@/components/commerce/CommerceForum";
 import UpgradeModal from "@/components/commerce/UpgradeModal";
+import CommerceNotificationBell from "@/components/commerce/CommerceNotificationBell";
 
 type CommerceSection = 
   | "overview" 
@@ -562,14 +563,22 @@ const CommerceDashboard = () => {
             <p className="text-[10px] text-primary-foreground/60">Painel</p>
           </div>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
-        >
-          <Menu className="w-6 h-6" />
-        </Button>
+        <div className="flex items-center gap-1">
+          {commerce && !isBlocked && (
+            <CommerceNotificationBell 
+              commerceId={commerce.id} 
+              onNavigateToInvoices={() => setActiveSection("financial")}
+            />
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/10"
+          >
+            <Menu className="w-6 h-6" />
+          </Button>
+        </div>
       </header>
 
       {/* Mobile Overlay */}
@@ -622,18 +631,26 @@ const CommerceDashboard = () => {
                 <p className="text-[10px] text-primary-foreground/60">Painel</p>
               </div>
             </motion.div>
-            {/* Botão Upgrade - só aparece para planos basic e startup */}
-            {planInfo && planInfo.type !== 'business' && !isBlocked && (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setUpgradeModalOpen(true)}
-                className="gap-0.5 text-[10px] px-2 py-1 h-6 text-primary/70 hover:text-primary hover:bg-primary/10"
-              >
-                <ArrowUp className="w-2.5 h-2.5" />
-                Up
-              </Button>
-            )}
+            <div className="flex items-center gap-1">
+              {commerce && !isBlocked && (
+                <CommerceNotificationBell 
+                  commerceId={commerce.id} 
+                  onNavigateToInvoices={() => setActiveSection("financial")}
+                />
+              )}
+              {/* Botão Upgrade - só aparece para planos basic e startup */}
+              {planInfo && planInfo.type !== 'business' && !isBlocked && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setUpgradeModalOpen(true)}
+                  className="gap-0.5 text-[10px] px-2 py-1 h-6 text-primary/70 hover:text-primary hover:bg-primary/10"
+                >
+                  <ArrowUp className="w-2.5 h-2.5" />
+                  Up
+                </Button>
+              )}
+            </div>
           </div>
 
           {/* Mobile close button */}
