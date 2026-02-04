@@ -1,144 +1,138 @@
 
-# Plano: Eliminar Delay Visual na Troca de Filtros de Data
+# Plano: Ordenar Comércios por Proximidade de CEP no Explorar
 
 ## Problema Identificado
 
-Quando o usuário troca o filtro de data (ex: "30 dias" para "Esse mês"), os **dados antigos continuam sendo exibidos** enquanto os novos dados são carregados. Isso causa um "flash" visual de valores incorretos ou negativos, conforme demonstrado nas imagens.
+Na aba "Explorar" do Dashboard do Usuário, os comércios não estão sendo ordenados por proximidade ao CEP do usuário. A listagem aparece na ordem de criação (mais recente primeiro) em vez de mostrar os comércios mais próximos primeiro.
 
-**Causa raiz técnica:**
-- O estado de `loading` não é resetado para `true` quando o filtro muda
-- Os valores nos cards não são limpos durante a transição
-- O `useEffect` chama `fetchData()` mas não indica visualmente que está carregando
+### Análise Técnica
+
+O código atual em `UserDashboard.tsx`:
+- **Interface Commerce** não inclui o campo `cep`
+- **fetchCommerces** não mapeia o campo `cep` dos dados retornados
+- **Não há lógica de ordenação** por proximidade como existe no `FeaturedStores.tsx`
+- O perfil do usuário possui o CEP (`profile.cep`), mas não é usado para ordenar
+
+A função RPC `get_public_commerces` **já retorna o campo `cep`**, então só preciso utilizá-lo no frontend.
 
 ---
 
 ## Solução Proposta
 
-Implementar **loading instantâneo** quando o filtro de data mudar, garantindo que:
-1. Os cards mostrem um skeleton/loading imediatamente ao trocar filtro
-2. Os dados antigos não apareçam durante a transição
-3. A experiência seja fluida e sem "flashes" de valores incorretos
+### Arquivo: `src/pages/user/UserDashboard.tsx`
 
----
+#### 1. Atualizar a Interface Commerce
+Adicionar o campo `cep` na interface:
 
-## Componentes a Modificar
-
-| Componente | Localização |
-|------------|-------------|
-| `CommerceFinancial.tsx` | Admin Comércio - Financeiro |
-| `CommerceOverview.tsx` | Admin Comércio - Visão Geral |
-| `CommerceOrders.tsx` | Admin Comércio - Pedidos |
-
----
-
-## Alterações Técnicas
-
-### 1. CommerceFinancial.tsx
-
-**Problema atual (linha 149-151, 400-402):**
 ```typescript
-const handleDateChange = (start: Date, end: Date) => {
-  setDateFilter({ start, end });
-  // loading não é resetado!
+interface Commerce {
+  id: string;
+  fantasy_name: string;
+  logo_url: string | null;
+  cover_url: string | null;
+  city: string | null;
+  neighborhood: string | null;
+  cep: string | null;  // NOVO
+  is_open: boolean | null;
+  opening_hours: OpeningHours | null;
+  whatsapp: string | null;
+  averageRating?: number;
+  reviewCount?: number;
+}
+```
+
+#### 2. Importar a Função de Proximidade
+Adicionar a importação do `getCepProximityScore`:
+
+```typescript
+import { fetchAddressByCep, formatCep, getCepProximityScore } from "@/lib/viaCepService";
+```
+
+#### 3. Modificar fetchCommerces para Incluir o CEP
+Passar o campo `cep` ao mapear os comércios:
+
+```typescript
+return {
+  id: commerce.id,
+  fantasy_name: commerce.fantasy_name,
+  logo_url: commerce.logo_url,
+  cover_url: commerce.cover_url,
+  city: commerce.city,
+  neighborhood: commerce.neighborhood,
+  cep: commerce.cep,  // NOVO
+  is_open: commerce.is_open,
+  opening_hours: commerce.opening_hours,
+  whatsapp: commerce.whatsapp,
+  averageRating,
+  reviewCount
 };
-
-useEffect(() => {
-  fetchData(); // dados antigos continuam visíveis
-}, [commerceId, dateFilter]);
 ```
 
-**Solução:**
+#### 4. Ordenar por Proximidade Após Carregar os Dados
+Ordenar os comércios usando o CEP do perfil:
+
 ```typescript
-const handleDateChange = (start: Date, end: Date) => {
-  setLoading(true); // Mostra loading IMEDIATAMENTE
-  setDateFilter({ start, end });
+// Ordenar por proximidade ao CEP do usuário
+if (profile?.cep) {
+  commercesWithRatings.sort((a, b) => {
+    if (!a.cep && !b.cep) return 0;
+    if (!a.cep) return 1;
+    if (!b.cep) return -1;
+    
+    const scoreA = getCepProximityScore(profile.cep!, a.cep);
+    const scoreB = getCepProximityScore(profile.cep!, b.cep);
+    return scoreA - scoreB;
+  });
+}
+
+setCommerces(commercesWithRatings);
+```
+
+#### 5. Garantir que fetchCommerces Tenha Acesso ao Perfil
+Modificar a ordem de execução para que o perfil seja carregado antes dos comércios, ou passar o CEP como dependência:
+
+```typescript
+// Modificar fetchCommerces para receber o CEP como parâmetro
+const fetchCommerces = async (userCep?: string | null) => {
+  // ... lógica atual ...
+  
+  // Ordenar após processar
+  if (userCep) {
+    commercesWithRatings.sort((a, b) => {
+      // lógica de ordenação
+    });
+  }
+  
+  setCommerces(commercesWithRatings);
 };
-
-// Alternativa: resetar loading no início do useEffect
-useEffect(() => {
-  setLoading(true);
-  fetchData();
-}, [commerceId, dateFilter]);
-```
-
-**Adicionar skeleton nos cards durante loading:**
-- Quando `loading === true`, exibir componentes `Skeleton` nos valores dos cards
-- Isso elimina completamente o flash de dados antigos
-
-### 2. CommerceOverview.tsx
-
-**Problema atual (linha 106-164):**
-- O `loading` não é resetado quando `dateFilter` muda
-- Linha 207: O spinner só aparece no carregamento inicial
-
-**Solução:**
-```typescript
-useEffect(() => {
-  const fetchStats = async () => {
-    setLoading(true); // ADICIONAR: Reset loading ao iniciar
-    // ... resto do código
-  };
-  fetchStats();
-}, [commerce.id, dateFilter]);
-```
-
-### 3. CommerceOrders.tsx
-
-Aplicar o mesmo padrão de reset de loading no useEffect.
-
----
-
-## Implementação Visual
-
-### Skeleton para Cards Financeiros
-
-Em vez de mostrar valores antigos durante o loading, exibir:
-
-```typescript
-{loading ? (
-  <Skeleton className="h-8 w-24" />
-) : (
-  <span className="text-2xl font-bold">{formatCurrency(stats.monthlyRevenue)}</span>
-)}
 ```
 
 ---
 
-## Fluxo Antes vs Depois
+## Fluxo de Dados
 
-**Antes (problema atual):**
+```text
++------------------+     +-------------------+     +----------------------+
+|  Carregar Perfil | --> | Obter CEP usuário | --> | Buscar Comércios RPC |
++------------------+     +-------------------+     +----------------------+
+                                                             |
+                                                             v
+                              +-----------------------------+
+                              | Ordenar por getCepProximityScore |
+                              | (menor score = mais próximo)     |
+                              +-----------------------------+
+                                                             |
+                                                             v
+                              +-----------------------------+
+                              | Exibir lista ordenada       |
+                              | (mais próximos primeiro)    |
+                              +-----------------------------+
 ```
-1. Usuário clica "Esse mês"
-2. Estado dateFilter atualiza
-3. fetchData() começa (assíncrono)
-4. DADOS ANTIGOS continuam visíveis (FLASH!)
-5. Dados novos chegam e substituem
-```
-
-**Depois (solução):**
-```
-1. Usuário clica "Esse mês"
-2. loading = true (IMEDIATO)
-3. Cards mostram Skeleton
-4. fetchData() busca dados
-5. Dados novos substituem skeleton
-```
-
----
-
-## Arquivos a Modificar
-
-| Arquivo | Alteração |
-|---------|-----------|
-| `src/components/commerce/CommerceFinancial.tsx` | Resetar loading no handleDateChange ou useEffect, adicionar skeletons nos cards |
-| `src/components/commerce/CommerceOverview.tsx` | Resetar loading no início do fetchStats |
-| `src/components/commerce/CommerceOrders.tsx` | Resetar loading quando filtro mudar |
 
 ---
 
 ## Resultado Esperado
 
-1. **Transição instantânea**: Ao trocar filtro, cards exibem skeleton imediatamente
-2. **Sem flash de dados antigos**: Usuário não vê valores negativos ou incorretos
-3. **Feedback visual claro**: Loading indica que novos dados estão sendo buscados
-4. **Experiência profissional**: Análise de dados confiável sem confusão visual
+- Os comércios na aba "Explorar" serão ordenados do **mais próximo** ao **mais distante** do CEP do usuário
+- Se o usuário não tiver CEP cadastrado, a ordenação será pela ordem padrão (mais recente)
+- Consistência com o comportamento do `FeaturedStores.tsx` na landing page
