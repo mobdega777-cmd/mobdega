@@ -1,81 +1,94 @@
 
-# Plano: Corrigir Erro de Enum invoice_type
+# Plano: Corrigir Função de Busca de Email para Login por CPF/CNPJ
 
-## Problema Identificado
+## Contexto do Problema
 
-Ao tentar criar uma nova fatura, o sistema mostra o erro:
-> `invalid input value for enum invoice_type: "monthly"`
+Você perguntou: **"Por que busca email se colocamos o CNPJ ou CPF para fazer o login?"**
 
-O enum `invoice_type` no banco de dados só aceita os valores:
-- `"payable"` (a pagar)
-- `"receivable"` (a receber)
+### Resposta Técnica
 
-O valor `"monthly"` não existe neste enum.
+O **sistema de autenticação do Lovable Cloud** (baseado em Supabase Auth) **só aceita login com email + senha**. Não existe suporte nativo para login com CPF/CNPJ.
 
----
+Para permitir que comerciantes façam login usando o documento, criamos um fluxo intermediário:
 
-## Causa do Erro
-
-A função `notify_commerce_on_new_invoice()` no banco de dados foi criada com referências a valores antigos (`'monthly'` e `'tax'`) que não existem no enum atual. Essa função é um trigger que dispara após cada inserção na tabela `invoices`.
-
-**Código atual da função:**
-```sql
-CASE 
-    WHEN NEW.type = 'monthly' THEN 'mensalidade'  -- ERRADO: 'monthly' não existe
-    WHEN NEW.type = 'tax' THEN 'imposto'          -- ERRADO: 'tax' não existe
-    ELSE 'cobrança'
-END
+```text
+┌──────────────────────────────────────────────────────────────┐
+│                FLUXO DE LOGIN POR CPF/CNPJ                   │
+├──────────────────────────────────────────────────────────────┤
+│                                                              │
+│   Comerciante digita:  44.072.657/0001-30 + senha           │
+│                              ↓                               │
+│   Sistema chama função:  get_commerce_email_by_document      │
+│                              ↓                               │
+│   Função retorna o email associado ao documento              │
+│                              ↓                               │
+│   Sistema faz login com:  email@encontrado.com + senha       │
+│                              ↓                               │
+│   Autenticação validada → Acesso liberado                    │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Solução
+## O Problema Identificado
 
-### Atualizar a Função no Banco de Dados
+A função `get_commerce_email_by_document` atual busca o email da **tabela `commerces`**:
 
-Corrigir a função `notify_commerce_on_new_invoice()` para usar os valores corretos do enum:
+| Tabela     | Campo       | Valor                      |
+|------------|-------------|----------------------------|
+| commerces  | document    | 44072657000130             |
+| commerces  | email       | ricardinhuloko@gmail.com   |
+| auth.users | email       | adegapremium@gmail.com     |
 
-```sql
-CREATE OR REPLACE FUNCTION public.notify_commerce_on_new_invoice()
-RETURNS TRIGGER AS $$
-BEGIN
-    INSERT INTO public.commerce_notifications (
-        commerce_id,
-        type,
-        title,
-        message,
-        invoice_id
-    ) VALUES (
-        NEW.commerce_id,
-        'new_invoice',
-        'Nova Fatura Disponível',
-        'Uma nova fatura de ' || 
-        CASE 
-            WHEN NEW.type = 'receivable' THEN 'mensalidade'
-            WHEN NEW.type = 'payable' THEN 'despesa'
-            ELSE 'cobrança'
-        END || 
-        ' no valor de R$ ' || 
-        TRIM(TO_CHAR(NEW.amount, 'FM999G999D00')) || 
-        ' foi gerada para o mês de ' || NEW.reference_month || '.',
-        NEW.id
-    );
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+Quando o email em `commerces` é diferente do email em `auth.users`, o login falha com "Invalid login credentials".
+
+---
+
+## Solução Proposta
+
+Alterar a função `get_commerce_email_by_document` para buscar o email diretamente da tabela `auth.users` através do `owner_id`, garantindo que **sempre usamos o email correto de autenticação**.
+
+### Nova Lógica:
+
+```text
+CPF/CNPJ → commerces.document → commerces.owner_id → auth.users.email
 ```
 
 ---
 
-## Observação sobre Cache do Navegador
+## Detalhes Técnicos
 
-Se após esta correção o erro persistir, pode ser necessário limpar o cache do navegador ou fazer um hard refresh (Ctrl+Shift+R) para garantir que o código mais recente do frontend está sendo executado.
+### Alteração no Banco de Dados
+
+Atualizar a função RPC para fazer um JOIN com `auth.users`:
+
+```sql
+CREATE OR REPLACE FUNCTION public.get_commerce_email_by_document(p_document text)
+RETURNS text
+LANGUAGE sql
+STABLE SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+  SELECT au.email 
+  FROM public.commerces c
+  JOIN auth.users au ON au.id = c.owner_id
+  WHERE REGEXP_REPLACE(c.document, '\D', '', 'g') = REGEXP_REPLACE(p_document, '\D', '', 'g')
+  LIMIT 1;
+$$;
+```
+
+### Por que isso é seguro?
+
+- A função usa `SECURITY DEFINER`, executando com permissões do criador
+- Retorna apenas o email, sem expor outros dados de `auth.users`
+- Mantém a mesma assinatura, então o código do frontend não precisa mudar
 
 ---
 
 ## Resultado Esperado
 
-Após a atualização:
-- Faturas poderão ser criadas sem erros
-- As notificações para comércios serão geradas corretamente
-- O texto da notificação usará "mensalidade" para tipo `receivable` e "despesa" para tipo `payable`
+Após a alteração:
+- O login por CPF/CNPJ sempre usará o email de autenticação correto
+- Mesmo que o email em `commerces` esteja desatualizado, o login funcionará
+- O fluxo permanece transparente para o comerciante
