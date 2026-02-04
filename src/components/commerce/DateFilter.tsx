@@ -153,7 +153,9 @@ const DateFilter = ({ onDateChange, defaultValue = "today" }: DateFilterProps) =
       <SelectTrigger className="w-[160px]">
         <div className="flex items-center gap-2">
           <CalendarIcon className="w-4 h-4" />
-          <span>{displayValue}</span>
+          <SelectValue placeholder="Selecionar">
+            {displayValue}
+          </SelectValue>
         </div>
       </SelectTrigger>
       <SelectContent>
