@@ -13,6 +13,10 @@ import UserDashboard from "./pages/user/UserDashboard";
 import Storefront from "./pages/Storefront";
 import Ranking from "./pages/Ranking";
 import ResetPassword from "./pages/ResetPassword";
+import TermosDeUso from "./pages/TermosDeUso";
+import PoliticaPrivacidade from "./pages/PoliticaPrivacidade";
+import Cookies from "./pages/Cookies";
+import SobreNos from "./pages/SobreNos";
 
 import ProtectedAdminRoute from "./components/auth/ProtectedAdminRoute";
 import ProtectedCommerceRoute from "./components/auth/ProtectedCommerceRoute";
@@ -67,6 +71,10 @@ function App() {
                 <Route path="/loja/:commerceId" element={<Storefront />} />
                 <Route path="/ranking" element={<Ranking />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/termos-de-uso" element={<TermosDeUso />} />
+                <Route path="/politica-de-privacidade" element={<PoliticaPrivacidade />} />
+                <Route path="/cookies" element={<Cookies />} />
+                <Route path="/sobre-nos" element={<SobreNos />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
