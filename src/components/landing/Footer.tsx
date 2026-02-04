@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
+import { Link } from "react-router-dom";
 import { 
   Instagram, 
   Facebook, 
@@ -145,24 +146,24 @@ const Footer = () => {
             </h4>
             <ul className="space-y-3">
               <li>
-                <a href="#" className="text-primary-foreground/70 hover:text-primary transition-colors">
+                <Link to="/termos-de-uso" className="text-primary-foreground/70 hover:text-primary transition-colors">
                   Termos de Uso
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="#" className="text-primary-foreground/70 hover:text-primary transition-colors">
+                <Link to="/politica-de-privacidade" className="text-primary-foreground/70 hover:text-primary transition-colors">
                   Política de Privacidade
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="#" className="text-primary-foreground/70 hover:text-primary transition-colors">
+                <Link to="/cookies" className="text-primary-foreground/70 hover:text-primary transition-colors">
                   Cookies
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="#" className="text-primary-foreground/70 hover:text-primary transition-colors">
+                <Link to="/sobre-nos" className="text-primary-foreground/70 hover:text-primary transition-colors">
                   Sobre Nós
-                </a>
+                </Link>
               </li>
             </ul>
           </motion.div>
