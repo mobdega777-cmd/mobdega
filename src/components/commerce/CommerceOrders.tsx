@@ -140,6 +140,7 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
   const { toast } = useToast();
 
   const handleDateChange = (start: Date, end: Date) => {
+    setLoading(true); // Mostra loading IMEDIATAMENTE para evitar flash de dados antigos
     setDateFilter({ start, end });
     setCurrentPage(1);
   };

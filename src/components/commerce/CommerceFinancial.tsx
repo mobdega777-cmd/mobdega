@@ -147,6 +147,7 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
   // Using centralized formatCurrency from @/lib/formatCurrency
 
   const handleDateChange = (start: Date, end: Date) => {
+    setLoading(true); // Mostra loading IMEDIATAMENTE para evitar flash de dados antigos
     setDateFilter({ start, end });
   };
 

@@ -27,6 +27,7 @@ import CommerceInsights from "./CommerceInsights";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { getSupabaseDateRange, getTodayDateRange } from "@/lib/dateUtils";
 import HelpTooltip from "@/components/ui/help-tooltip";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface OpeningHours {
   [key: string]: { open: string; close: string; enabled: boolean };
@@ -105,6 +106,9 @@ const CommerceOverview = ({ commerce }: CommerceOverviewProps) => {
 
   useEffect(() => {
     const fetchStats = async () => {
+      // IMPORTANTE: Resetar loading IMEDIATAMENTE para evitar flash de dados antigos
+      setLoading(true);
+      
       const { startISO, endISO } = getSupabaseDateRange(dateFilter.start, dateFilter.end);
       
       // Busca pedidos para status e entregas ativas
@@ -157,7 +161,6 @@ const CommerceOverview = ({ commerce }: CommerceOverviewProps) => {
         activeDeliveries, 
         completedToday: completedCount 
       });
-      setLoading(false);
       setLoading(false);
     };
     fetchStats();
@@ -300,7 +303,11 @@ const CommerceOverview = ({ commerce }: CommerceOverviewProps) => {
                     <p className="text-xs md:text-sm text-muted-foreground truncate">{stat.title}</p>
                     <HelpTooltip content={stat.tooltip} className="flex-shrink-0" />
                   </div>
-                  <p className="text-lg md:text-2xl font-bold mt-1">{stat.value}</p>
+                  {loading ? (
+                    <Skeleton className="h-7 md:h-8 w-20 md:w-24 mt-1" />
+                  ) : (
+                    <p className="text-lg md:text-2xl font-bold mt-1">{stat.value}</p>
+                  )}
                 </div>
                 <div className={`p-2 md:p-3 rounded-xl ${stat.bgColor}`}>
                   <Icon className={`w-4 h-4 md:w-6 md:h-6 ${stat.color}`} />
