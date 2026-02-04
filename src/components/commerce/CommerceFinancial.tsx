@@ -99,6 +99,8 @@ interface Commerce {
   tax_paid_at?: string;
 }
 
+const INVOICES_PER_PAGE = 5;
+
 const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
@@ -107,6 +109,7 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
   const [pendingInvoicesCount, setPendingInvoicesCount] = useState(0);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [invoicesPage, setInvoicesPage] = useState(1);
   // Usa data local para evitar problemas de fuso horário UTC
   const getLocalToday = () => {
     const now = new Date();
@@ -315,11 +318,39 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
     const pendingCount = invoicesData?.filter(i => i.status === 'pending').length || 0;
     setPendingInvoicesCount(pendingCount);
 
-    const pendingPayments = invoicesData?.filter(i => 
+    // Fetch expenses with due dates for A Pagar/Vencidos calculation
+    const { data: expensesData } = await supabase
+      .from('expenses')
+      .select('*')
+      .eq('commerce_id', commerceId)
+      .eq('is_active', true);
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    
+    // Despesas pendentes (não pagas e não vencidas)
+    const pendingExpenses = expensesData?.filter(e => 
+      !e.is_paid && e.due_date && e.due_date >= todayStr
+    ).reduce((sum, e) => sum + Number(e.amount), 0) || 0;
+
+    // Despesas vencidas (não pagas e já vencidas)
+    const overdueExpenses = expensesData?.filter(e => 
+      !e.is_paid && e.due_date && e.due_date < todayStr
+    ).reduce((sum, e) => sum + Number(e.amount), 0) || 0;
+
+    // Verificar se imposto está pago neste mês
+    const isTaxPaidThisMonth = () => {
+      if (!commerceData?.tax_paid_at) return false;
+      const paidDate = new Date(commerceData.tax_paid_at);
+      const now = new Date();
+      return paidDate.getMonth() === now.getMonth() && 
+             paidDate.getFullYear() === now.getFullYear();
+    };
+
+    const invoicePendingPayments = invoicesData?.filter(i => 
       i.status === 'pending'
     ).reduce((sum, i) => sum + Number(i.amount), 0) || 0;
 
-    const overduePayments = invoicesData?.filter(i => 
+    const invoiceOverduePayments = invoicesData?.filter(i => 
       i.status === 'overdue'
     ).reduce((sum, i) => sum + Number(i.amount), 0) || 0;
 
@@ -330,6 +361,18 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
     } else if (commerceData?.tax_type === 'percentage') {
       taxAmount = (monthlyRevenue * (commerceData.tax_value || 0)) / 100;
     }
+
+    // Verificar se imposto está vencido
+    const taxPaymentDay = commerceData?.tax_payment_day || 20;
+    const currentDay = today.getDate();
+    const isTaxOverdue = currentDay > taxPaymentDay && !isTaxPaidThisMonth() && taxAmount > 0;
+    const isTaxPending = currentDay <= taxPaymentDay && !isTaxPaidThisMonth() && taxAmount > 0;
+
+    // Total A Pagar = Faturas pendentes + Despesas pendentes + Imposto pendente (se antes do vencimento)
+    const pendingPayments = invoicePendingPayments + pendingExpenses + (isTaxPending ? taxAmount : 0);
+
+    // Total Vencidos = Faturas vencidas + Despesas vencidas + Imposto vencido
+    const overduePayments = invoiceOverduePayments + overdueExpenses + (isTaxOverdue ? taxAmount : 0);
 
     setStats({
       monthlyRevenue,
@@ -756,7 +799,7 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
               <div>
                 <div className="flex items-center gap-2">
                   <p className="text-sm text-muted-foreground">A Pagar (Pendente)</p>
-                  <HelpTooltip content="Valor total de faturas pendentes como mensalidades e outras cobranças que você ainda precisa pagar." />
+                  <HelpTooltip content="Soma de: faturas pendentes + despesas com vencimento futuro não pagas + imposto do mês (se não pago e antes do vencimento)." />
                 </div>
                 <p className="text-2xl font-bold text-yellow-500">{formatCurrency(stats.pendingPayments)}</p>
               </div>
@@ -773,7 +816,7 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
               <div>
                 <div className="flex items-center gap-2">
                   <p className="text-sm text-muted-foreground">Vencidos</p>
-                  <HelpTooltip content="Faturas que já passaram da data de vencimento e precisam ser regularizadas para evitar suspensão." />
+                  <HelpTooltip content="Soma de: faturas vencidas + despesas com vencimento passado não pagas + imposto do mês (se não pago e após o vencimento)." />
                 </div>
                 <p className="text-2xl font-bold text-red-500">{formatCurrency(stats.overduePayments)}</p>
               </div>
@@ -860,6 +903,17 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
 
       {/* Tax Card */}
       {(() => {
+        // Verificar se o pagamento do imposto foi feito no mês atual
+        const isTaxPaidThisMonth = () => {
+          if (!commerce?.tax_paid_at) return false;
+          const paidDate = new Date(commerce.tax_paid_at);
+          const now = new Date();
+          return paidDate.getMonth() === now.getMonth() && 
+                 paidDate.getFullYear() === now.getFullYear();
+        };
+        
+        const taxPaidThisMonth = isTaxPaidThisMonth();
+        
         // Calculate if payment is due in 2 days or less
         const today = new Date();
         const currentDay = today.getDate();
@@ -874,7 +928,7 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
           daysUntilDue = daysInMonth - currentDay + paymentDay;
         }
         
-        const isAlertActive = daysUntilDue <= 2 && taxConfig && !commerce?.tax_paid_current_month;
+        const isAlertActive = daysUntilDue <= 2 && taxConfig && !taxPaidThisMonth;
 
         const handleMarkAsPaid = async () => {
           await supabase
@@ -913,7 +967,7 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
                           Vence em {daysUntilDue} dia{daysUntilDue !== 1 ? 's' : ''}!
                         </Badge>
                       )}
-                      {commerce?.tax_paid_current_month && (
+                      {taxPaidThisMonth && (
                         <Badge className="bg-green-500">Pago</Badge>
                       )}
                     </div>
@@ -926,7 +980,7 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
                   </div>
                 </div>
                  <div className="flex flex-col gap-2">
-                   {taxConfig && !commerce?.tax_paid_current_month && (
+                   {taxConfig && !taxPaidThisMonth && (
                      <Button
                        size="sm"
                        onClick={handleMarkAsPaid}
@@ -1069,62 +1123,91 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
               <p className="text-muted-foreground">Nenhuma fatura encontrada</p>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Referência</TableHead>
-                  <TableHead>Valor</TableHead>
-                  <TableHead>Vencimento</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Ação</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {invoices.map((invoice) => {
-                  const status = getStatusBadge(invoice.status);
-                  return (
-                    <TableRow key={invoice.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <ArrowDownCircle className="w-4 h-4 text-red-500" />
-                          <span>A Pagar</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>{invoice.reference_month}</TableCell>
-                      <TableCell className="font-medium">R$ {Number(invoice.amount).toFixed(2)}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2 text-sm">
-                          <Calendar className="w-4 h-4 text-muted-foreground" />
-                          {/* Parse date correctly to avoid timezone issues with DATE fields */}
-                          {invoice.due_date.includes('T') 
-                            ? new Date(invoice.due_date).toLocaleDateString('pt-BR')
-                            : new Date(invoice.due_date + 'T12:00:00').toLocaleDateString('pt-BR')
-                          }
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${status.color}`}>
-                          {status.label}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {invoice.status === 'pending' && (
-                          <Button 
-                            size="sm" 
-                            onClick={() => handlePayInvoice(invoice)}
-                            className="gap-1"
-                          >
-                            <CreditCard className="w-3 h-3" />
-                            Pagar
-                          </Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>Referência</TableHead>
+                    <TableHead>Valor</TableHead>
+                    <TableHead>Vencimento</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Ação</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {invoices
+                    .slice((invoicesPage - 1) * INVOICES_PER_PAGE, invoicesPage * INVOICES_PER_PAGE)
+                    .map((invoice) => {
+                    const status = getStatusBadge(invoice.status);
+                    return (
+                      <TableRow key={invoice.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <ArrowDownCircle className="w-4 h-4 text-red-500" />
+                            <span>A Pagar</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>{invoice.reference_month}</TableCell>
+                        <TableCell className="font-medium">R$ {Number(invoice.amount).toFixed(2)}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2 text-sm">
+                            <Calendar className="w-4 h-4 text-muted-foreground" />
+                            {/* Parse date correctly to avoid timezone issues with DATE fields */}
+                            {invoice.due_date.includes('T') 
+                              ? new Date(invoice.due_date).toLocaleDateString('pt-BR')
+                              : new Date(invoice.due_date + 'T12:00:00').toLocaleDateString('pt-BR')
+                            }
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${status.color}`}>
+                            {status.label}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {invoice.status === 'pending' && (
+                            <Button 
+                              size="sm" 
+                              onClick={() => handlePayInvoice(invoice)}
+                              className="gap-1"
+                            >
+                              <CreditCard className="w-3 h-3" />
+                              Pagar
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+              {invoices.length > INVOICES_PER_PAGE && (
+                <div className="flex items-center justify-between mt-4 px-2">
+                  <p className="text-sm text-muted-foreground">
+                    Página {invoicesPage} de {Math.ceil(invoices.length / INVOICES_PER_PAGE)}
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setInvoicesPage(p => Math.max(1, p - 1))}
+                      disabled={invoicesPage === 1}
+                    >
+                      Anterior
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setInvoicesPage(p => Math.min(Math.ceil(invoices.length / INVOICES_PER_PAGE), p + 1))}
+                      disabled={invoicesPage >= Math.ceil(invoices.length / INVOICES_PER_PAGE)}
+                    >
+                      Próximo
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
