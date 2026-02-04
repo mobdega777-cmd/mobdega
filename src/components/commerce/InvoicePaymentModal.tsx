@@ -61,11 +61,15 @@ const InvoicePaymentModal = ({ isOpen, onClose, invoice, commerceStats }: Invoic
   }, [isOpen]);
 
   const fetchBillingConfig = async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('billing_config')
       .select('*')
       .limit(1)
-      .single();
+      .maybeSingle();
+    
+    if (error) {
+      console.error('Error fetching billing config:', error);
+    }
     
     if (data) {
       setBillingConfig(data);
