@@ -513,7 +513,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
       } else {
         toast({
           title: "Email enviado!",
-          description: "Verifique sua caixa de entrada para redefinir sua senha.",
+          description: "Verifique sua caixa de entrada para redefinir sua senha. Caso não encontre, verifique também a pasta de SPAM ou lixo eletrônico.",
         });
         setShowForgotPassword(false);
         setForgotPasswordEmail("");
