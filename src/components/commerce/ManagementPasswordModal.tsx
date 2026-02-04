@@ -10,13 +10,16 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Shield, Eye, EyeOff, AlertCircle } from "lucide-react";
+import { Shield, Eye, EyeOff, AlertCircle, Loader2, Mail } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface ManagementPasswordModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
   correctPassword: string;
+  commerceEmail?: string;
 }
 
 const ManagementPasswordModal = ({
@@ -24,10 +27,13 @@ const ManagementPasswordModal = ({
   onClose,
   onSuccess,
   correctPassword,
+  commerceEmail,
 }: ManagementPasswordModalProps) => {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(false);
+  const [sendingRecovery, setSendingRecovery] = useState(false);
+  const { toast } = useToast();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,6 +44,47 @@ const ManagementPasswordModal = ({
       onSuccess();
     } else {
       setError(true);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!commerceEmail) {
+      toast({
+        variant: "destructive",
+        title: "Email não encontrado",
+        description: "Não foi possível encontrar o email do comércio.",
+      });
+      return;
+    }
+
+    setSendingRecovery(true);
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(commerceEmail, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (error) {
+        toast({
+          variant: "destructive",
+          title: "Erro ao enviar email",
+          description: error.message,
+        });
+      } else {
+        toast({
+          title: "Email enviado!",
+          description: `Enviamos um link de recuperação para ${commerceEmail}. Verifique também a pasta de SPAM ou lixo eletrônico.`,
+        });
+        handleClose();
+      }
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Ocorreu um erro inesperado. Tente novamente.",
+      });
+    } finally {
+      setSendingRecovery(false);
     }
   };
 
@@ -96,6 +143,28 @@ const ManagementPasswordModal = ({
                 Senha incorreta
               </p>
             )}
+          </div>
+
+          {/* Forgot Password Link */}
+          <div className="text-center">
+            <button
+              type="button"
+              onClick={handleForgotPassword}
+              disabled={sendingRecovery}
+              className="text-sm text-primary hover:underline disabled:opacity-50 inline-flex items-center gap-1"
+            >
+              {sendingRecovery ? (
+                <>
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  Enviando...
+                </>
+              ) : (
+                <>
+                  <Mail className="w-3 h-3" />
+                  Esqueci a senha
+                </>
+              )}
+            </button>
           </div>
 
           <DialogFooter className="gap-2 sm:gap-0">

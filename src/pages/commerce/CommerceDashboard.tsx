@@ -115,6 +115,7 @@ interface Commerce {
   id: string;
   fantasy_name: string;
   logo_url: string | null;
+  email: string;
   status: string;
   plan_id: string | null;
   rejection_reason: string | null;
@@ -159,7 +160,7 @@ const CommerceDashboard = () => {
     
     const { data, error } = await supabase
       .from('commerces')
-      .select('id, fantasy_name, logo_url, status, plan_id, rejection_reason, coupon_code, force_password_change, employee_visible_menu_items, management_password')
+      .select('id, fantasy_name, logo_url, email, status, plan_id, rejection_reason, coupon_code, force_password_change, employee_visible_menu_items, management_password')
       .eq('owner_id', user.id)
       .maybeSingle();
     
@@ -176,6 +177,7 @@ const CommerceDashboard = () => {
         id: data.id,
         fantasy_name: data.fantasy_name,
         logo_url: data.logo_url,
+        email: data.email,
         status: data.status,
         plan_id: data.plan_id,
         rejection_reason: data.rejection_reason,
@@ -803,6 +805,7 @@ const CommerceDashboard = () => {
         onClose={() => setShowPasswordModal(false)}
         onSuccess={handlePasswordSuccess}
         correctPassword={commerce?.management_password || ""}
+        commerceEmail={commerce?.email}
       />
     </div>
   );
