@@ -27,6 +27,14 @@ interface SystemUpdate {
 // Lista estática de atualizações do sistema - pode ser expandida para buscar do banco
 const systemUpdates: SystemUpdate[] = [
   {
+    id: "insights1",
+    date: "04/02/2026",
+    time: "14:00",
+    type: "create",
+    module: "Visão Geral",
+    description: "Nova seção 'Insights Poderosos' com métricas de BI: ticket médio, horário/dia de pico, taxa de retenção, produto campeão e dicas de marketing personalizadas"
+  },
+  {
     id: "pag1",
     date: "04/02/2026",
     time: "10:00",

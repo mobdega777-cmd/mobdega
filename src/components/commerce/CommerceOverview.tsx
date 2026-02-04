@@ -2,17 +2,14 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { 
-  ShoppingCart, 
   Package, 
   DollarSign, 
   Clock,
   CheckCircle,
   Truck,
-  Store,
   Settings,
   Share2
 } from "lucide-react";
@@ -26,6 +23,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import DateFilter from "./DateFilter";
 import SystemUpdates from "./SystemUpdates";
+import CommerceInsights from "./CommerceInsights";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { getSupabaseDateRange, getTodayDateRange } from "@/lib/dateUtils";
 import HelpTooltip from "@/components/ui/help-tooltip";
@@ -64,7 +62,6 @@ const DAY_NAMES: Record<string, string> = {
 
 const CommerceOverview = ({ commerce }: CommerceOverviewProps) => {
   const [stats, setStats] = useState<Stats>({ totalOrders: 0, pendingOrders: 0, todayRevenue: 0, totalProducts: 0, activeDeliveries: 0, completedToday: 0 });
-  const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const todayRange = getTodayDateRange();
   const [dateFilter, setDateFilter] = useState({ start: todayRange.start, end: todayRange.end });
@@ -152,16 +149,6 @@ const CommerceOverview = ({ commerce }: CommerceOverviewProps) => {
       
       const { count: productsCount } = await supabase.from('products').select('id', { count: 'exact', head: true }).eq('commerce_id', commerce.id);
       
-      // Pedidos recentes filtrados por data
-      const { data: recent } = await supabase
-        .from('orders')
-        .select('*')
-        .eq('commerce_id', commerce.id)
-        .gte('created_at', startISO)
-        .lte('created_at', endISO)
-        .order('created_at', { ascending: false })
-        .limit(10);
-      
       setStats({ 
         totalOrders: orders?.length || 0, 
         pendingOrders, 
@@ -170,7 +157,7 @@ const CommerceOverview = ({ commerce }: CommerceOverviewProps) => {
         activeDeliveries, 
         completedToday: completedCount 
       });
-      setRecentOrders(recent || []);
+      setLoading(false);
       setLoading(false);
     };
     fetchStats();
@@ -215,20 +202,7 @@ const CommerceOverview = ({ commerce }: CommerceOverviewProps) => {
     { title: "Entregas Ativas", value: stats.activeDeliveries, icon: Truck, color: "text-blue-500", bgColor: "bg-blue-500/10", tooltip: "Pedidos de delivery que estão em rota de entrega neste momento." },
     { title: "Finalizados no Período", value: stats.completedToday, icon: CheckCircle, color: "text-emerald-500", bgColor: "bg-emerald-500/10", tooltip: "Quantidade de pedidos concluídos com sucesso no período selecionado." },
     { title: "Total de Produtos", value: stats.totalProducts, icon: Package, color: "text-purple-500", bgColor: "bg-purple-500/10", tooltip: "Quantidade de produtos cadastrados no seu cardápio." },
-    { title: "Total de Pedidos", value: stats.totalOrders, icon: ShoppingCart, color: "text-primary", bgColor: "bg-primary/10", tooltip: "Todos os pedidos recebidos desde a criação do comércio." },
   ];
-
-  const getStatusBadge = (status: string) => {
-    const cfg: Record<string, { label: string; color: string }> = {
-      pending: { label: "Pendente", color: "bg-yellow-500/20 text-yellow-500" },
-      confirmed: { label: "Confirmado", color: "bg-blue-500/20 text-blue-500" },
-      preparing: { label: "Preparando", color: "bg-orange-500/20 text-orange-500" },
-      delivering: { label: "Em Entrega", color: "bg-purple-500/20 text-purple-500" },
-      delivered: { label: "Entregue", color: "bg-green-500/20 text-green-500" },
-      cancelled: { label: "Cancelado", color: "bg-red-500/20 text-red-500" },
-    };
-    return cfg[status] || { label: status, color: "bg-muted text-muted-foreground" };
-  };
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div></div>;
 
@@ -337,24 +311,11 @@ const CommerceOverview = ({ commerce }: CommerceOverviewProps) => {
         ); })}
       </div>
 
-      {/* Atualizações do Sistema */}
-      <SystemUpdates />
+      {/* Insights Poderosos */}
+      <CommerceInsights commerceId={commerce.id} />
 
-      <Card>
-        <CardHeader className="p-4 md:p-6"><CardTitle className="flex items-center gap-2 text-base md:text-lg"><ShoppingCart className="w-4 h-4 md:w-5 md:h-5" />Pedidos Recentes</CardTitle></CardHeader>
-        <CardContent className="p-3 md:p-6 pt-0 md:pt-0">
-          {recentOrders.length === 0 ? <p className="text-center text-muted-foreground py-8 text-sm">Nenhum pedido recebido ainda</p> : (
-            <div className="space-y-2 md:space-y-3">
-              {recentOrders.map((order) => { const status = getStatusBadge(order.status); return (
-                <div key={order.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 md:p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors gap-2 sm:gap-4">
-                  <div className="flex items-center gap-3 md:gap-4"><div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0"><ShoppingCart className="w-4 h-4 md:w-5 md:h-5 text-primary" /></div><div className="min-w-0"><p className="font-medium text-sm md:text-base truncate">Pedido #{order.id.slice(0, 8)}</p><p className="text-xs md:text-sm text-muted-foreground">{new Date(order.created_at).toLocaleString('pt-BR')}</p></div></div>
-                  <div className="flex items-center gap-2 md:gap-4 ml-11 sm:ml-0"><span className={`px-2 md:px-3 py-1 rounded-full text-xs font-medium ${status.color}`}>{status.label}</span><span className="font-bold text-sm md:text-base">{formatCurrency(Number(order.total))}</span></div>
-                </div>
-              ); })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* Atualizações do Sistema - movido para o final */}
+      <SystemUpdates />
     </div>
   );
 };
