@@ -267,6 +267,13 @@ const CommerceDashboard = () => {
     fetchCommerce();
   }, [user]);
 
+  // Auto-navigate to training when pending approval
+  useEffect(() => {
+    if (isPending && activeSection === "overview") {
+      setActiveSection("training");
+    }
+  }, [isPending]);
+
   // Keep plan/menu in sync after upgrades (plan_id changes)
   useEffect(() => {
     if (!commerce?.id) return;
@@ -368,6 +375,8 @@ const CommerceDashboard = () => {
 
   // Check if menu item is hidden by employee mode
   const isMenuItemHiddenByEmployeeMode = (itemId: string) => {
+    // Training is always visible when pending approval
+    if (isPending && itemId === "training") return false;
     if (!isEmployeeMode) return false; // Management mode shows all
     if (!commerce?.employee_visible_menu_items) return false; // No config = show all
     return !commerce.employee_visible_menu_items.includes(itemId);
