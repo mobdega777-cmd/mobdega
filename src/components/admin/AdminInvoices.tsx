@@ -46,6 +46,14 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Database } from "@/integrations/supabase/types";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 type InvoiceStatus = Database['public']['Enums']['invoice_status'];
 type InvoiceType = Database['public']['Enums']['invoice_type'];
@@ -79,7 +87,9 @@ const AdminInvoices = () => {
   const [commerces, setCommerces] = useState<Commerce[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [currentPage, setCurrentPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
+  const ITEMS_PER_PAGE = 10;
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [autoInvoiceDialogOpen, setAutoInvoiceDialogOpen] = useState(false);
   const [selectedCommerce, setSelectedCommerce] = useState<Commerce | null>(null);
@@ -279,6 +289,18 @@ const AdminInvoices = () => {
     return matchesSearch && matchesStatus;
   });
 
+  // Pagination
+  const totalPages = Math.ceil(filteredInvoices.length / ITEMS_PER_PAGE);
+  const paginatedInvoices = filteredInvoices.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter]);
+
   const getStatusBadge = (status: InvoiceStatus) => {
     const config = {
       pending: { label: "Pendente", variant: "warning" as const, icon: Clock },
@@ -428,7 +450,7 @@ const AdminInvoices = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredInvoices.map((invoice) => (
+                  {paginatedInvoices.map((invoice) => (
                     <TableRow 
                       key={invoice.id}
                       className={invoice.payment_confirmed_by_commerce && invoice.status === 'pending' 
@@ -485,6 +507,37 @@ const AdminInvoices = () => {
                 </TableBody>
               </Table>
             </div>
+          )}
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <Pagination className="mt-4">
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious 
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                  />
+                </PaginationItem>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                  <PaginationItem key={page}>
+                    <PaginationLink
+                      onClick={() => setCurrentPage(page)}
+                      isActive={currentPage === page}
+                      className="cursor-pointer"
+                    >
+                      {page}
+                    </PaginationLink>
+                  </PaginationItem>
+                ))}
+                <PaginationItem>
+                  <PaginationNext 
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
           )}
         </CardContent>
       </Card>
