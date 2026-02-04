@@ -477,9 +477,11 @@ export type Database = {
           document_type: string
           email: string
           employee_visible_menu_items: string[] | null
+          facebook_url: string | null
           fantasy_name: string
           force_password_change: boolean | null
           id: string
+          instagram_url: string | null
           is_open: boolean | null
           logo_url: string | null
           management_password: string | null
@@ -523,9 +525,11 @@ export type Database = {
           document_type: string
           email: string
           employee_visible_menu_items?: string[] | null
+          facebook_url?: string | null
           fantasy_name: string
           force_password_change?: boolean | null
           id?: string
+          instagram_url?: string | null
           is_open?: boolean | null
           logo_url?: string | null
           management_password?: string | null
@@ -569,9 +573,11 @@ export type Database = {
           document_type?: string
           email?: string
           employee_visible_menu_items?: string[] | null
+          facebook_url?: string | null
           fantasy_name?: string
           force_password_change?: boolean | null
           id?: string
+          instagram_url?: string | null
           is_open?: boolean | null
           logo_url?: string | null
           management_password?: string | null
