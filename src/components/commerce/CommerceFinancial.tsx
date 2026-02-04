@@ -45,6 +45,7 @@ import { formatCurrency, formatPercentage } from "@/lib/formatCurrency";
 import { getSupabaseDateRange } from "@/lib/dateUtils";
 import HelpTooltip from "@/components/ui/help-tooltip";
 import { generateSalesReportPDF, generateStockReportPDF } from "@/lib/pdfReportGenerator";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface CommerceFinancialProps {
   commerceId: string;
@@ -685,13 +686,8 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
     setIsPaymentModalOpen(true);
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
+  // IMPORTANTE: Não desmontar o DateFilter durante loading para preservar o estado de seleção
+  // O loading agora é tratado com skeletons nos cards individuais
 
   return (
     <div className="space-y-6">
@@ -763,11 +759,19 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
                   <p className="text-sm text-muted-foreground">Faturamento Líquido</p>
                   <HelpTooltip content={`Total de vendas realizadas menos as taxas das operadoras de cartão/maquininha. Bruto: ${formatCurrency(stats.monthlyRevenue)} | Taxas: ${formatCurrency(operatorFees)}`} />
                 </div>
-                <p className="text-2xl font-bold text-green-500">{formatCurrency(stats.monthlyRevenue - operatorFees)}</p>
-                <p className={`text-xs mt-1 flex items-center gap-1 ${stats.growthRate >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-                  {stats.growthRate >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                  {stats.growthRate.toFixed(1)}% vs mês anterior
-                </p>
+                {loading ? (
+                  <Skeleton className="h-8 w-28 mt-1" />
+                ) : (
+                  <p className="text-2xl font-bold text-green-500">{formatCurrency(stats.monthlyRevenue - operatorFees)}</p>
+                )}
+                {loading ? (
+                  <Skeleton className="h-4 w-32 mt-2" />
+                ) : (
+                  <p className={`text-xs mt-1 flex items-center gap-1 ${stats.growthRate >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                    {stats.growthRate >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                    {stats.growthRate.toFixed(1)}% vs mês anterior
+                  </p>
+                )}
               </div>
               <div className="p-3 rounded-xl bg-green-500/10">
                 <TrendingUp className="w-6 h-6 text-green-500" />
@@ -784,8 +788,16 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
                   <p className="text-sm text-muted-foreground">Lucro Estimado</p>
                   <HelpTooltip content="Lucro estimado considerando margem de 40% sobre o faturamento líquido (após taxas de operadoras)." />
                 </div>
-                <p className="text-2xl font-bold text-blue-500">{formatCurrency((stats.monthlyRevenue - operatorFees) * 0.4)}</p>
-                <p className="text-xs mt-1 text-muted-foreground">Margem: 40% (após taxas)</p>
+                {loading ? (
+                  <Skeleton className="h-8 w-28 mt-1" />
+                ) : (
+                  <p className="text-2xl font-bold text-blue-500">{formatCurrency((stats.monthlyRevenue - operatorFees) * 0.4)}</p>
+                )}
+                {loading ? (
+                  <Skeleton className="h-4 w-28 mt-2" />
+                ) : (
+                  <p className="text-xs mt-1 text-muted-foreground">Margem: 40% (após taxas)</p>
+                )}
               </div>
               <div className="p-3 rounded-xl bg-blue-500/10">
                 <Wallet className="w-6 h-6 text-blue-500" />
@@ -802,7 +814,11 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
                   <p className="text-sm text-muted-foreground">A Pagar (Pendente)</p>
                   <HelpTooltip content="Soma de: faturas pendentes + despesas com vencimento futuro não pagas + imposto do mês (se não pago e antes do vencimento)." />
                 </div>
-                <p className="text-2xl font-bold text-yellow-500">{formatCurrency(stats.pendingPayments)}</p>
+                {loading ? (
+                  <Skeleton className="h-8 w-28 mt-1" />
+                ) : (
+                  <p className="text-2xl font-bold text-yellow-500">{formatCurrency(stats.pendingPayments)}</p>
+                )}
               </div>
               <div className="p-3 rounded-xl bg-yellow-500/10">
                 <ArrowDownCircle className="w-6 h-6 text-yellow-500" />
@@ -819,7 +835,11 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
                   <p className="text-sm text-muted-foreground">Vencidos</p>
                   <HelpTooltip content="Soma de: faturas vencidas + despesas com vencimento passado não pagas + imposto do mês (se não pago e após o vencimento)." />
                 </div>
-                <p className="text-2xl font-bold text-red-500">{formatCurrency(stats.overduePayments)}</p>
+                {loading ? (
+                  <Skeleton className="h-8 w-28 mt-1" />
+                ) : (
+                  <p className="text-2xl font-bold text-red-500">{formatCurrency(stats.overduePayments)}</p>
+                )}
               </div>
               <div className="p-3 rounded-xl bg-red-500/10">
                 <TrendingDownIcon className="w-6 h-6 text-red-500" />
@@ -842,7 +862,11 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
                   <p className="text-xs text-muted-foreground">Pedidos no Período</p>
                   <HelpTooltip content="Quantidade total de pedidos finalizados no período, incluindo todas as modalidades." />
                 </div>
-                <p className="text-lg font-bold">{stats.totalOrders}</p>
+                {loading ? (
+                  <Skeleton className="h-6 w-12 mt-1" />
+                ) : (
+                  <p className="text-lg font-bold">{stats.totalOrders}</p>
+                )}
               </div>
             </div>
           </CardContent>
@@ -859,7 +883,11 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
                   <p className="text-xs text-muted-foreground">Ticket Médio</p>
                   <HelpTooltip content="Valor médio gasto por pedido. Calculado dividindo o faturamento total pelo número de pedidos." />
                 </div>
-                <p className="text-lg font-bold">{formatCurrency(stats.avgTicket)}</p>
+                {loading ? (
+                  <Skeleton className="h-6 w-20 mt-1" />
+                ) : (
+                  <p className="text-lg font-bold">{formatCurrency(stats.avgTicket)}</p>
+                )}
               </div>
             </div>
           </CardContent>
@@ -876,7 +904,11 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
                   <p className="text-xs text-muted-foreground">Projeção Mensal</p>
                   <HelpTooltip content="Estimativa de faturamento até o fim do mês, baseada na média diária de vendas até agora." />
                 </div>
-                <p className="text-lg font-bold">{formatCurrency(stats.projectedRevenue)}</p>
+                {loading ? (
+                  <Skeleton className="h-6 w-24 mt-1" />
+                ) : (
+                  <p className="text-lg font-bold">{formatCurrency(stats.projectedRevenue)}</p>
+                )}
               </div>
             </div>
           </CardContent>
@@ -893,9 +925,13 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
                   <p className="text-xs text-muted-foreground">Taxa de Crescimento</p>
                   <HelpTooltip content="Comparativo do faturamento atual com o mês anterior. Verde indica crescimento, vermelho indica queda." />
                 </div>
-                <p className={`text-lg font-bold ${stats.growthRate >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                  {stats.growthRate >= 0 ? '+' : ''}{stats.growthRate.toFixed(1)}%
-                </p>
+                {loading ? (
+                  <Skeleton className="h-6 w-16 mt-1" />
+                ) : (
+                  <p className={`text-lg font-bold ${stats.growthRate >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                    {stats.growthRate >= 0 ? '+' : ''}{stats.growthRate.toFixed(1)}%
+                  </p>
+                )}
               </div>
             </div>
           </CardContent>
