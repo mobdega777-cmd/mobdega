@@ -54,6 +54,17 @@ export const getTodayDateRange = (): { start: Date; end: Date } => {
 };
 
 /**
+ * Retorna o range do mês atual (do dia 1 até hoje) no fuso horário local
+ */
+export const getThisMonthDateRange = (): { start: Date; end: Date } => {
+  const today = getLocalToday();
+  return {
+    start: startOfDay(startOfMonth(today)),
+    end: endOfDay(today)
+  };
+};
+
+/**
  * Converte uma data local para string ISO compatível com queries Supabase
  * Adiciona o offset correto do timezone Brasil (UTC-3)
  * 
