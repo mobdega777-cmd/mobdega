@@ -697,7 +697,7 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
             <h1 className="text-2xl sm:text-3xl font-bold">Financeiro</h1>
             <p className="text-muted-foreground text-sm sm:text-base">Dashboard financeiro e insights do seu comércio</p>
           </div>
-          <DateFilter onDateChange={handleDateChange} defaultValue="30days" />
+          <DateFilter onDateChange={handleDateChange} defaultValue="thisMonth" />
         </div>
         <div className="flex flex-wrap gap-2">
           <Button 
