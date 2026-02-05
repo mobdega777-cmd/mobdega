@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, Edit, Receipt, TrendingDown, DollarSign, Wallet, Package, CalendarIcon, Check } from "lucide-react";
+import { Plus, Trash2, Edit, Receipt, TrendingDown, DollarSign, Wallet, Package, CalendarIcon, Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/formatCurrency";
@@ -61,11 +61,14 @@ interface Expense {
   paid_at: string | null;
 }
 
+const EXPENSES_PER_PAGE = 10;
+
 const CommerceExpenses = ({ commerceId, monthlyRevenue, operatorFees = 0, productCost = 0, stockPurchasesTotal = 0 }: CommerceExpensesProps) => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
   const { toast } = useToast();
 
   const [formData, setFormData] = useState({
@@ -196,6 +199,13 @@ const CommerceExpenses = ({ commerceId, monthlyRevenue, operatorFees = 0, produc
   // Valor disponível estoque = custo produtos vendidos - compras de estoque lançadas
   const stockAvailableValue = productCost - totalStockPurchases;
 
+  // Paginação
+  const totalPages = Math.ceil(expenses.length / EXPENSES_PER_PAGE);
+  const paginatedExpenses = expenses.slice(
+    (currentPage - 1) * EXPENSES_PER_PAGE,
+    currentPage * EXPENSES_PER_PAGE
+  );
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-32">
@@ -315,8 +325,8 @@ const CommerceExpenses = ({ commerceId, monthlyRevenue, operatorFees = 0, produc
               <div className="flex items-center justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
-                    <p className="text-xs text-muted-foreground">Valor Disponível Estoque</p>
-                    <HelpTooltip content="Valor acumulado de custos de produtos vendidos menos as compras de estoque lançadas. Use para controlar quanto pode reinvestir em estoque." />
+                    <p className="text-xs text-muted-foreground">Valor Disponível P/ Recompra</p>
+                    <HelpTooltip content="Valor acumulado de custos de produtos vendidos menos as compras de estoque lançadas. Use para controlar quanto pode reinvestir em recompra de estoque." />
                   </div>
                   <p className={`text-xl font-bold ${stockAvailableValue >= 0 ? 'text-cyan-600' : 'text-red-600'}`}>
                     {formatCurrency(stockAvailableValue)}
@@ -366,7 +376,8 @@ const CommerceExpenses = ({ commerceId, monthlyRevenue, operatorFees = 0, produc
               <p className="text-sm mt-2">Adicione gastos fixos (aluguel, internet) e variáveis (embalagens, etc.)</p>
             </div>
           ) : (
-            <Table>
+            <>
+              <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Nome</TableHead>
@@ -379,7 +390,7 @@ const CommerceExpenses = ({ commerceId, monthlyRevenue, operatorFees = 0, produc
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {expenses.map((expense) => {
+                {paginatedExpenses.map((expense) => {
                   const today = new Date().toISOString().split('T')[0];
                   const isOverdue = expense.due_date && !expense.is_paid && expense.due_date < today;
                   const isPending = expense.due_date && !expense.is_paid && expense.due_date >= today;
@@ -440,6 +451,37 @@ const CommerceExpenses = ({ commerceId, monthlyRevenue, operatorFees = 0, produc
                 })}
               </TableBody>
             </Table>
+            
+            {/* Paginação */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                <p className="text-sm text-muted-foreground">
+                  Página {currentPage} de {totalPages} ({expenses.length} registros)
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </Button>
+                  <span className="text-sm font-medium px-2">
+                    {currentPage}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+            </>
           )}
         </CardContent>
       </Card>
