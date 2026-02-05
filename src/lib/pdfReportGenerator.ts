@@ -286,9 +286,8 @@ export const generateSalesReportPDF = async (data: SalesReportData) => {
       ['(-) Custo dos Produtos Vendidos (CPV)', `- ${formatCurrency(fd.productCostSold)}`, `-${fd.grossRevenue > 0 ? ((fd.productCostSold / fd.grossRevenue) * 100).toFixed(1) : 0}%`],
       ['(=) Lucro Bruto', formatCurrency(fd.netRevenue - fd.productCostSold), `${fd.grossRevenue > 0 ? (((fd.netRevenue - fd.productCostSold) / fd.grossRevenue) * 100).toFixed(1) : 0}%`],
       ['(-) Despesas Fixas', `- ${formatCurrency(fd.fixedExpenses)}`, `-${fd.grossRevenue > 0 ? ((fd.fixedExpenses / fd.grossRevenue) * 100).toFixed(1) : 0}%`],
-      ['(-) Compras de Estoque', `- ${formatCurrency(fd.stockPurchases)}`, `-${fd.grossRevenue > 0 ? ((fd.stockPurchases / fd.grossRevenue) * 100).toFixed(1) : 0}%`],
       ['(-) Impostos (' + getTaxRegimeLabel(fd.taxRegime) + ')', `- ${formatCurrency(fd.taxAmount)}`, `-${fd.grossRevenue > 0 ? ((fd.taxAmount / fd.grossRevenue) * 100).toFixed(1) : 0}%`],
-      ['(=) LUCRO LÍQUIDO', formatCurrency(fd.netProfit), `${fd.grossRevenue > 0 ? ((fd.netProfit / fd.grossRevenue) * 100).toFixed(1) : 0}%`],
+      ['(=) LUCRO LÍQUIDO', formatCurrency(fd.netRevenue - fd.productCostSold - fd.fixedExpenses - fd.taxAmount), `${fd.grossRevenue > 0 ? (((fd.netRevenue - fd.productCostSold - fd.fixedExpenses - fd.taxAmount) / fd.grossRevenue) * 100).toFixed(1) : 0}%`],
     ];
 
     autoTable(doc, {
