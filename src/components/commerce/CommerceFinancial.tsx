@@ -554,24 +554,102 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
         orders: data.orders
       }));
 
-      // Calculate financial details
-      const grossRevenue = stats.monthlyRevenue;
-      const netRevenue = grossRevenue - operatorFees;
-      const netProfit = netRevenue - stats.productCostSold - totalFixedExpenses - totalStockPurchases - stats.taxAmount;
+      // Calculate financial details from fetched data (não usar stats que pode estar com período diferente)
+      // Calcular faturamento bruto diretamente dos cash_movements do período
+      const reportGrossRevenue = cashMovements?.reduce((sum, m) => sum + Number(m.amount), 0) || 0;
+      const reportTotalOrders = cashMovements?.length || 0;
+      const reportAvgTicket = reportTotalOrders > 0 ? reportGrossRevenue / reportTotalOrders : 0;
+      
+      // Fetch payment methods for fee calculation (para o período do relatório)
+      const { data: paymentMethods } = await supabase
+        .from('payment_methods')
+        .select('type, fee_percentage, fee_fixed')
+        .eq('commerce_id', commerceId)
+        .eq('is_active', true);
+
+      const feeMap = new Map(paymentMethods?.map(pm => [pm.type, { percentage: pm.fee_percentage || 0, fixed: pm.fee_fixed || 0 }]) || []);
+      
+      // Calcular taxas de operadoras para o período do relatório
+      let reportOperatorFees = 0;
+      cashMovements?.forEach(m => {
+        const fee = feeMap.get(m.payment_method);
+        if (fee) {
+          reportOperatorFees += (Number(m.amount) * fee.percentage / 100) + fee.fixed;
+        }
+      });
+      
+      // Fetch products for cost calculation
+      const { data: allProducts } = await supabase
+        .from('products')
+        .select('id, price, stock')
+        .eq('commerce_id', commerceId);
+      
+      // Calcular CPV (Custo dos Produtos Vendidos) para o período
+      // Usar uma estimativa baseada em margem média ou preço de custo se disponível
+      const reportProductCostSold = orderItems?.reduce((sum, item) => {
+        // Estimativa: custo = 60% do preço de venda (pode ser ajustado)
+        return sum + Number(item.total_price) * 0.6;
+      }, 0) || 0;
+      
+      // Calcular imposto para o período do relatório
+      let reportTaxAmount = 0;
+      if (taxConfig) {
+        if (taxConfig.tax_type === 'fixed') {
+          reportTaxAmount = taxConfig.tax_value;
+        } else {
+          reportTaxAmount = (reportGrossRevenue * taxConfig.tax_value) / 100;
+        }
+      }
+      
+      // Calculate growth rate (comparar com período anterior de mesmo tamanho)
+      const periodDays = Math.ceil((dateFilter.end.getTime() - dateFilter.start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      const previousStart = new Date(dateFilter.start);
+      previousStart.setDate(previousStart.getDate() - periodDays);
+      const previousEnd = new Date(dateFilter.start);
+      previousEnd.setDate(previousEnd.getDate() - 1);
+      
+      const { startISO: prevStartISO, endISO: prevEndISO } = getSupabaseDateRange(previousStart, previousEnd);
+      const { data: previousCashMovements } = await supabase
+        .from('cash_movements')
+        .select('amount')
+        .eq('commerce_id', commerceId)
+        .eq('type', 'sale')
+        .gte('created_at', prevStartISO)
+        .lte('created_at', prevEndISO);
+      
+      const previousRevenue = previousCashMovements?.reduce((sum, m) => sum + Number(m.amount), 0) || 0;
+      const reportGrowthRate = previousRevenue > 0 
+        ? ((reportGrossRevenue - previousRevenue) / previousRevenue) * 100 
+        : 0;
+      
+      const reportNetRevenue = reportGrossRevenue - reportOperatorFees;
+      const reportNetProfit = reportNetRevenue - reportProductCostSold - totalFixedExpenses - reportTaxAmount;
       
       // Business valuation: 12x monthly net profit
-      const monthlyNetProfit = netProfit > 0 ? netProfit : 0;
+      const monthlyNetProfit = reportNetProfit > 0 ? reportNetProfit : 0;
       const businessValuation = monthlyNetProfit * 12;
+      
+      // Projeção mensal baseada no período
+      const daysInPeriod = periodDays;
+      const reportProjectedRevenue = daysInPeriod > 0 ? (reportGrossRevenue / daysInPeriod) * 30 : 0;
+      
+      // Calcular valor em estoque atual (não depende do período)
+      const reportStockCostValue = allProducts?.reduce((sum, p) => sum + ((p.stock || 0) * (p.price * 0.6)), 0) || 0;
+      const reportStockSaleValue = allProducts?.reduce((sum, p) => sum + ((p.stock || 0) * p.price), 0) || 0;
+      const reportPotentialProfit = reportStockSaleValue - reportStockCostValue;
+      
+      // Calcular margem de lucro do período
+      const reportProfitMargin = reportGrossRevenue > 0 ? (reportNetProfit / reportGrossRevenue) * 100 : 0;
 
       await generateSalesReportPDF({
         commerceName: commerce.fantasy_name,
         logoUrl: commerce.logo_url,
         period: `${format(dateFilter.start, 'dd/MM/yyyy')} a ${format(dateFilter.end, 'dd/MM/yyyy')}`,
-        totalRevenue: stats.monthlyRevenue,
-        totalOrders: stats.totalOrders,
-        avgTicket: stats.avgTicket,
-        profitMargin: stats.profitMargin,
-        growthRate: stats.growthRate,
+        totalRevenue: reportGrossRevenue,
+        totalOrders: reportTotalOrders,
+        avgTicket: reportAvgTicket,
+        profitMargin: reportProfitMargin,
+        growthRate: reportGrowthRate,
         topCategories,
         paymentMethodBreakdown: Array.from(paymentMap.entries()).map(([method, data]) => ({
           method,
@@ -581,19 +659,19 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
         dailySales: dailySalesArray,
         weeklySales: weeklySalesArray,
         financialDetails: {
-          grossRevenue,
-          netRevenue,
-          operatorFees,
-          productCostSold: stats.productCostSold,
-          taxAmount: stats.taxAmount,
+          grossRevenue: reportGrossRevenue,
+          netRevenue: reportNetRevenue,
+          operatorFees: reportOperatorFees,
+          productCostSold: reportProductCostSold,
+          taxAmount: reportTaxAmount,
           taxRegime: taxConfig?.tax_regime || 'simples',
           taxPaymentDay: taxConfig?.tax_payment_day || 20,
           fixedExpenses: totalFixedExpenses,
-          stockPurchases: totalStockPurchases,
-          netProfit,
-          stockValue: stats.stockCostValue,
-          potentialStockProfit: stats.potentialProfit,
-          projectedRevenue: stats.projectedRevenue,
+          stockPurchases: 0,
+          netProfit: reportNetProfit,
+          stockValue: reportStockCostValue,
+          potentialStockProfit: reportPotentialProfit,
+          projectedRevenue: reportProjectedRevenue,
           businessValuation,
           expenses: fixedExpenses.map(e => ({
             name: e.name,
