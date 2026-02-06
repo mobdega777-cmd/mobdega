@@ -412,9 +412,15 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
 
       // For split bill mode, group items by participant
       const finalOrders = Array.from(ordersByTable.values()).map(tableOrder => {
+        const tableCouponDiscount = tableOrder.coupon_discount || 0;
+        
+        // Subtrair o desconto do cupom do total da mesa
+        if (tableCouponDiscount > 0) {
+          tableOrder.total = Math.max(0, tableOrder.total - tableCouponDiscount);
+        }
+        
         if (tableOrder.session?.bill_mode === 'split') {
           const participantOrdersMap = new Map<string, ParticipantOrder>();
-          const tableCouponDiscount = tableOrder.coupon_discount || 0;
           
           tableOrder.session.participants.forEach(participant => {
             const participantItems = tableOrder.items.filter(item => item.user_id === participant.user_id);
