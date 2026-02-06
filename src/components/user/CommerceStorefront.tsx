@@ -1132,25 +1132,23 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
 
     // If table has an active session, check if user can join (regardless of status)
     if (hasActiveSession) {
-      // Fetch session info
-      const { data: sessionData } = await supabase
-        .from('table_sessions')
-        .select('*')
-        .eq('id', currentTable.session_id)
-        .eq('status', 'active')
-        .single();
+      // Check if user is already a participant (this query is allowed by RLS)
+      const { data: existingParticipant } = await supabase
+        .from('table_participants')
+        .select('id, session_id')
+        .eq('session_id', currentTable.session_id)
+        .eq('user_id', user.id)
+        .maybeSingle();
 
-      if (sessionData) {
-        // Check if user is already a participant
-        const { data: existingParticipant } = await supabase
-          .from('table_participants')
-          .select('id')
-          .eq('session_id', sessionData.id)
-          .eq('user_id', user.id)
-          .maybeSingle();
-
-        if (existingParticipant) {
-          // User is already part of this session
+      if (existingParticipant) {
+        // User is already part of this session - fetch session data they can access
+        const { data: sessionData } = await supabase
+          .from('table_sessions')
+          .select('*')
+          .eq('id', currentTable.session_id)
+          .single();
+        
+        if (sessionData) {
           setSelectedTable({ ...table, status: 'occupied', session_id: sessionData.id });
           setCurrentSession(sessionData as TableSession);
           setOrderMode('table');
@@ -1158,28 +1156,31 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
           toast({ title: `Você já está na Mesa ${table.number}!` });
           return;
         }
+      }
 
-        // Fetch participants and host name
-        const { data: participants } = await supabase
-          .from('table_participants')
-          .select('*')
-          .eq('session_id', sessionData.id);
+      // Use RPC to get session info (bypasses RLS for joining purposes)
+      const { data: sessionInfoArray, error: sessionError } = await supabase
+        .rpc('get_session_info_for_join', { p_session_id: currentTable.session_id });
 
-        const hostParticipant = participants?.find(p => p.is_host);
-        let hostName = null;
-        if (hostParticipant) {
-          const { data: hostProfile } = await supabase
-            .from('profiles')
-            .select('full_name')
-            .eq('user_id', hostParticipant.user_id)
-            .maybeSingle();
-          hostName = hostProfile?.full_name || null;
-        }
+      const sessionInfo = sessionInfoArray?.[0];
+
+      if (sessionInfo && !sessionError) {
+        // Build session data for the modal
+        const sessionData: TableSession = {
+          id: sessionInfo.id,
+          table_id: sessionInfo.table_id,
+          commerce_id: sessionInfo.commerce_id,
+          bill_mode: sessionInfo.bill_mode as 'single' | 'split',
+          opened_at: sessionInfo.opened_at,
+          opened_by_user_id: sessionInfo.opened_by_user_id,
+          status: sessionInfo.status,
+          closed_at: null
+        };
 
         setPendingTable(table);
-        setCurrentSession(sessionData as TableSession);
-        setSessionParticipants((participants as TableParticipant[]) || []);
-        setSessionHostName(hostName);
+        setCurrentSession(sessionData);
+        setSessionParticipants([]); // Will be populated after join
+        setSessionHostName(sessionInfo.host_name);
         setShowTableModal(false);
         setShowJoinSessionModal(true);
         return;
@@ -2553,7 +2554,7 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
               </div>
             ))}
 
-            {/* Customer Info - Editable */}
+            {/* Customer Info - Locked for table orders when user is logged in */}
             <div className="border-t pt-4 space-y-3">
               <h4 className="font-semibold text-foreground">Seus Dados</h4>
               
@@ -2566,6 +2567,8 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
                     onChange={(e) => setCustomerName(e.target.value)}
                     placeholder="Seu nome"
                     className="mt-1"
+                    disabled={orderMode === 'table' && !!user}
+                    readOnly={orderMode === 'table' && !!user}
                   />
                 </div>
                 <div>
@@ -2576,6 +2579,8 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
                     onChange={(e) => setCustomerPhone(e.target.value)}
                     placeholder="(00) 00000-0000"
                     className="mt-1"
+                    disabled={orderMode === 'table' && !!user}
+                    readOnly={orderMode === 'table' && !!user}
                   />
                 </div>
               </div>
