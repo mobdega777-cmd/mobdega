@@ -2009,6 +2009,20 @@ export type Database = {
         Args: { _session_id: string }
         Returns: string
       }
+      get_session_info_for_join: {
+        Args: { p_session_id: string }
+        Returns: {
+          bill_mode: string
+          commerce_id: string
+          host_name: string
+          id: string
+          opened_at: string
+          opened_by_user_id: string
+          participants_count: number
+          status: string
+          table_id: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
