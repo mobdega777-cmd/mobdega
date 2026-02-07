@@ -300,6 +300,9 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
   const [sessionParticipants, setSessionParticipants] = useState<TableParticipant[]>([]);
   const [sessionHostName, setSessionHostName] = useState<string | null>(null);
   
+  // Pending bill mode - session will be created only when order is submitted
+  const [pendingBillMode, setPendingBillMode] = useState<'single' | 'split' | null>(null);
+  
   // Review form
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState("");
@@ -1111,6 +1114,13 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
       return;
     }
 
+    // If user had a pending table selection (not submitted), reset it
+    if (pendingBillMode && selectedTable && selectedTable.id !== table.id && !currentSession) {
+      setSelectedTable(null);
+      setPendingBillMode(null);
+      setOrderMode('none');
+    }
+
     // Double-check table status and get session info
     const { data: currentTable, error: currentTableError } = await supabase
       .from('tables')
@@ -1204,19 +1214,35 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
     fetchTables();
   };
 
-  // Create new session when user selects bill mode
+  // Store bill mode selection - session will be created only when order is submitted
   const handleBillModeSelect = async (mode: 'single' | 'split') => {
     if (!user || !pendingTable) return;
 
     setShowBillModeModal(false);
 
+    // Store the pending bill mode - session will be created when order is submitted
+    setPendingBillMode(mode);
+    setSelectedTable(pendingTable);
+    setOrderMode('table');
+    setPendingTable(null);
+    
+    toast({ 
+      title: `Mesa ${pendingTable.number} selecionada!`,
+      description: mode === 'single' ? 'Comanda única ativada' : 'Comandas separadas ativadas'
+    });
+  };
+  
+  // Create session and update table - called when order is submitted
+  const createTableSession = async (): Promise<TableSession | null> => {
+    if (!user || !selectedTable || !pendingBillMode) return null;
+    
     // Create the session
     const { data: sessionData, error: sessionError } = await supabase
       .from('table_sessions')
       .insert({
-        table_id: pendingTable.id,
+        table_id: selectedTable.id,
         commerce_id: commerceId,
-        bill_mode: mode,
+        bill_mode: pendingBillMode,
         opened_by_user_id: user.id,
         status: 'active'
       })
@@ -1225,8 +1251,7 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
 
     if (sessionError) {
       toast({ variant: "destructive", title: "Erro ao criar sessão", description: sessionError.message });
-      setPendingTable(null);
-      return;
+      return null;
     }
 
     // Add user as host participant
@@ -1251,21 +1276,19 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
         opened_at: new Date().toISOString(),
         session_id: sessionData.id
       })
-      .eq('id', pendingTable.id);
+      .eq('id', selectedTable.id);
 
     if (tableError) {
       toast({ variant: "destructive", title: "Erro ao atualizar mesa", description: tableError.message });
-      return;
+      return null;
     }
 
-    setSelectedTable({ ...pendingTable, status: 'occupied', session_id: sessionData.id });
+    // Update selected table with session info
+    setSelectedTable(prev => prev ? { ...prev, status: 'occupied', session_id: sessionData.id } : null);
     setCurrentSession(sessionData as TableSession);
-    setOrderMode('table');
-    setPendingTable(null);
-    toast({ 
-      title: `Mesa ${pendingTable.number} selecionada!`,
-      description: mode === 'single' ? 'Comanda única ativada' : 'Comandas separadas ativadas'
-    });
+    setPendingBillMode(null);
+    
+    return sessionData as TableSession;
   };
 
   // Join existing session
@@ -1483,6 +1506,17 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
 
     setSubmittingOrder(true);
 
+    // For table orders with pending bill mode, create session now
+    let sessionId: string | null = currentSession?.id || null;
+    if (orderMode === 'table' && pendingBillMode && !currentSession) {
+      const newSession = await createTableSession();
+      if (!newSession) {
+        setSubmittingOrder(false);
+        return;
+      }
+      sessionId = newSession.id;
+    }
+
     const subtotal = cartTotal;
     const total = orderTotal;
 
@@ -1493,6 +1527,7 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
         user_id: user.id,
         order_type: orderMode,
         table_id: selectedTable?.id || null,
+        session_id: sessionId,
         delivery_address: null,
         delivery_fee: 0,
         discount: couponDiscount,
@@ -1551,6 +1586,17 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
 
     setSubmittingOrder(true);
 
+    // For table orders with pending bill mode, create session now
+    let sessionId: string | null = currentSession?.id || null;
+    if (orderMode === 'table' && pendingBillMode && !currentSession) {
+      const newSession = await createTableSession();
+      if (!newSession) {
+        setSubmittingOrder(false);
+        return;
+      }
+      sessionId = newSession.id;
+    }
+
     const subtotal = cartTotal;
     const total = orderTotal;
     const fullAddress = orderMode === 'delivery' 
@@ -1564,6 +1610,7 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
         user_id: user.id,
         order_type: orderMode,
         table_id: selectedTable?.id || null,
+        session_id: sessionId,
         delivery_address: fullAddress,
         delivery_fee: orderMode === 'delivery' ? deliveryFee : 0,
         discount: couponDiscount,
@@ -2453,7 +2500,18 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
       </Dialog>
 
       {/* Table Selection Modal */}
-      <Dialog open={showTableModal} onOpenChange={setShowTableModal}>
+      <Dialog 
+        open={showTableModal} 
+        onOpenChange={(open) => {
+          setShowTableModal(open);
+          // Reset pending state when modal is closed without action
+          if (!open && !currentSession) {
+            setSelectedTable(null);
+            setPendingBillMode(null);
+            setOrderMode('none');
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Selecione uma Mesa</DialogTitle>
@@ -2978,7 +3036,14 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
         open={showBillModeModal}
         onOpenChange={(open) => {
           setShowBillModeModal(open);
-          if (!open) setPendingTable(null);
+          if (!open) {
+            setPendingTable(null);
+            // If modal was closed without selecting, reset table state
+            if (!pendingBillMode) {
+              setSelectedTable(null);
+              setOrderMode('none');
+            }
+          }
         }}
         tableNumber={pendingTable?.number || 0}
         onSelectMode={handleBillModeSelect}
