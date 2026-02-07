@@ -4,14 +4,16 @@ import {
   Play, 
   Video, 
   Loader2,
-  ExternalLink,
   BookOpen,
   Clock,
-  GraduationCap
+  GraduationCap,
+  X
 } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 
 interface TrainingVideo {
@@ -31,6 +33,7 @@ const CommerceTraining = ({ isPendingApproval = false }: CommerceTrainingProps) 
   const [videos, setVideos] = useState<TrainingVideo[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [selectedVideo, setSelectedVideo] = useState<TrainingVideo | null>(null);
 
   useEffect(() => {
     fetchVideos();
@@ -61,6 +64,14 @@ const CommerceTraining = ({ isPendingApproval = false }: CommerceTrainingProps) 
     const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
     const match = url.match(regex);
     return match ? match[1] : null;
+  };
+
+  const isDirectVideoUrl = (url: string): boolean => {
+    return url.includes('.mp4') || url.includes('.webm') || url.includes('.ogg') || url.includes('.mov');
+  };
+
+  const handleVideoClick = (video: TrainingVideo) => {
+    setSelectedVideo(video);
   };
 
   if (loading) {
@@ -152,7 +163,7 @@ const CommerceTraining = ({ isPendingApproval = false }: CommerceTrainingProps) 
                 transition={{ delay: index * 0.05 }}
               >
                 <Card className="overflow-hidden hover:border-primary/50 transition-colors cursor-pointer group"
-                  onClick={() => window.open(video.video_url, '_blank')}
+                  onClick={() => handleVideoClick(video)}
                 >
                   <div className="aspect-video bg-muted relative">
                     {thumbnail ? (
@@ -176,7 +187,7 @@ const CommerceTraining = ({ isPendingApproval = false }: CommerceTrainingProps) 
                   <CardContent className="p-4">
                     <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors flex items-center gap-2">
                       {video.title}
-                      <ExternalLink className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <Play className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" />
                     </h3>
                     {video.description && (
                       <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
@@ -190,6 +201,58 @@ const CommerceTraining = ({ isPendingApproval = false }: CommerceTrainingProps) 
           })}
         </div>
       )}
+
+      {/* Video Player Modal */}
+      <Dialog open={!!selectedVideo} onOpenChange={() => setSelectedVideo(null)}>
+        <DialogContent className="max-w-4xl w-full p-0 overflow-hidden">
+          <DialogHeader className="p-4 pb-0">
+            <DialogTitle className="flex items-center gap-2">
+              <Video className="w-5 h-5 text-primary" />
+              {selectedVideo?.title}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="p-4 pt-2">
+            {selectedVideo && (
+              <>
+                {isDirectVideoUrl(selectedVideo.video_url) ? (
+                  <video
+                    src={selectedVideo.video_url}
+                    controls
+                    autoPlay
+                    className="w-full aspect-video rounded-lg bg-black"
+                  >
+                    Seu navegador não suporta a reprodução de vídeos.
+                  </video>
+                ) : getYouTubeId(selectedVideo.video_url) ? (
+                  <iframe
+                    src={`https://www.youtube.com/embed/${getYouTubeId(selectedVideo.video_url)}?autoplay=1`}
+                    className="w-full aspect-video rounded-lg"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
+                ) : (
+                  <div className="flex flex-col items-center justify-center aspect-video bg-muted rounded-lg">
+                    <Video className="w-16 h-16 text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground">Formato de vídeo não suportado</p>
+                    <Button 
+                      variant="outline" 
+                      className="mt-4"
+                      onClick={() => window.open(selectedVideo.video_url, '_blank')}
+                    >
+                      Abrir em nova aba
+                    </Button>
+                  </div>
+                )}
+                {selectedVideo.description && (
+                  <p className="text-sm text-muted-foreground mt-4">
+                    {selectedVideo.description}
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
