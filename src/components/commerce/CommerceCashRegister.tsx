@@ -359,7 +359,10 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
       tableOrdersData.forEach(order => {
         const table = tableMap.get(order.table_id);
         const tableKey = order.table_id || order.id;
-        const session = table?.session_id ? sessionsMap.get(table.session_id) : null;
+
+        // Prefer session_id from the order (tables.session_id may be null after releasing the table)
+        const sessionIdToUse = (order.session_id as string | null) || table?.session_id || null;
+        const session = sessionIdToUse ? sessionsMap.get(sessionIdToUse) : null;
         
         // Add user_id to each item for participant filtering
         const itemsWithUserId = (order.order_items || []).map(item => ({
