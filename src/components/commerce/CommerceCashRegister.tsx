@@ -361,7 +361,7 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
 
       // Consolidar pedidos por sessão - agrupar itens de múltiplos pedidos na mesma sessão
       // Se não houver sessão, agrupa por mesa para manter compatibilidade
-      const ordersBySession = new Map<string, TableOrder & { all_order_ids: string[] }>();
+      const ordersBySession = new Map<string, TableOrder & { all_order_ids: string[]; couponsByUser: Map<string, number> }>();
       
       tableOrdersData.forEach(order => {
         const table = tableMap.get(order.table_id);
@@ -386,8 +386,10 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
           existingOrder.items = [...existingOrder.items, ...itemsWithUserId];
           existingOrder.total = Number(existingOrder.total) + Number(order.total);
           existingOrder.all_order_ids.push(order.id);
-          // Aggregate coupon discount
-          if (order.coupon_discount) {
+          // Aggregate coupon discount per user_id who applied the coupon
+          if (order.coupon_discount && order.coupon_discount > 0 && order.user_id) {
+            const currentUserDiscount = existingOrder.couponsByUser.get(order.user_id) || 0;
+            existingOrder.couponsByUser.set(order.user_id, currentUserDiscount + Number(order.coupon_discount));
             existingOrder.coupon_discount = (existingOrder.coupon_discount || 0) + Number(order.coupon_discount);
           }
           // Keep first coupon code found
@@ -402,6 +404,12 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
         } else {
           // Nova sessão
           const hasBillRequests = session?.participants.some(p => p.bill_requested) || false;
+          
+          // Initialize coupons by user map
+          const couponsByUser = new Map<string, number>();
+          if (order.coupon_discount && order.coupon_discount > 0 && order.user_id) {
+            couponsByUser.set(order.user_id, Number(order.coupon_discount));
+          }
           
           ordersBySession.set(groupKey, {
             id: order.id,
@@ -419,7 +427,8 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
             session: session || null,
             hasBillRequests,
             coupon_code: order.coupon_code || null,
-            coupon_discount: Number(order.coupon_discount) || 0
+            coupon_discount: Number(order.coupon_discount) || 0,
+            couponsByUser
           });
         }
       });
@@ -436,13 +445,17 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
         if (sessionOrder.session?.bill_mode === 'split') {
           const participantOrdersMap = new Map<string, ParticipantOrder>();
           
+          // Get the couponsByUser map (if available)
+          const couponsByUser = (sessionOrder as any).couponsByUser as Map<string, number> | undefined;
+          
           sessionOrder.session.participants.forEach(participant => {
             const participantItems = sessionOrder.items.filter(item => item.user_id === participant.user_id);
             let participantTotal = participantItems.reduce((sum, item) => sum + Number(item.total_price), 0);
             
-            // Aplicar o desconto do cupom inteiro ao host/solicitante
-            if (participant.is_host && tableCouponDiscount > 0) {
-              participantTotal = Math.max(0, participantTotal - tableCouponDiscount);
+            // Aplicar o desconto do cupom ao usuário que aplicou (não ao host)
+            const userCouponDiscount = couponsByUser?.get(participant.user_id) || 0;
+            if (userCouponDiscount > 0) {
+              participantTotal = Math.max(0, participantTotal - userCouponDiscount);
             }
             
             const participantOrderIds = [...new Set(
