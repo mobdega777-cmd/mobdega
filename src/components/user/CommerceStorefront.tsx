@@ -740,6 +740,9 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
       setActiveOrderCoupon({ code: couponCodes[0] || null, discount: combinedCouponDiscount });
       setOrderMode('table');
 
+      // Priority: Use session_id from order if available, otherwise from table
+      const sessionIdToUse = primaryOrder.session_id;
+
       // Fetch table info directly from database
       if (primaryOrder.table_id) {
         const { data: tableData } = await supabase
@@ -750,28 +753,28 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
         
         if (tableData) {
           setSelectedTable(tableData as Table);
+        }
+      }
+
+      // Fetch session info using the order's session_id (don't require session to be active)
+      // This allows bill requests even after table is released but order is still pending payment
+      if (sessionIdToUse) {
+        const { data: sessionData } = await supabase
+          .from('table_sessions')
+          .select('*')
+          .eq('id', sessionIdToUse)
+          .maybeSingle();
+        
+        if (sessionData) {
+          setCurrentSession(sessionData as TableSession);
           
-          // Fetch session info if there's an active session
-          if (tableData.session_id) {
-            const { data: sessionData } = await supabase
-              .from('table_sessions')
-              .select('*')
-              .eq('id', tableData.session_id)
-              .eq('status', 'active')
-              .maybeSingle();
-            
-            if (sessionData) {
-              setCurrentSession(sessionData as TableSession);
-              
-              // Fetch participants for this session
-              const { data: participants } = await supabase
-                .from('table_participants')
-                .select('*')
-                .eq('session_id', sessionData.id);
-              
-              setSessionParticipants((participants as TableParticipant[]) || []);
-            }
-          }
+          // Fetch participants for this session
+          const { data: participants } = await supabase
+            .from('table_participants')
+            .select('*')
+            .eq('session_id', sessionData.id);
+          
+          setSessionParticipants((participants as TableParticipant[]) || []);
         }
       }
 
