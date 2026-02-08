@@ -332,8 +332,8 @@ const AddToTabModal = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader>
+      <DialogContent className="max-w-lg max-h-[85vh] flex flex-col p-0">
+        <DialogHeader className="p-6 pb-2 flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <UtensilsCrossed className="w-5 h-5" />
             {hasPreselection && preSelectedTableNumber ? (
@@ -345,19 +345,19 @@ const AddToTabModal = ({
         </DialogHeader>
 
         {loading ? (
-          <div className="flex items-center justify-center py-8">
+          <div className="flex items-center justify-center py-8 px-6">
             <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
           </div>
         ) : activeSessions.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
+          <div className="text-center py-8 px-6 text-muted-foreground">
             <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
             <p>Nenhuma mesa/comanda ativa no momento</p>
             <p className="text-sm">Aguarde um cliente abrir uma mesa</p>
           </div>
         ) : (
-          <>
-            <ScrollArea className="flex-1 pr-4 max-h-[55vh]">
-              <div className="space-y-4">
+          <div className="flex flex-col flex-1 min-h-0">
+            <ScrollArea className="flex-1 px-6">
+              <div className="space-y-4 pb-2">
                 {/* Step 1: Select Table/Session - Hide if pre-selected */}
                 {!hasPreselection && (
                   <div className="space-y-2">
@@ -622,8 +622,8 @@ const AddToTabModal = ({
               </div>
             </ScrollArea>
 
-            {/* Submit Button - Outside ScrollArea for fixed position */}
-            <div className="pt-4 border-t mt-4 flex-shrink-0">
+            {/* Submit Button - Fixed at bottom */}
+            <div className="p-6 pt-4 border-t flex-shrink-0 bg-background">
               <Button
                 className="w-full gap-2"
                 size="lg"
@@ -639,7 +639,7 @@ const AddToTabModal = ({
                 {submitting ? "Adicionando..." : "Adicionar à Comanda"}
               </Button>
             </div>
-          </>
+          </div>
         )}
       </DialogContent>
     </Dialog>

@@ -1950,6 +1950,7 @@ export type Database = {
         Args: { _order_id: string }
         Returns: undefined
       }
+      can_manage_order: { Args: { _order_id: string }; Returns: boolean }
       get_commerce_email_by_document: {
         Args: { p_document: string }
         Returns: string
