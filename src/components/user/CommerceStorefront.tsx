@@ -439,16 +439,8 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
           filter: `commerce_id=eq.${commerceId}` 
         },
         (payload) => {
-          // Update the changed table in state - include both status and session_id
-          setTables(prev => prev.map(t => 
-            t.id === payload.new.id 
-              ? { 
-                  ...t, 
-                  status: payload.new.status as string,
-                  session_id: payload.new.session_id as string | null
-                }
-              : t
-          ));
+          // Recompute occupied tables via RPC (tables row may be reset to available while session stays active)
+          fetchTables();
         }
       )
       .on(
@@ -489,10 +481,11 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
           filter: `commerce_id=eq.${commerceId}` 
         },
         (payload) => {
-          // When a session is closed, refresh tables to update availability
+          // Any session status change can affect table availability (active/closed)
+          fetchTables();
+
+          // When a session is closed, clear local state if it was the user's current session
           if (payload.new.status === 'closed') {
-            // Immediately refetch tables to get updated session_id
-            fetchTables();
             
             // Use functional update to get current session value (avoid stale closure)
             setCurrentSession(prevSession => {

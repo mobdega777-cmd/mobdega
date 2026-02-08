@@ -1716,11 +1716,11 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
 
                         {/* Split Bill - Show participants separately */}
                         {isSplitBill && order.participantOrders && order.participantOrders.length > 0 ? (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div className="space-y-3">
                             {order.participantOrders.map((po) => (
                               <div 
                                 key={po.participant.id} 
-                                className={`p-3 rounded-lg border ${po.participant.bill_requested ? 'border-destructive bg-destructive/5' : 'border-border bg-muted/30'}`}
+                                className={`w-full max-w-[260px] p-3 rounded-lg border ${po.participant.bill_requested ? 'border-destructive bg-destructive/5' : 'border-border bg-muted/30'}`}
                               >
                                 {/* Header row - name and badges */}
                                 <div className="flex items-start justify-between gap-2 mb-1">
