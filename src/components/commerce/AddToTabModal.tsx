@@ -654,7 +654,7 @@ const AddToTabModal = ({
                       <ShoppingBag className="w-4 h-4" />
                       Itens na lista ({cartItems.length})
                     </h4>
-                    <div className="space-y-2">
+                    <div className="space-y-2 max-h-[150px] overflow-y-auto pr-1">
                       {cartItems.map((item, index) => (
                         <div key={index} className="flex items-center justify-between bg-background p-2 rounded-lg">
                           <div className="flex-1 min-w-0">
