@@ -851,13 +851,50 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
     };
   }, [user, selectedTable]);
 
-  // Re-check active orders when user changes or loading completes
+  // Clear all state and re-check orders when user changes
+  useEffect(() => {
+    // Clear all session/table state when user changes (including logout)
+    // This prevents state from leaking between different users on the same browser
+    const clearSessionState = () => {
+      setSelectedTable(null);
+      setCurrentSession(null);
+      setSessionParticipants([]);
+      setSessionHostName(null);
+      setPendingTable(null);
+      setPendingBillMode(null);
+      setOrderMode('none');
+      setCart([]);
+      setHasActiveTableOrder(false);
+      setActiveOrderId(null);
+      setActiveOrderTotal(0);
+      setActiveOrderCoupon(null);
+      setActiveOrderItems([]);
+      setCreatedOrderId(null);
+      setOrderStatus('pending');
+      setCouponCode('');
+      setCouponDiscount(0);
+      setCouponValid(null);
+      setCouponMessage(null);
+    };
+
+    // Always clear state first when user identity changes
+    clearSessionState();
+
+    // Then re-fetch active orders for the new user (if logged in)
+    if (user && !loading) {
+      checkActiveTableOrder();
+      checkActiveDeliveryOrder();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]); // Only depend on user.id to detect user changes
+
+  // Re-check orders when loading completes (initial page load)
   useEffect(() => {
     if (user && !loading) {
       checkActiveTableOrder();
       checkActiveDeliveryOrder();
     }
-  }, [user, loading]);
+  }, [loading]);
 
   // Realtime subscription for active delivery order status updates
   useEffect(() => {
