@@ -53,7 +53,8 @@ import {
   AlertTriangle,
   Users,
   Receipt,
-  Tag
+  Tag,
+  ClipboardList
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -62,6 +63,7 @@ import DateFilter, { getDateRange } from "./DateFilter";
 import { startOfDay, endOfDay, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { HelpTooltip } from "@/components/ui/help-tooltip";
+import AddToTabModal from "./AddToTabModal";
 
 interface CommerceCashRegisterProps {
   commerceId: string;
@@ -196,6 +198,9 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
   const [showCloseParticipantModal, setShowCloseParticipantModal] = useState(false);
   const [participantPaymentMethod, setParticipantPaymentMethod] = useState<string>("cash");
   const [participantCashReceived, setParticipantCashReceived] = useState("");
+
+  // Add to Tab modal
+  const [showAddToTabModal, setShowAddToTabModal] = useState(false);
 
   // Date filter state - usa data local para evitar problemas de fuso horário UTC
   const getLocalToday = () => {
@@ -1163,6 +1168,17 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
             </Dialog>
           ) : (
             <>
+              {/* Lançar em Comanda Button */}
+              <Button 
+                variant="outline" 
+                className="gap-2 text-sm border-primary text-primary hover:bg-primary hover:text-primary-foreground" 
+                size="sm"
+                onClick={() => setShowAddToTabModal(true)}
+              >
+                <ClipboardList className="w-4 h-4" />
+                <span className="hidden sm:inline">Lançar em</span> Comanda
+              </Button>
+
               {/* Lançar Venda Dialog */}
               <Dialog open={isSaleDialogOpen} onOpenChange={(open) => {
                 setIsSaleDialogOpen(open);
@@ -2355,6 +2371,14 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Add to Tab Modal */}
+      <AddToTabModal
+        open={showAddToTabModal}
+        onOpenChange={setShowAddToTabModal}
+        commerceId={commerceId}
+        onSuccess={fetchData}
+      />
     </div>
   );
 };
