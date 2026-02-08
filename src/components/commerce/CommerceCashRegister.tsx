@@ -475,6 +475,45 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
 
   useEffect(() => {
     fetchData();
+
+    // Subscribe to orders changes for real-time updates
+    const ordersChannel = supabase
+      .channel(`cash-register-orders-${commerceId}`)
+      .on(
+        'postgres_changes',
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'orders',
+          filter: `commerce_id=eq.${commerceId}` 
+        },
+        () => {
+          fetchData();
+        }
+      )
+      .subscribe();
+
+    // Subscribe to table_participants changes for real-time bill request alerts
+    const participantsChannel = supabase
+      .channel(`cash-register-participants-${commerceId}`)
+      .on(
+        'postgres_changes',
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'table_participants'
+        },
+        () => {
+          // Refetch data when any participant changes (bill_requested, etc.)
+          fetchData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(ordersChannel);
+      supabase.removeChannel(participantsChannel);
+    };
   }, [commerceId]);
 
   // Filter movements by date

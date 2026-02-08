@@ -241,19 +241,28 @@ const CommerceDashboard = () => {
   };
 
   const fetchBillRequests = async (commerceId: string) => {
-    // Fetch active sessions for this commerce with pending bill requests
-    const { data: sessions } = await supabase
-      .from('table_sessions')
-      .select('id')
+    // Fetch sessions from orders with pending payment (payment_method = 'pending')
+    // This ensures we see bill requests even after table is released
+    const { data: ordersData } = await supabase
+      .from('orders')
+      .select('session_id')
       .eq('commerce_id', commerceId)
-      .eq('status', 'active');
+      .eq('order_type', 'table')
+      .eq('payment_method', 'pending')
+      .not('session_id', 'is', null);
 
-    if (!sessions || sessions.length === 0) {
+    if (!ordersData || ordersData.length === 0) {
       setBillRequestsCount(0);
       return;
     }
 
-    const sessionIds = sessions.map(s => s.id);
+    const sessionIds = [...new Set(ordersData.map(o => o.session_id).filter(Boolean) as string[])];
+    
+    if (sessionIds.length === 0) {
+      setBillRequestsCount(0);
+      return;
+    }
+
     const { count } = await supabase
       .from('table_participants')
       .select('*', { count: 'exact', head: true })
@@ -318,6 +327,7 @@ const CommerceDashboard = () => {
           () => {
             fetchPendingOrders(commerce.id);
             fetchPendingDeliveryOrders(commerce.id);
+            fetchBillRequests(commerce.id); // Also refresh bill requests when orders change
           }
         )
         .subscribe();
