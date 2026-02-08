@@ -313,16 +313,17 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
 
       const tableMap = new Map(tablesData?.map(t => [t.id, t]) || []);
 
-      // Fetch sessions for these tables
-      const sessionIds = [...new Set(tablesData?.map(t => t.session_id).filter(Boolean) || [])];
+      // Fetch sessions for these orders - use session_id from orders, not from tables
+      // This ensures we get bill_requested even after table is released but payment is pending
+      const sessionIds = [...new Set(tableOrdersData.map(o => o.session_id).filter(Boolean) as string[])];
       let sessionsMap = new Map<string, TableSession>();
       
       if (sessionIds.length > 0) {
+        // Don't filter by status - we need to see bill requests even for closed sessions
         const { data: sessionsData } = await supabase
           .from('table_sessions')
           .select('id, bill_mode, status')
-          .in('id', sessionIds)
-          .eq('status', 'active');
+          .in('id', sessionIds);
 
         if (sessionsData) {
           // Fetch participants for these sessions
