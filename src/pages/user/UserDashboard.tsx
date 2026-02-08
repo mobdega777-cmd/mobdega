@@ -131,6 +131,7 @@ const UserDashboard = () => {
   
   const [profile, setProfile] = useState<Profile | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [ordersCount, setOrdersCount] = useState<number>(0);
   const [favorites, setFavorites] = useState<Favorite[]>([]);
   const [commerces, setCommerces] = useState<Commerce[]>([]);
   const [loading, setLoading] = useState(true);
@@ -247,12 +248,15 @@ const UserDashboard = () => {
   const fetchOrders = async () => {
     if (!user) return;
     
-    const { data, error } = await supabase
+    const { data, error, count } = await supabase
       .from('orders')
-      .select(`
+      .select(
+        `
         id, created_at, status, total, order_type,
         commerce:commerces(fantasy_name, logo_url)
-      `)
+      `,
+        { count: 'exact' }
+      )
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(50);
@@ -261,8 +265,9 @@ const UserDashboard = () => {
       console.error('Error fetching orders:', error);
       return;
     }
-    
+
     setOrders((data || []) as unknown as Order[]);
+    setOrdersCount(count ?? (data?.length ?? 0));
   };
 
   const fetchFavorites = async () => {
@@ -590,7 +595,7 @@ const UserDashboard = () => {
               onClick={() => setActiveTab('orders')}
             >
               <Package className="w-6 h-6 mx-auto text-primary mb-2" />
-              <p className="text-2xl font-bold text-foreground">{orders.length}</p>
+              <p className="text-2xl font-bold text-foreground">{ordersCount}</p>
               <p className="text-xs text-muted-foreground">Pedidos</p>
             </Card>
             <Card 
@@ -733,7 +738,7 @@ const UserDashboard = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {orders.length === 0 ? (
+                  {ordersCount === 0 ? (
                     <div className="text-center py-12 text-muted-foreground">
                       <ShoppingBag className="w-12 h-12 mx-auto mb-4 opacity-50" />
                       <p className="text-lg">Nenhum pedido ainda</p>
