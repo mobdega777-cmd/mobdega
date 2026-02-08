@@ -285,8 +285,9 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
       // when status becomes 'delivered'
       
       if (newStatus === 'delivered' && order) {
-        // Liberar a mesa se for pedido de mesa
-        if (order.order_type === 'table' && order.table_id) {
+        // Para pedidos de mesa com pagamento pendente (paga no final), NÃO liberar mesa/sessão aqui.
+        // A mesa deve permanecer ocupada até o fechamento da comanda no PDV.
+        if (order.order_type === 'table' && order.table_id && order.payment_method !== 'pending') {
           await releaseTableAndSession(order);
         }
 
@@ -312,6 +313,12 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
   // Helper function to release table and close its session
   const releaseTableAndSession = async (order: Order) => {
     if (!order.table_id) return;
+
+    // Para pedidos de mesa com pagamento pendente, a liberação é feita no PDV.
+    // Aqui só liberamos automaticamente quando NÃO é "pending" (ou em cancelamentos).
+    if (order.status === 'delivered' && order.payment_method === 'pending') {
+      return;
+    }
 
     // First, get the table to find its session_id
     const { data: tableData } = await supabase
