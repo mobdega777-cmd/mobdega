@@ -31,12 +31,25 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/formatCurrency";
 
+interface PreSelectedSessionData {
+  id: string;
+  table_id: string;
+  bill_mode: 'single' | 'split';
+  participants: Array<{
+    id: string;
+    user_id: string;
+    customer_name: string | null;
+    is_host: boolean;
+  }>;
+}
+
 interface AddToTabModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   commerceId: string;
   preSelectedSessionId?: string | null;
   preSelectedTableNumber?: number | null;
+  preSelectedSessionData?: PreSelectedSessionData | null;
   onSuccess?: () => void;
 }
 
@@ -72,6 +85,7 @@ const AddToTabModal = ({
   commerceId, 
   preSelectedSessionId,
   preSelectedTableNumber,
+  preSelectedSessionData,
   onSuccess 
 }: AddToTabModalProps) => {
   const [activeSessions, setActiveSessions] = useState<TableSession[]>([]);
@@ -88,7 +102,33 @@ const AddToTabModal = ({
 
   useEffect(() => {
     if (open) {
-      fetchData();
+      // If we have pre-selected session data, use it directly instead of fetching
+      if (preSelectedSessionData && preSelectedSessionId) {
+        const session: TableSession = {
+          id: preSelectedSessionData.id,
+          table_id: preSelectedSessionData.table_id,
+          table_number: preSelectedTableNumber || 0,
+          table_name: null,
+          bill_mode: preSelectedSessionData.bill_mode,
+          participants: preSelectedSessionData.participants.map(p => ({
+            ...p,
+            session_id: preSelectedSessionData.id
+          }))
+        };
+        setActiveSessions([session]);
+        setSelectedSession(session.id);
+        
+        // For single bill, auto-select the host participant
+        if (session.bill_mode === 'single') {
+          const host = session.participants.find(p => p.is_host);
+          if (host) setSelectedParticipant(host.id);
+        }
+        
+        // Only fetch products
+        fetchProducts();
+      } else {
+        fetchData();
+      }
     } else {
       // Reset form when closing
       setSelectedProduct(null);
@@ -97,11 +137,11 @@ const AddToTabModal = ({
       setSelectedSession("");
       setSelectedParticipant("");
     }
-  }, [open, commerceId]);
+  }, [open, commerceId, preSelectedSessionData, preSelectedSessionId]);
 
-  // Set pre-selected session when it changes
+  // Set pre-selected session when it changes (fallback for non-pre-loaded data)
   useEffect(() => {
-    if (preSelectedSessionId && activeSessions.length > 0) {
+    if (preSelectedSessionId && activeSessions.length > 0 && !preSelectedSessionData) {
       setSelectedSession(preSelectedSessionId);
       const session = activeSessions.find(s => s.id === preSelectedSessionId);
       // For single bill, auto-select the host participant
@@ -110,7 +150,20 @@ const AddToTabModal = ({
         if (host) setSelectedParticipant(host.id);
       }
     }
-  }, [preSelectedSessionId, activeSessions]);
+  }, [preSelectedSessionId, activeSessions, preSelectedSessionData]);
+
+  const fetchProducts = async () => {
+    setLoading(true);
+    const { data: productsData } = await supabase
+      .from('products')
+      .select('id, name, price, promotional_price, stock, category:categories(name)')
+      .eq('commerce_id', commerceId)
+      .eq('is_active', true)
+      .order('name');
+
+    setProducts(productsData || []);
+    setLoading(false);
+  };
 
   const fetchData = async () => {
     setLoading(true);

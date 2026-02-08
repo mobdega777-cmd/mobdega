@@ -2376,6 +2376,17 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
         commerceId={commerceId}
         preSelectedSessionId={selectedTableOrderForTab?.session?.id || null}
         preSelectedTableNumber={selectedTableOrderForTab?.table_number || null}
+        preSelectedSessionData={selectedTableOrderForTab?.session ? {
+          id: selectedTableOrderForTab.session.id,
+          table_id: selectedTableOrderForTab.table_id,
+          bill_mode: selectedTableOrderForTab.session.bill_mode,
+          participants: selectedTableOrderForTab.session.participants.map(p => ({
+            id: p.id,
+            user_id: p.user_id,
+            customer_name: p.customer_name,
+            is_host: p.is_host
+          }))
+        } : null}
         onSuccess={fetchData}
       />
     </div>
