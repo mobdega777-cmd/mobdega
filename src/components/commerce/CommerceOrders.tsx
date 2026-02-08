@@ -287,18 +287,18 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
       if (newStatus === 'delivered' && order) {
         // Liberar a mesa se for pedido de mesa
         if (order.order_type === 'table' && order.table_id) {
-          await supabase
-            .from('tables')
-            .update({ 
-              status: 'available', 
-              current_order_id: null,
-              closed_at: new Date().toISOString()
-            })
-            .eq('id', order.table_id);
+          await releaseTableAndSession(order);
         }
 
         // Criar movimentação de caixa automaticamente para consolidar vendas
         await createCashMovementForOrder(order);
+      }
+      
+      // Also release table when order is cancelled
+      if (newStatus === 'cancelled' && order) {
+        if (order.order_type === 'table' && order.table_id) {
+          await releaseTableAndSession(order);
+        }
       }
       
       toast({ title: "Status atualizado com sucesso!" });
@@ -307,6 +307,49 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
         setSelectedOrder({ ...selectedOrder, status: newStatus });
       }
     }
+  };
+
+  // Helper function to release table and close its session
+  const releaseTableAndSession = async (order: Order) => {
+    if (!order.table_id) return;
+
+    // First, get the table to find its session_id
+    const { data: tableData } = await supabase
+      .from('tables')
+      .select('session_id')
+      .eq('id', order.table_id)
+      .maybeSingle();
+
+    // If there's an active session, close it and reset participants
+    if (tableData?.session_id) {
+      // Reset bill_requested for all participants
+      await supabase
+        .from('table_participants')
+        .update({ 
+          bill_requested: false, 
+          bill_requested_at: null, 
+          selected_payment_method: null,
+          change_for: null
+        })
+        .eq('session_id', tableData.session_id);
+      
+      // Close the session
+      await supabase
+        .from('table_sessions')
+        .update({ status: 'closed', closed_at: new Date().toISOString() })
+        .eq('id', tableData.session_id);
+    }
+
+    // Release the table
+    await supabase
+      .from('tables')
+      .update({ 
+        status: 'available', 
+        session_id: null,
+        current_order_id: null,
+        closed_at: new Date().toISOString()
+      })
+      .eq('id', order.table_id);
   };
 
   // Função para criar cash_movement ao finalizar pedido
