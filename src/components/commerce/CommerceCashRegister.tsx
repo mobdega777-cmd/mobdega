@@ -1716,7 +1716,7 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
 
                         {/* Split Bill - Show participants separately */}
                         {isSplitBill && order.participantOrders && order.participantOrders.length > 0 ? (
-                          <div className="space-y-3">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             {order.participantOrders.map((po) => (
                               <div 
                                 key={po.participant.id} 

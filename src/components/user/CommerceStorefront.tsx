@@ -350,33 +350,30 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
       .eq('commerce_id', commerceId)
       .order('number');
     
-    if (tablesData) {
-      // For tables without session_id, check if there's an active session in table_sessions
-      const tablesWithoutSession = tablesData.filter(t => !t.session_id);
+    if (tablesData && tablesData.length > 0) {
+      // Use RPC to get active sessions for all tables (bypasses RLS safely)
+      const tableIds = tablesData.map(t => t.id);
+      const { data: activeSessions } = await supabase
+        .rpc('get_active_sessions_for_tables', { p_table_ids: tableIds });
       
-      if (tablesWithoutSession.length > 0) {
-        const { data: activeSessions } = await supabase
-          .from('table_sessions')
-          .select('id, table_id')
-          .in('table_id', tablesWithoutSession.map(t => t.id))
-          .eq('status', 'active');
+      if (activeSessions && activeSessions.length > 0) {
+        const sessionMap = new Map(activeSessions.map((s: { table_id: string; session_id: string }) => [s.table_id, s.session_id]));
         
-        if (activeSessions && activeSessions.length > 0) {
-          const sessionMap = new Map(activeSessions.map(s => [s.table_id, s.id]));
-          
-          // Update tables with active session info
-          const updatedTables = tablesData.map(t => {
-            if (!t.session_id && sessionMap.has(t.id)) {
-              return { ...t, session_id: sessionMap.get(t.id), status: 'occupied' as const };
-            }
-            return t;
-          });
-          
-          setTables(updatedTables as Table[]);
-          return;
-        }
+        // Update tables with active session info
+        const updatedTables = tablesData.map(t => {
+          const activeSessionId = sessionMap.get(t.id);
+          if (activeSessionId) {
+            return { ...t, session_id: activeSessionId, status: 'occupied' as const };
+          }
+          return t;
+        });
+        
+        setTables(updatedTables as Table[]);
+        return;
       }
       
+      setTables(tablesData as Table[]);
+    } else if (tablesData) {
       setTables(tablesData as Table[]);
     }
   };

@@ -1951,6 +1951,13 @@ export type Database = {
         Returns: undefined
       }
       can_manage_order: { Args: { _order_id: string }; Returns: boolean }
+      get_active_sessions_for_tables: {
+        Args: { p_table_ids: string[] }
+        Returns: {
+          session_id: string
+          table_id: string
+        }[]
+      }
       get_commerce_email_by_document: {
         Args: { p_document: string }
         Returns: string
