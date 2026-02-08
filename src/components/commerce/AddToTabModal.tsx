@@ -11,13 +11,6 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Accordion,
   AccordionContent,
   AccordionItem,
@@ -42,6 +35,8 @@ interface AddToTabModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   commerceId: string;
+  preSelectedSessionId?: string | null;
+  preSelectedTableNumber?: number | null;
   onSuccess?: () => void;
 }
 
@@ -71,7 +66,14 @@ interface TableSession {
   participants: TableParticipant[];
 }
 
-const AddToTabModal = ({ open, onOpenChange, commerceId, onSuccess }: AddToTabModalProps) => {
+const AddToTabModal = ({ 
+  open, 
+  onOpenChange, 
+  commerceId, 
+  preSelectedSessionId,
+  preSelectedTableNumber,
+  onSuccess 
+}: AddToTabModalProps) => {
   const [activeSessions, setActiveSessions] = useState<TableSession[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -87,8 +89,28 @@ const AddToTabModal = ({ open, onOpenChange, commerceId, onSuccess }: AddToTabMo
   useEffect(() => {
     if (open) {
       fetchData();
+    } else {
+      // Reset form when closing
+      setSelectedProduct(null);
+      setProductSearch("");
+      setQuantity(1);
+      setSelectedSession("");
+      setSelectedParticipant("");
     }
   }, [open, commerceId]);
+
+  // Set pre-selected session when it changes
+  useEffect(() => {
+    if (preSelectedSessionId && activeSessions.length > 0) {
+      setSelectedSession(preSelectedSessionId);
+      const session = activeSessions.find(s => s.id === preSelectedSessionId);
+      // For single bill, auto-select the host participant
+      if (session && session.bill_mode === 'single') {
+        const host = session.participants.find(p => p.is_host);
+        if (host) setSelectedParticipant(host.id);
+      }
+    }
+  }, [preSelectedSessionId, activeSessions]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -170,13 +192,17 @@ const AddToTabModal = ({ open, onOpenChange, commerceId, onSuccess }: AddToTabMo
 
     // Determine user_id for the order
     let targetUserId: string;
+    let targetCustomerName: string;
+    
     if (session.bill_mode === 'split' && selectedParticipant) {
       const participant = session.participants.find(p => p.id === selectedParticipant);
       targetUserId = participant?.user_id || user.id;
+      targetCustomerName = participant?.customer_name || 'Cliente';
     } else {
       // Single bill - use the host's user_id
       const host = session.participants.find(p => p.is_host);
       targetUserId = host?.user_id || session.participants[0]?.user_id || user.id;
+      targetCustomerName = host?.customer_name || session.participants[0]?.customer_name || 'Cliente';
     }
 
     setSubmitting(true);
@@ -198,9 +224,7 @@ const AddToTabModal = ({ open, onOpenChange, commerceId, onSuccess }: AddToTabMo
           subtotal: totalPrice,
           total: totalPrice,
           payment_method: 'pending',
-          customer_name: session.bill_mode === 'split' 
-            ? session.participants.find(p => p.id === selectedParticipant)?.customer_name 
-            : session.participants.find(p => p.is_host)?.customer_name || 'Cliente',
+          customer_name: targetCustomerName,
         })
         .select()
         .single();
@@ -230,8 +254,6 @@ const AddToTabModal = ({ open, onOpenChange, commerceId, onSuccess }: AddToTabMo
       setSelectedProduct(null);
       setProductSearch("");
       setQuantity(1);
-      setSelectedSession("");
-      setSelectedParticipant("");
       
       onSuccess?.();
       onOpenChange(false);
@@ -252,13 +274,20 @@ const AddToTabModal = ({ open, onOpenChange, commerceId, onSuccess }: AddToTabMo
 
   const selectedSessionData = activeSessions.find(s => s.id === selectedSession);
 
+  // Check if we have a pre-selected session
+  const hasPreselection = !!preSelectedSessionId;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <UtensilsCrossed className="w-5 h-5" />
-            Lançar em Comanda
+            {hasPreselection && preSelectedTableNumber ? (
+              <>Lançar em Comanda - Mesa {preSelectedTableNumber}</>
+            ) : (
+              <>Lançar em Comanda</>
+            )}
           </DialogTitle>
         </DialogHeader>
 
@@ -275,87 +304,125 @@ const AddToTabModal = ({ open, onOpenChange, commerceId, onSuccess }: AddToTabMo
         ) : (
           <ScrollArea className="flex-1 pr-4">
             <div className="space-y-4">
-              {/* Step 1: Select Table/Session */}
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2">
-                  <span className="bg-primary text-primary-foreground w-5 h-5 rounded-full text-xs flex items-center justify-center">1</span>
-                  Selecione a Mesa
-                </Label>
-                <Accordion type="single" collapsible className="border rounded-lg">
-                  {activeSessions.map((session) => (
-                    <AccordionItem key={session.id} value={session.id} className="border-0">
-                      <AccordionTrigger 
-                        className={`px-4 hover:no-underline ${selectedSession === session.id ? 'bg-primary/10' : ''}`}
-                        onClick={() => {
-                          setSelectedSession(session.id);
-                          setSelectedParticipant("");
-                        }}
-                      >
-                        <div className="flex items-center gap-3 text-left">
-                          {selectedSession === session.id && (
-                            <Check className="w-4 h-4 text-primary" />
-                          )}
-                          <div>
-                            <p className="font-medium">
-                              Mesa {session.table_number}
-                              {session.table_name && ` - ${session.table_name}`}
-                            </p>
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                              <Badge variant={session.bill_mode === 'split' ? 'secondary' : 'outline'} className="text-xs">
-                                {session.bill_mode === 'split' ? 'Comanda Separada' : 'Comanda Única'}
-                              </Badge>
-                              <span>{session.participants.length} pessoa(s)</span>
+              {/* Step 1: Select Table/Session - Hide if pre-selected */}
+              {!hasPreselection && (
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <span className="bg-primary text-primary-foreground w-5 h-5 rounded-full text-xs flex items-center justify-center">1</span>
+                    Selecione a Mesa
+                  </Label>
+                  <Accordion type="single" collapsible className="border rounded-lg">
+                    {activeSessions.map((session) => (
+                      <AccordionItem key={session.id} value={session.id} className="border-0">
+                        <AccordionTrigger 
+                          className={`px-4 hover:no-underline ${selectedSession === session.id ? 'bg-primary/10' : ''}`}
+                          onClick={() => {
+                            setSelectedSession(session.id);
+                            setSelectedParticipant("");
+                          }}
+                        >
+                          <div className="flex items-center gap-3 text-left">
+                            {selectedSession === session.id && (
+                              <Check className="w-4 h-4 text-primary" />
+                            )}
+                            <div>
+                              <p className="font-medium">
+                                Mesa {session.table_number}
+                                {session.table_name && ` - ${session.table_name}`}
+                              </p>
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <Badge variant={session.bill_mode === 'split' ? 'secondary' : 'outline'} className="text-xs">
+                                  {session.bill_mode === 'split' ? 'Comanda Separada' : 'Comanda Única'}
+                                </Badge>
+                                <span>{session.participants.length} pessoa(s)</span>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      </AccordionTrigger>
-                      <AccordionContent className="px-4 pb-3">
-                        <div className="space-y-2">
-                          {session.participants.map((participant) => (
-                            <div 
-                              key={participant.id}
-                              className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${
-                                session.bill_mode === 'split' 
-                                  ? selectedParticipant === participant.id 
-                                    ? 'bg-primary/20 border border-primary' 
-                                    : 'bg-muted/50 hover:bg-muted'
-                                  : 'bg-muted/50'
-                              }`}
-                              onClick={() => {
-                                if (session.bill_mode === 'split') {
-                                  setSelectedSession(session.id);
-                                  setSelectedParticipant(participant.id);
-                                }
-                              }}
-                            >
-                              <User className="w-4 h-4 text-muted-foreground" />
-                              <span className="text-sm">
-                                {participant.customer_name}
-                                {participant.is_host && (
-                                  <Badge variant="outline" className="ml-2 text-xs">Anfitrião</Badge>
+                        </AccordionTrigger>
+                        <AccordionContent className="px-4 pb-3">
+                          <div className="space-y-2">
+                            {session.participants.map((participant) => (
+                              <div 
+                                key={participant.id}
+                                className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${
+                                  session.bill_mode === 'split' 
+                                    ? selectedParticipant === participant.id 
+                                      ? 'bg-primary/20 border border-primary' 
+                                      : 'bg-muted/50 hover:bg-muted'
+                                    : 'bg-muted/50'
+                                }`}
+                                onClick={() => {
+                                  if (session.bill_mode === 'split') {
+                                    setSelectedSession(session.id);
+                                    setSelectedParticipant(participant.id);
+                                  }
+                                }}
+                              >
+                                <User className="w-4 h-4 text-muted-foreground" />
+                                <span className="text-sm">
+                                  {participant.customer_name}
+                                  {participant.is_host && (
+                                    <Badge variant="outline" className="ml-2 text-xs">Anfitrião</Badge>
+                                  )}
+                                </span>
+                                {session.bill_mode === 'split' && selectedParticipant === participant.id && (
+                                  <Check className="w-4 h-4 text-primary ml-auto" />
                                 )}
-                              </span>
-                              {session.bill_mode === 'split' && selectedParticipant === participant.id && (
-                                <Check className="w-4 h-4 text-primary ml-auto" />
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                        {session.bill_mode === 'split' && (
-                          <p className="text-xs text-muted-foreground mt-2">
-                            Selecione o cliente para adicionar o item
-                          </p>
+                              </div>
+                            ))}
+                          </div>
+                          {session.bill_mode === 'split' && (
+                            <p className="text-xs text-muted-foreground mt-2">
+                              Selecione o cliente para adicionar o item
+                            </p>
+                          )}
+                        </AccordionContent>
+                      </AccordionItem>
+                    ))}
+                  </Accordion>
+                </div>
+              )}
+
+              {/* Show participant selector for pre-selected split bill */}
+              {hasPreselection && selectedSessionData?.bill_mode === 'split' && (
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <span className="bg-primary text-primary-foreground w-5 h-5 rounded-full text-xs flex items-center justify-center">1</span>
+                    Selecione o Cliente
+                  </Label>
+                  <div className="space-y-2 border rounded-lg p-3">
+                    {selectedSessionData.participants.map((participant) => (
+                      <div 
+                        key={participant.id}
+                        className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${
+                          selectedParticipant === participant.id 
+                            ? 'bg-primary/20 border border-primary' 
+                            : 'bg-muted/50 hover:bg-muted'
+                        }`}
+                        onClick={() => setSelectedParticipant(participant.id)}
+                      >
+                        <User className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm">
+                          {participant.customer_name}
+                          {participant.is_host && (
+                            <Badge variant="outline" className="ml-2 text-xs">Anfitrião</Badge>
+                          )}
+                        </span>
+                        {selectedParticipant === participant.id && (
+                          <Check className="w-4 h-4 text-primary ml-auto" />
                         )}
-                      </AccordionContent>
-                    </AccordionItem>
-                  ))}
-                </Accordion>
-              </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Step 2: Select Product */}
               <div className="space-y-2">
                 <Label className="flex items-center gap-2">
-                  <span className="bg-primary text-primary-foreground w-5 h-5 rounded-full text-xs flex items-center justify-center">2</span>
+                  <span className="bg-primary text-primary-foreground w-5 h-5 rounded-full text-xs flex items-center justify-center">
+                    {hasPreselection && selectedSessionData?.bill_mode !== 'split' ? '1' : hasPreselection ? '2' : '2'}
+                  </span>
                   Selecione o Produto
                 </Label>
                 <div className="relative">
@@ -370,6 +437,7 @@ const AddToTabModal = ({ open, onOpenChange, commerceId, onSuccess }: AddToTabMo
                     }}
                     placeholder="Buscar produto..."
                     className="pl-10"
+                    autoFocus={hasPreselection}
                   />
                 </div>
                 {productSearch && !selectedProduct && (
@@ -428,7 +496,9 @@ const AddToTabModal = ({ open, onOpenChange, commerceId, onSuccess }: AddToTabMo
               {selectedProduct && (
                 <div className="space-y-2">
                   <Label className="flex items-center gap-2">
-                    <span className="bg-primary text-primary-foreground w-5 h-5 rounded-full text-xs flex items-center justify-center">3</span>
+                    <span className="bg-primary text-primary-foreground w-5 h-5 rounded-full text-xs flex items-center justify-center">
+                      {hasPreselection && selectedSessionData?.bill_mode !== 'split' ? '2' : hasPreselection ? '3' : '3'}
+                    </span>
                     Quantidade
                   </Label>
                   <div className="flex items-center gap-3">

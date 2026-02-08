@@ -201,6 +201,7 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
 
   // Add to Tab modal
   const [showAddToTabModal, setShowAddToTabModal] = useState(false);
+  const [selectedTableOrderForTab, setSelectedTableOrderForTab] = useState<TableOrder | null>(null);
 
   // Date filter state - usa data local para evitar problemas de fuso horário UTC
   const getLocalToday = () => {
@@ -1168,17 +1169,6 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
             </Dialog>
           ) : (
             <>
-              {/* Lançar em Comanda Button */}
-              <Button 
-                variant="outline" 
-                className="gap-2 text-sm border-primary text-primary hover:bg-primary hover:text-primary-foreground" 
-                size="sm"
-                onClick={() => setShowAddToTabModal(true)}
-              >
-                <ClipboardList className="w-4 h-4" />
-                <span className="hidden sm:inline">Lançar em</span> Comanda
-              </Button>
-
               {/* Lançar Venda Dialog */}
               <Dialog open={isSaleDialogOpen} onOpenChange={(open) => {
                 setIsSaleDialogOpen(open);
@@ -1889,16 +1879,17 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
                           <span className="text-lg font-bold text-primary">{formatCurrency(order.total)}</span>
                         </div>
 
-                        {/* Actions - for single bill only */}
-                        {!isSplitBill && (
-                          <div className="grid grid-cols-2 gap-2">
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => openTableOrderDetails(order)}
-                            >
-                              Ver Detalhes
-                            </Button>
+                        {/* Actions Row 1: Ver Detalhes | Fechar Mesa */}
+                        <div className="grid grid-cols-2 gap-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => openTableOrderDetails(order)}
+                          >
+                            <Eye className="w-4 h-4 mr-1" />
+                            Ver Detalhes
+                          </Button>
+                          {!isSplitBill ? (
                             <Button 
                               size="sm"
                               onClick={() => openCloseTableModal(order)}
@@ -1906,19 +1897,7 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
                             >
                               Fechar Mesa
                             </Button>
-                          </div>
-                        )}
-                        
-                        {/* For split bills - view details and unify option */}
-                        {isSplitBill && (
-                          <div className="grid grid-cols-2 gap-2">
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => openTableOrderDetails(order)}
-                            >
-                              Ver Detalhes
-                            </Button>
+                          ) : (
                             <Button 
                               variant="secondary"
                               size="sm"
@@ -1927,18 +1906,33 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
                             >
                               Unificar Contas
                             </Button>
-                          </div>
-                        )}
+                          )}
+                        </div>
                         
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
-                          onClick={() => cancelTableOrder(order)}
-                        >
-                          <XCircle className="w-4 h-4 mr-2" />
-                          Cancelar Mesa
-                        </Button>
+                        {/* Actions Row 2: Lançar em Comanda | Cancelar Mesa */}
+                        <div className="grid grid-cols-2 gap-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            className="border-primary text-primary hover:bg-primary hover:text-primary-foreground"
+                            onClick={() => {
+                              setSelectedTableOrderForTab(order);
+                              setShowAddToTabModal(true);
+                            }}
+                          >
+                            <ClipboardList className="w-4 h-4 mr-1" />
+                            Lançar em Comanda
+                          </Button>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="text-destructive border-destructive hover:bg-destructive hover:text-destructive-foreground"
+                            onClick={() => cancelTableOrder(order)}
+                          >
+                            <XCircle className="w-4 h-4 mr-1" />
+                            Cancelar Mesa
+                          </Button>
+                        </div>
                       </CardContent>
                     </Card>
                   );
@@ -2375,8 +2369,13 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
       {/* Add to Tab Modal */}
       <AddToTabModal
         open={showAddToTabModal}
-        onOpenChange={setShowAddToTabModal}
+        onOpenChange={(open) => {
+          setShowAddToTabModal(open);
+          if (!open) setSelectedTableOrderForTab(null);
+        }}
         commerceId={commerceId}
+        preSelectedSessionId={selectedTableOrderForTab?.session?.id || null}
+        preSelectedTableNumber={selectedTableOrderForTab?.table_number || null}
         onSuccess={fetchData}
       />
     </div>
