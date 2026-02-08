@@ -98,38 +98,56 @@ const CommerceCustomers = ({ commerceId }: CommerceCustomersProps) => {
   const fetchCustomers = async () => {
     setLoading(true);
 
-    // First, fetch all orders for this commerce to get unique customers
-    const { data: ordersData, error: ordersError } = await supabase
-      .from('orders')
-      .select('user_id, total, status, created_at')
-      .eq('commerce_id', commerceId)
-      .neq('status', 'cancelled');
-
-    if (ordersError) {
-      console.error('Error fetching orders:', ordersError);
-      setLoading(false);
-      return;
-    }
-
-    // Get unique user IDs
+    // Fetch all orders for this commerce using pagination to bypass 1000 row limit
     const userOrderStats = new Map<string, { total: number; count: number; lastDate: string }>();
-    
-    ordersData?.forEach(order => {
-      const existing = userOrderStats.get(order.user_id);
-      if (existing) {
-        existing.total += Number(order.total);
-        existing.count += 1;
-        if (order.created_at > existing.lastDate) {
-          existing.lastDate = order.created_at;
-        }
-      } else {
-        userOrderStats.set(order.user_id, {
-          total: Number(order.total),
-          count: 1,
-          lastDate: order.created_at
-        });
+    let page = 0;
+    const pageSize = 1000;
+    let hasMore = true;
+
+    while (hasMore) {
+      const from = page * pageSize;
+      const to = from + pageSize - 1;
+
+      const { data: ordersData, error: ordersError } = await supabase
+        .from('orders')
+        .select('user_id, total, status, created_at')
+        .eq('commerce_id', commerceId)
+        .neq('status', 'cancelled')
+        .range(from, to);
+
+      if (ordersError) {
+        console.error('Error fetching orders:', ordersError);
+        setLoading(false);
+        return;
       }
-    });
+
+      if (!ordersData || ordersData.length === 0) {
+        hasMore = false;
+      } else {
+        ordersData.forEach(order => {
+          const existing = userOrderStats.get(order.user_id);
+          if (existing) {
+            existing.total += Number(order.total);
+            existing.count += 1;
+            if (order.created_at > existing.lastDate) {
+              existing.lastDate = order.created_at;
+            }
+          } else {
+            userOrderStats.set(order.user_id, {
+              total: Number(order.total),
+              count: 1,
+              lastDate: order.created_at
+            });
+          }
+        });
+
+        if (ordersData.length < pageSize) {
+          hasMore = false;
+        } else {
+          page++;
+        }
+      }
+    }
 
     const userIds = Array.from(userOrderStats.keys());
 
@@ -187,10 +205,10 @@ const CommerceCustomers = ({ commerceId }: CommerceCustomersProps) => {
     const from = (page - 1) * ORDERS_PER_PAGE;
     const to = from + ORDERS_PER_PAGE - 1;
 
-    // Get total count
+    // Get total count (sem limite)
     const { count } = await supabase
       .from('orders')
-      .select('*', { count: 'exact', head: true })
+      .select('id', { count: 'exact', head: true })
       .eq('commerce_id', commerceId)
       .eq('user_id', userId);
 

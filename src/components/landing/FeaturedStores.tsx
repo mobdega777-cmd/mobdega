@@ -436,26 +436,6 @@ const FeaturedStores = () => {
           </div>
         )}
 
-        {/* Platform Stats */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.5, delay: 0.4 }}
-          className="text-center mt-12 space-y-4"
-        >
-          <div className="bg-card rounded-xl p-4 shadow-card max-w-md mx-auto">
-            <p className="text-muted-foreground">
-              <span className="font-bold text-primary text-xl">{totalCommerces.toLocaleString('pt-BR')}</span> comércios cadastrados na plataforma
-            </p>
-          </div>
-          
-          <div className="bg-card rounded-xl p-4 shadow-card max-w-md mx-auto">
-            <p className="text-muted-foreground">
-              <span className="font-bold text-secondary text-xl">{totalUsers.toLocaleString('pt-BR')}</span> usuários cadastrados na plataforma
-            </p>
-          </div>
-        </motion.div>
       </div>
     </section>
   );

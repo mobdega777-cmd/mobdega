@@ -102,7 +102,7 @@ const orderTypeLabels: Record<string, string> = {
   delivery: "Delivery",
   pickup: "Retirada",
   table: "Mesa",
-  pos: "PDV/Caixa",
+  pos: "Venda",
 };
 
 const paymentMethodLabels: Record<string, string> = {
