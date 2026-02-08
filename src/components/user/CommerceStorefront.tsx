@@ -299,6 +299,7 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
   const [currentSession, setCurrentSession] = useState<TableSession | null>(null);
   const [sessionParticipants, setSessionParticipants] = useState<TableParticipant[]>([]);
   const [sessionHostName, setSessionHostName] = useState<string | null>(null);
+  const [sessionParticipantsCount, setSessionParticipantsCount] = useState<number>(0);
   
   // Pending bill mode - session will be created only when order is submitted
   const [pendingBillMode, setPendingBillMode] = useState<'single' | 'split' | null>(null);
@@ -863,6 +864,7 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
       setCurrentSession(null);
       setSessionParticipants([]);
       setSessionHostName(null);
+      setSessionParticipantsCount(0);
       setPendingTable(null);
       setPendingBillMode(null);
       setOrderMode('none');
@@ -1231,6 +1233,7 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
         setCurrentSession(sessionData);
         setSessionParticipants([]); // Will be populated after join
         setSessionHostName(sessionInfo.host_name);
+        setSessionParticipantsCount(Number(sessionInfo.participants_count) || 0);
         setShowTableModal(false);
         setShowJoinSessionModal(true);
         return;
@@ -1366,6 +1369,7 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
     setCurrentSession(null);
     setSessionParticipants([]);
     setSessionHostName(null);
+    setSessionParticipantsCount(0);
   };
 
   // Handle request bill - opens payment method selection modal
@@ -2544,6 +2548,10 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
         open={showTableModal} 
         onOpenChange={(open) => {
           setShowTableModal(open);
+          // Refresh tables when opening the modal to ensure latest session status
+          if (open) {
+            fetchTables();
+          }
           // Reset pending state when modal is closed without action
           if (!open && !currentSession) {
             setSelectedTable(null);
@@ -3097,9 +3105,10 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
           if (!open) handleCancelJoinSession();
         }}
         tableNumber={pendingTable?.number || 0}
+        tableName={pendingTable?.name}
         hostName={sessionHostName}
         billMode={currentSession?.bill_mode || 'single'}
-        participantsCount={sessionParticipants.length}
+        participantsCount={sessionParticipantsCount || sessionParticipants.length}
         onJoin={handleJoinSession}
         onCancel={handleCancelJoinSession}
       />
