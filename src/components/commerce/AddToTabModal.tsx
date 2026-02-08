@@ -24,7 +24,8 @@ import {
   Plus,
   Minus,
   ShoppingBag,
-  Check
+  Check,
+  Trash2
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -79,6 +80,13 @@ interface TableSession {
   participants: TableParticipant[];
 }
 
+interface CartItem {
+  product: Product;
+  quantity: number;
+  unitPrice: number;
+  totalPrice: number;
+}
+
 const AddToTabModal = ({ 
   open, 
   onOpenChange, 
@@ -97,6 +105,7 @@ const AddToTabModal = ({
   const [selectedSession, setSelectedSession] = useState<string>("");
   const [selectedParticipant, setSelectedParticipant] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const { user } = useAuth();
   const { toast } = useToast();
 
@@ -136,6 +145,7 @@ const AddToTabModal = ({
       setQuantity(1);
       setSelectedSession("");
       setSelectedParticipant("");
+      setCartItems([]);
     }
   }, [open, commerceId, preSelectedSessionData, preSelectedSessionId]);
 
@@ -237,8 +247,47 @@ const AddToTabModal = ({
     setProductSearch(product.name);
   };
 
+  const handleAddToCart = () => {
+    if (!selectedProduct) return;
+    
+    const salePrice = selectedProduct.promotional_price || selectedProduct.price;
+    
+    // Check if product already in cart
+    const existingIndex = cartItems.findIndex(item => item.product.id === selectedProduct.id);
+    
+    if (existingIndex >= 0) {
+      // Update existing item quantity
+      const updatedItems = [...cartItems];
+      updatedItems[existingIndex].quantity += quantity;
+      updatedItems[existingIndex].totalPrice = updatedItems[existingIndex].unitPrice * updatedItems[existingIndex].quantity;
+      setCartItems(updatedItems);
+    } else {
+      // Add new item
+      setCartItems([...cartItems, {
+        product: selectedProduct,
+        quantity,
+        unitPrice: salePrice,
+        totalPrice: salePrice * quantity
+      }]);
+    }
+    
+    // Reset product selection for next addition
+    setSelectedProduct(null);
+    setProductSearch("");
+    setQuantity(1);
+    
+    toast({
+      title: "Item adicionado à lista",
+      description: `${quantity}x ${selectedProduct.name}`,
+    });
+  };
+
+  const handleRemoveFromCart = (index: number) => {
+    setCartItems(cartItems.filter((_, i) => i !== index));
+  };
+
   const handleAddToTab = async () => {
-    if (!selectedProduct || !selectedSession || !user) return;
+    if (cartItems.length === 0 || !selectedSession || !user) return;
 
     const session = activeSessions.find(s => s.id === selectedSession);
     if (!session) return;
@@ -261,10 +310,9 @@ const AddToTabModal = ({
     setSubmitting(true);
 
     try {
-      const salePrice = selectedProduct.promotional_price || selectedProduct.price;
-      const totalPrice = salePrice * quantity;
+      const totalOrder = cartItems.reduce((sum, item) => sum + item.totalPrice, 0);
 
-      // Create order for this item
+      // Create a single order for all items
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
         .insert({
@@ -274,8 +322,8 @@ const AddToTabModal = ({
           session_id: session.id,
           order_type: 'table',
           status: 'delivered',
-          subtotal: totalPrice,
-          total: totalPrice,
+          subtotal: totalOrder,
+          total: totalOrder,
           payment_method: 'pending',
           customer_name: targetCustomerName,
         })
@@ -284,26 +332,30 @@ const AddToTabModal = ({
 
       if (orderError) throw orderError;
 
-      // Create order item
-      const { error: itemError } = await supabase
+      // Create all order items
+      const orderItems = cartItems.map(item => ({
+        order_id: orderData.id,
+        product_id: item.product.id,
+        product_name: item.product.name,
+        quantity: item.quantity,
+        unit_price: item.unitPrice,
+        total_price: item.totalPrice,
+      }));
+
+      const { error: itemsError } = await supabase
         .from('order_items')
-        .insert({
-          order_id: orderData.id,
-          product_id: selectedProduct.id,
-          product_name: selectedProduct.name,
-          quantity: quantity,
-          unit_price: salePrice,
-          total_price: totalPrice,
-        });
+        .insert(orderItems);
 
-      if (itemError) throw itemError;
+      if (itemsError) throw itemsError;
 
+      const itemsText = cartItems.map(item => `${item.quantity}x ${item.product.name}`).join(', ');
       toast({
-        title: "Item adicionado!",
-        description: `${quantity}x ${selectedProduct.name} adicionado à comanda da Mesa ${session.table_number}`,
+        title: "Itens adicionados!",
+        description: `${itemsText} adicionados à comanda da Mesa ${session.table_number}`,
       });
 
       // Reset form
+      setCartItems([]);
       setSelectedProduct(null);
       setProductSearch("");
       setQuantity(1);
@@ -313,7 +365,7 @@ const AddToTabModal = ({
     } catch (error: any) {
       toast({
         variant: "destructive",
-        title: "Erro ao adicionar item",
+        title: "Erro ao adicionar itens",
         description: error.message
       });
     } finally {
@@ -326,13 +378,12 @@ const AddToTabModal = ({
   );
 
   const selectedSessionData = activeSessions.find(s => s.id === selectedSession);
-
-  // Check if we have a pre-selected session
   const hasPreselection = !!preSelectedSessionId;
+  const cartTotal = cartItems.reduce((sum, item) => sum + item.totalPrice, 0);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[85vh] flex flex-col p-0">
+      <DialogContent className="max-w-lg max-h-[85vh] flex flex-col p-0 overflow-hidden">
         <DialogHeader className="p-6 pb-2 flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <UtensilsCrossed className="w-5 h-5" />
@@ -355,9 +406,9 @@ const AddToTabModal = ({
             <p className="text-sm">Aguarde um cliente abrir uma mesa</p>
           </div>
         ) : (
-          <div className="flex flex-col flex-1 min-h-0">
-            <ScrollArea className="flex-1 px-6">
-              <div className="space-y-4 pb-2">
+          <div className="flex flex-col flex-1 overflow-hidden">
+            <ScrollArea className="flex-1 min-h-0">
+              <div className="px-6 space-y-4 pb-4">
                 {/* Step 1: Select Table/Session - Hide if pre-selected */}
                 {!hasPreselection && (
                   <div className="space-y-2">
@@ -512,16 +563,9 @@ const AddToTabModal = ({
                                   <p className="text-xs text-muted-foreground">{product.category.name}</p>
                                 )}
                               </div>
-                              <div className="text-right">
-                                {product.promotional_price ? (
-                                  <>
-                                    <p className="text-xs line-through text-muted-foreground">{formatCurrency(product.price)}</p>
-                                    <p className="font-semibold text-primary">{formatCurrency(product.promotional_price)}</p>
-                                  </>
-                                ) : (
-                                  <p className="font-semibold text-primary">{formatCurrency(product.price)}</p>
-                                )}
-                              </div>
+                              <p className="font-semibold text-primary">
+                                {formatCurrency(product.promotional_price || product.price)}
+                              </p>
                             </div>
                           </div>
                         ))
@@ -554,7 +598,7 @@ const AddToTabModal = ({
                   )}
                 </div>
 
-                {/* Quantity Selector */}
+                {/* Quantity Selector + Add Button */}
                 {selectedProduct && (
                   <div className="space-y-2">
                     <Label className="flex items-center gap-2">
@@ -588,32 +632,72 @@ const AddToTabModal = ({
                       >
                         <Plus className="w-4 h-4" />
                       </Button>
+                      
+                      {/* Add to list button */}
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        className="ml-auto gap-2"
+                        onClick={handleAddToCart}
+                      >
+                        <Plus className="w-4 h-4" />
+                        Adicionar
+                      </Button>
                     </div>
                   </div>
                 )}
 
-                {/* Summary */}
-                {selectedProduct && selectedSession && (
-                  <div className="p-4 bg-muted rounded-lg space-y-2">
-                    <h4 className="font-semibold text-sm">Resumo</h4>
-                    <div className="text-sm space-y-1">
+                {/* Cart Items List */}
+                {cartItems.length > 0 && (
+                  <div className="p-4 bg-muted rounded-lg space-y-3">
+                    <h4 className="font-semibold text-sm flex items-center gap-2">
+                      <ShoppingBag className="w-4 h-4" />
+                      Itens na lista ({cartItems.length})
+                    </h4>
+                    <div className="space-y-2">
+                      {cartItems.map((item, index) => (
+                        <div key={index} className="flex items-center justify-between bg-background p-2 rounded-lg">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{item.quantity}x {item.product.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {formatCurrency(item.unitPrice)} cada
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-primary text-sm">
+                              {formatCurrency(item.totalPrice)}
+                            </span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-destructive hover:text-destructive"
+                              onClick={() => handleRemoveFromCart(index)}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex justify-between font-bold text-base pt-2 border-t">
+                      <span>Total:</span>
+                      <span className="text-primary">{formatCurrency(cartTotal)}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Summary for selected session */}
+                {selectedSession && cartItems.length > 0 && (
+                  <div className="p-3 bg-primary/5 rounded-lg border border-primary/20">
+                    <div className="text-sm">
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Mesa:</span>
-                        <span>
+                        <span className="font-medium">
                           Mesa {selectedSessionData?.table_number}
                           {selectedSessionData?.bill_mode === 'split' && selectedParticipant && (
                             <> - {selectedSessionData.participants.find(p => p.id === selectedParticipant)?.customer_name}</>
                           )}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Produto:</span>
-                        <span>{quantity}x {selectedProduct.name}</span>
-                      </div>
-                      <div className="flex justify-between font-bold text-base pt-2 border-t">
-                        <span>Total:</span>
-                        <span className="text-primary">
-                          {formatCurrency((selectedProduct.promotional_price || selectedProduct.price) * quantity)}
                         </span>
                       </div>
                     </div>
@@ -628,7 +712,7 @@ const AddToTabModal = ({
                 className="w-full gap-2"
                 size="lg"
                 disabled={
-                  !selectedProduct || 
+                  cartItems.length === 0 || 
                   !selectedSession || 
                   (selectedSessionData?.bill_mode === 'split' && !selectedParticipant) ||
                   submitting
@@ -636,7 +720,7 @@ const AddToTabModal = ({
                 onClick={handleAddToTab}
               >
                 <ShoppingBag className="w-4 h-4" />
-                {submitting ? "Adicionando..." : "Adicionar à Comanda"}
+                {submitting ? "Adicionando..." : `Adicionar à Comanda (${formatCurrency(cartTotal)})`}
               </Button>
             </div>
           </div>
