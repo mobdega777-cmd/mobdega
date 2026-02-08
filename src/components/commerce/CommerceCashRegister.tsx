@@ -1914,23 +1914,23 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
                           <Button 
                             variant="outline" 
                             size="sm"
-                            className="border-primary text-primary hover:bg-primary hover:text-primary-foreground"
+                            className="border-primary text-primary hover:bg-primary hover:text-primary-foreground text-xs px-2"
                             onClick={() => {
                               setSelectedTableOrderForTab(order);
                               setShowAddToTabModal(true);
                             }}
                           >
-                            <ClipboardList className="w-4 h-4 mr-1" />
-                            Lançar em Comanda
+                            <ClipboardList className="w-3 h-3 mr-1 flex-shrink-0" />
+                            <span className="truncate">Lançar Comanda</span>
                           </Button>
                           <Button 
                             variant="outline" 
                             size="sm" 
-                            className="text-destructive border-destructive hover:bg-destructive hover:text-destructive-foreground"
+                            className="text-destructive border-destructive hover:bg-destructive hover:text-destructive-foreground text-xs px-2"
                             onClick={() => cancelTableOrder(order)}
                           >
-                            <XCircle className="w-4 h-4 mr-1" />
-                            Cancelar Mesa
+                            <XCircle className="w-3 h-3 mr-1 flex-shrink-0" />
+                            <span className="truncate">Cancelar Mesa</span>
                           </Button>
                         </div>
                       </CardContent>
