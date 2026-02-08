@@ -1720,7 +1720,7 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
                             {order.participantOrders.map((po) => (
                               <div 
                                 key={po.participant.id} 
-                                className={`w-full max-w-[260px] p-3 rounded-lg border ${po.participant.bill_requested ? 'border-destructive bg-destructive/5' : 'border-border bg-muted/30'}`}
+                                className={`w-full p-3 rounded-lg border ${po.participant.bill_requested ? 'border-destructive bg-destructive/5' : 'border-border bg-muted/30'}`}
                               >
                                 {/* Header row - name and badges */}
                                 <div className="flex items-start justify-between gap-2 mb-1">
