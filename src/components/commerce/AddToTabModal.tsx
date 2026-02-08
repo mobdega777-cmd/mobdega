@@ -355,263 +355,275 @@ const AddToTabModal = ({
             <p className="text-sm">Aguarde um cliente abrir uma mesa</p>
           </div>
         ) : (
-          <ScrollArea className="flex-1 pr-4">
-            <div className="space-y-4">
-              {/* Step 1: Select Table/Session - Hide if pre-selected */}
-              {!hasPreselection && (
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-2">
-                    <span className="bg-primary text-primary-foreground w-5 h-5 rounded-full text-xs flex items-center justify-center">1</span>
-                    Selecione a Mesa
-                  </Label>
-                  <Accordion type="single" collapsible className="border rounded-lg">
-                    {activeSessions.map((session) => (
-                      <AccordionItem key={session.id} value={session.id} className="border-0">
-                        <AccordionTrigger 
-                          className={`px-4 hover:no-underline ${selectedSession === session.id ? 'bg-primary/10' : ''}`}
-                          onClick={() => {
-                            setSelectedSession(session.id);
-                            setSelectedParticipant("");
-                          }}
-                        >
-                          <div className="flex items-center gap-3 text-left">
-                            {selectedSession === session.id && (
-                              <Check className="w-4 h-4 text-primary" />
-                            )}
-                            <div>
-                              <p className="font-medium">
-                                Mesa {session.table_number}
-                                {session.table_name && ` - ${session.table_name}`}
-                              </p>
-                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                <Badge variant={session.bill_mode === 'split' ? 'secondary' : 'outline'} className="text-xs">
-                                  {session.bill_mode === 'split' ? 'Comanda Separada' : 'Comanda Única'}
-                                </Badge>
-                                <span>{session.participants.length} pessoa(s)</span>
-                              </div>
-                            </div>
-                          </div>
-                        </AccordionTrigger>
-                        <AccordionContent className="px-4 pb-3">
-                          <div className="space-y-2">
-                            {session.participants.map((participant) => (
-                              <div 
-                                key={participant.id}
-                                className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${
-                                  session.bill_mode === 'split' 
-                                    ? selectedParticipant === participant.id 
-                                      ? 'bg-primary/20 border border-primary' 
-                                      : 'bg-muted/50 hover:bg-muted'
-                                    : 'bg-muted/50'
-                                }`}
-                                onClick={() => {
-                                  if (session.bill_mode === 'split') {
-                                    setSelectedSession(session.id);
-                                    setSelectedParticipant(participant.id);
-                                  }
-                                }}
-                              >
-                                <User className="w-4 h-4 text-muted-foreground" />
-                                <span className="text-sm">
-                                  {participant.customer_name}
-                                  {participant.is_host && (
-                                    <Badge variant="outline" className="ml-2 text-xs">Anfitrião</Badge>
-                                  )}
-                                </span>
-                                {session.bill_mode === 'split' && selectedParticipant === participant.id && (
-                                  <Check className="w-4 h-4 text-primary ml-auto" />
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                          {session.bill_mode === 'split' && (
-                            <p className="text-xs text-muted-foreground mt-2">
-                              Selecione o cliente para adicionar o item
-                            </p>
-                          )}
-                        </AccordionContent>
-                      </AccordionItem>
-                    ))}
-                  </Accordion>
-                </div>
-              )}
-
-              {/* Show participant selector for pre-selected split bill */}
-              {hasPreselection && selectedSessionData?.bill_mode === 'split' && (
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-2">
-                    <span className="bg-primary text-primary-foreground w-5 h-5 rounded-full text-xs flex items-center justify-center">1</span>
-                    Selecione o Cliente
-                  </Label>
-                  <div className="space-y-2 border rounded-lg p-3">
-                    {selectedSessionData.participants.map((participant) => (
-                      <div 
-                        key={participant.id}
-                        className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${
-                          selectedParticipant === participant.id 
-                            ? 'bg-primary/20 border border-primary' 
-                            : 'bg-muted/50 hover:bg-muted'
-                        }`}
-                        onClick={() => setSelectedParticipant(participant.id)}
-                      >
-                        <User className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-sm">
-                          {participant.customer_name}
-                          {participant.is_host && (
-                            <Badge variant="outline" className="ml-2 text-xs">Anfitrião</Badge>
-                          )}
-                        </span>
-                        {selectedParticipant === participant.id && (
-                          <Check className="w-4 h-4 text-primary ml-auto" />
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Step 2: Select Product */}
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2">
-                  <span className="bg-primary text-primary-foreground w-5 h-5 rounded-full text-xs flex items-center justify-center">
-                    {hasPreselection && selectedSessionData?.bill_mode !== 'split' ? '1' : hasPreselection ? '2' : '2'}
-                  </span>
-                  Selecione o Produto
-                </Label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    value={productSearch}
-                    onChange={(e) => {
-                      setProductSearch(e.target.value);
-                      if (selectedProduct && e.target.value !== selectedProduct.name) {
-                        setSelectedProduct(null);
-                      }
-                    }}
-                    placeholder="Buscar produto..."
-                    className="pl-10"
-                    autoFocus={hasPreselection}
-                  />
-                </div>
-                {productSearch && !selectedProduct && (
-                  <div className="max-h-40 overflow-y-auto border rounded-lg">
-                    {filteredProducts.length === 0 ? (
-                      <p className="text-sm text-muted-foreground p-3">Nenhum produto encontrado</p>
-                    ) : (
-                      filteredProducts.slice(0, 10).map((product) => (
-                        <div
-                          key={product.id}
-                          className="p-3 hover:bg-muted cursor-pointer border-b last:border-b-0"
-                          onClick={() => handleSelectProduct(product)}
-                        >
-                          <div className="flex justify-between items-center">
-                            <div>
-                              <p className="font-medium text-sm">{product.name}</p>
-                              {product.category?.name && (
-                                <p className="text-xs text-muted-foreground">{product.category.name}</p>
+          <>
+            <ScrollArea className="flex-1 pr-4 max-h-[55vh]">
+              <div className="space-y-4">
+                {/* Step 1: Select Table/Session - Hide if pre-selected */}
+                {!hasPreselection && (
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <span className="bg-primary text-primary-foreground w-5 h-5 rounded-full text-xs flex items-center justify-center">1</span>
+                      Selecione a Mesa
+                    </Label>
+                    <Accordion type="single" collapsible className="border rounded-lg">
+                      {activeSessions.map((session) => (
+                        <AccordionItem key={session.id} value={session.id} className="border-0">
+                          <AccordionTrigger 
+                            className={`px-4 hover:no-underline ${selectedSession === session.id ? 'bg-primary/10' : ''}`}
+                            onClick={() => {
+                              setSelectedSession(session.id);
+                              setSelectedParticipant("");
+                            }}
+                          >
+                            <div className="flex items-center gap-3 text-left">
+                              {selectedSession === session.id && (
+                                <Check className="w-4 h-4 text-primary" />
                               )}
+                              <div>
+                                <p className="font-medium">
+                                  Mesa {session.table_number}
+                                  {session.table_name && ` - ${session.table_name}`}
+                                </p>
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                  <Badge variant={session.bill_mode === 'split' ? 'secondary' : 'outline'} className="text-xs">
+                                    {session.bill_mode === 'split' ? 'Comanda Separada' : 'Comanda Única'}
+                                  </Badge>
+                                  <span>{session.participants.length} pessoa(s)</span>
+                                </div>
+                              </div>
                             </div>
-                            <p className="font-bold text-primary">
-                              {formatCurrency(product.promotional_price || product.price)}
-                            </p>
-                          </div>
-                        </div>
-                      ))
-                    )}
+                          </AccordionTrigger>
+                          <AccordionContent className="px-4 pb-3">
+                            <div className="space-y-2">
+                              {session.participants.map((participant) => (
+                                <div 
+                                  key={participant.id}
+                                  className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${
+                                    session.bill_mode === 'split' 
+                                      ? selectedParticipant === participant.id 
+                                        ? 'bg-primary/20 border border-primary' 
+                                        : 'bg-muted/50 hover:bg-muted'
+                                      : 'bg-muted/50'
+                                  }`}
+                                  onClick={() => {
+                                    if (session.bill_mode === 'split') {
+                                      setSelectedSession(session.id);
+                                      setSelectedParticipant(participant.id);
+                                    }
+                                  }}
+                                >
+                                  <User className="w-4 h-4 text-muted-foreground" />
+                                  <span className="text-sm">
+                                    {participant.customer_name}
+                                    {participant.is_host && (
+                                      <Badge variant="outline" className="ml-2 text-xs">Anfitrião</Badge>
+                                    )}
+                                  </span>
+                                  {session.bill_mode === 'split' && selectedParticipant === participant.id && (
+                                    <Check className="w-4 h-4 text-primary ml-auto" />
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                            {session.bill_mode === 'split' && (
+                              <p className="text-xs text-muted-foreground mt-2">
+                                Selecione o cliente para adicionar o item
+                              </p>
+                            )}
+                          </AccordionContent>
+                        </AccordionItem>
+                      ))}
+                    </Accordion>
                   </div>
                 )}
 
-                {selectedProduct && (
-                  <div className="p-3 bg-primary/10 rounded-lg border border-primary/30">
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <p className="font-medium">{selectedProduct.name}</p>
-                        <p className="text-sm text-primary font-bold">
-                          {formatCurrency(selectedProduct.promotional_price || selectedProduct.price)}
-                        </p>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
+                {/* Show participant selector for pre-selected split bill */}
+                {hasPreselection && selectedSessionData?.bill_mode === 'split' && (
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <span className="bg-primary text-primary-foreground w-5 h-5 rounded-full text-xs flex items-center justify-center">1</span>
+                      Selecione o Cliente
+                    </Label>
+                    <div className="space-y-2 border rounded-lg p-3">
+                      {selectedSessionData.participants.map((participant) => (
+                        <div 
+                          key={participant.id}
+                          className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${
+                            selectedParticipant === participant.id 
+                              ? 'bg-primary/20 border border-primary' 
+                              : 'bg-muted/50 hover:bg-muted'
+                          }`}
+                          onClick={() => setSelectedParticipant(participant.id)}
+                        >
+                          <User className="w-4 h-4 text-muted-foreground" />
+                          <span className="text-sm">
+                            {participant.customer_name}
+                            {participant.is_host && (
+                              <Badge variant="outline" className="ml-2 text-xs">Anfitrião</Badge>
+                            )}
+                          </span>
+                          {selectedParticipant === participant.id && (
+                            <Check className="w-4 h-4 text-primary ml-auto" />
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Step 2: Select Product */}
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <span className="bg-primary text-primary-foreground w-5 h-5 rounded-full text-xs flex items-center justify-center">
+                      {hasPreselection && selectedSessionData?.bill_mode !== 'split' ? '1' : hasPreselection ? '2' : '2'}
+                    </span>
+                    Selecione o Produto
+                  </Label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      value={productSearch}
+                      onChange={(e) => {
+                        setProductSearch(e.target.value);
+                        if (selectedProduct && e.target.value !== selectedProduct.name) {
                           setSelectedProduct(null);
-                          setProductSearch("");
-                        }}
+                        }
+                      }}
+                      placeholder="Buscar produto..."
+                      className="pl-10"
+                      autoFocus={hasPreselection}
+                    />
+                  </div>
+                  {productSearch && !selectedProduct && (
+                    <div className="max-h-40 overflow-y-auto border rounded-lg">
+                      {filteredProducts.length === 0 ? (
+                        <p className="text-sm text-muted-foreground p-3">Nenhum produto encontrado</p>
+                      ) : (
+                        filteredProducts.slice(0, 10).map((product) => (
+                          <div
+                            key={product.id}
+                            className="p-3 hover:bg-muted cursor-pointer border-b last:border-b-0"
+                            onClick={() => handleSelectProduct(product)}
+                          >
+                            <div className="flex justify-between items-center">
+                              <div>
+                                <p className="font-medium text-sm">{product.name}</p>
+                                {product.category?.name && (
+                                  <p className="text-xs text-muted-foreground">{product.category.name}</p>
+                                )}
+                              </div>
+                              <div className="text-right">
+                                {product.promotional_price ? (
+                                  <>
+                                    <p className="text-xs line-through text-muted-foreground">{formatCurrency(product.price)}</p>
+                                    <p className="font-semibold text-primary">{formatCurrency(product.promotional_price)}</p>
+                                  </>
+                                ) : (
+                                  <p className="font-semibold text-primary">{formatCurrency(product.price)}</p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+
+                  {/* Selected Product Display */}
+                  {selectedProduct && (
+                    <div className="p-3 border rounded-lg bg-primary/5 border-primary/20">
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <p className="font-medium">{selectedProduct.name}</p>
+                          <p className="text-sm text-primary font-semibold">
+                            {formatCurrency(selectedProduct.promotional_price || selectedProduct.price)}
+                          </p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedProduct(null);
+                            setProductSearch("");
+                          }}
+                        >
+                          Trocar
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Quantity Selector */}
+                {selectedProduct && (
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <span className="bg-primary text-primary-foreground w-5 h-5 rounded-full text-xs flex items-center justify-center">
+                        {hasPreselection && selectedSessionData?.bill_mode !== 'split' ? '2' : hasPreselection ? '3' : '3'}
+                      </span>
+                      Quantidade
+                    </Label>
+                    <div className="flex items-center gap-3">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                        disabled={quantity <= 1}
                       >
-                        Trocar
+                        <Minus className="w-4 h-4" />
+                      </Button>
+                      <Input
+                        type="number"
+                        min="1"
+                        value={quantity}
+                        onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                        className="w-20 text-center"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={() => setQuantity(quantity + 1)}
+                      >
+                        <Plus className="w-4 h-4" />
                       </Button>
                     </div>
                   </div>
                 )}
+
+                {/* Summary */}
+                {selectedProduct && selectedSession && (
+                  <div className="p-4 bg-muted rounded-lg space-y-2">
+                    <h4 className="font-semibold text-sm">Resumo</h4>
+                    <div className="text-sm space-y-1">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Mesa:</span>
+                        <span>
+                          Mesa {selectedSessionData?.table_number}
+                          {selectedSessionData?.bill_mode === 'split' && selectedParticipant && (
+                            <> - {selectedSessionData.participants.find(p => p.id === selectedParticipant)?.customer_name}</>
+                          )}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Produto:</span>
+                        <span>{quantity}x {selectedProduct.name}</span>
+                      </div>
+                      <div className="flex justify-between font-bold text-base pt-2 border-t">
+                        <span>Total:</span>
+                        <span className="text-primary">
+                          {formatCurrency((selectedProduct.promotional_price || selectedProduct.price) * quantity)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
+            </ScrollArea>
 
-              {/* Step 3: Quantity */}
-              {selectedProduct && (
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-2">
-                    <span className="bg-primary text-primary-foreground w-5 h-5 rounded-full text-xs flex items-center justify-center">
-                      {hasPreselection && selectedSessionData?.bill_mode !== 'split' ? '2' : hasPreselection ? '3' : '3'}
-                    </span>
-                    Quantidade
-                  </Label>
-                  <div className="flex items-center gap-3">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                      disabled={quantity <= 1}
-                    >
-                      <Minus className="w-4 h-4" />
-                    </Button>
-                    <Input
-                      type="number"
-                      min="1"
-                      value={quantity}
-                      onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                      className="w-20 text-center"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      onClick={() => setQuantity(quantity + 1)}
-                    >
-                      <Plus className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {/* Summary */}
-              {selectedProduct && selectedSession && (
-                <div className="p-4 bg-muted rounded-lg space-y-2">
-                  <h4 className="font-semibold text-sm">Resumo</h4>
-                  <div className="text-sm space-y-1">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Mesa:</span>
-                      <span>
-                        Mesa {selectedSessionData?.table_number}
-                        {selectedSessionData?.bill_mode === 'split' && selectedParticipant && (
-                          <> - {selectedSessionData.participants.find(p => p.id === selectedParticipant)?.customer_name}</>
-                        )}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Produto:</span>
-                      <span>{quantity}x {selectedProduct.name}</span>
-                    </div>
-                    <div className="flex justify-between font-bold text-base pt-2 border-t">
-                      <span>Total:</span>
-                      <span className="text-primary">
-                        {formatCurrency((selectedProduct.promotional_price || selectedProduct.price) * quantity)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Submit Button */}
+            {/* Submit Button - Outside ScrollArea for fixed position */}
+            <div className="pt-4 border-t mt-4 flex-shrink-0">
               <Button
                 className="w-full gap-2"
                 size="lg"
@@ -627,7 +639,7 @@ const AddToTabModal = ({
                 {submitting ? "Adicionando..." : "Adicionar à Comanda"}
               </Button>
             </div>
-          </ScrollArea>
+          </>
         )}
       </DialogContent>
     </Dialog>
