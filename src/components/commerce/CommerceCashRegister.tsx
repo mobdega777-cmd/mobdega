@@ -359,16 +359,20 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
         }
       }
 
-      // Consolidar pedidos por mesa - agrupar itens de múltiplos pedidos na mesma mesa
-      const ordersByTable = new Map<string, TableOrder & { all_order_ids: string[] }>();
+      // Consolidar pedidos por sessão - agrupar itens de múltiplos pedidos na mesma sessão
+      // Se não houver sessão, agrupa por mesa para manter compatibilidade
+      const ordersBySession = new Map<string, TableOrder & { all_order_ids: string[] }>();
       
       tableOrdersData.forEach(order => {
         const table = tableMap.get(order.table_id);
-        const tableKey = order.table_id || order.id;
-
+        
         // Prefer session_id from the order (tables.session_id may be null after releasing the table)
         const sessionIdToUse = (order.session_id as string | null) || table?.session_id || null;
         const session = sessionIdToUse ? sessionsMap.get(sessionIdToUse) : null;
+        
+        // Use session_id as key when available, otherwise fall back to table_id
+        // This ensures that each session is displayed separately, even if on the same table
+        const groupKey = sessionIdToUse || order.table_id || order.id;
         
         // Add user_id to each item for participant filtering
         const itemsWithUserId = (order.order_items || []).map(item => ({
@@ -376,9 +380,9 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
           user_id: order.user_id
         }));
         
-        if (ordersByTable.has(tableKey)) {
-          // Mesa já existe - adicionar itens e somar total
-          const existingOrder = ordersByTable.get(tableKey)!;
+        if (ordersBySession.has(groupKey)) {
+          // Sessão já existe - adicionar itens e somar total
+          const existingOrder = ordersBySession.get(groupKey)!;
           existingOrder.items = [...existingOrder.items, ...itemsWithUserId];
           existingOrder.total = Number(existingOrder.total) + Number(order.total);
           existingOrder.all_order_ids.push(order.id);
@@ -396,10 +400,10 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
             existingOrder.status = order.status;
           }
         } else {
-          // Nova mesa
+          // Nova sessão
           const hasBillRequests = session?.participants.some(p => p.bill_requested) || false;
           
-          ordersByTable.set(tableKey, {
+          ordersBySession.set(groupKey, {
             id: order.id,
             table_id: order.table_id || '',
             table_number: table?.number || 0,
@@ -421,19 +425,19 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
       });
 
       // For split bill mode, group items by participant
-      const finalOrders = Array.from(ordersByTable.values()).map(tableOrder => {
-        const tableCouponDiscount = tableOrder.coupon_discount || 0;
+      const finalOrders = Array.from(ordersBySession.values()).map(sessionOrder => {
+        const tableCouponDiscount = sessionOrder.coupon_discount || 0;
         
         // Subtrair o desconto do cupom do total da mesa
         if (tableCouponDiscount > 0) {
-          tableOrder.total = Math.max(0, tableOrder.total - tableCouponDiscount);
+          sessionOrder.total = Math.max(0, sessionOrder.total - tableCouponDiscount);
         }
         
-        if (tableOrder.session?.bill_mode === 'split') {
+        if (sessionOrder.session?.bill_mode === 'split') {
           const participantOrdersMap = new Map<string, ParticipantOrder>();
           
-          tableOrder.session.participants.forEach(participant => {
-            const participantItems = tableOrder.items.filter(item => item.user_id === participant.user_id);
+          sessionOrder.session.participants.forEach(participant => {
+            const participantItems = sessionOrder.items.filter(item => item.user_id === participant.user_id);
             let participantTotal = participantItems.reduce((sum, item) => sum + Number(item.total_price), 0);
             
             // Aplicar o desconto do cupom inteiro ao host/solicitante
@@ -443,7 +447,7 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
             
             const participantOrderIds = [...new Set(
               tableOrdersData
-                .filter(o => o.table_id === tableOrder.table_id && o.user_id === participant.user_id)
+                .filter(o => o.session_id === sessionOrder.session?.id && o.user_id === participant.user_id)
                 .map(o => o.id)
             )];
             
@@ -457,10 +461,10 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
             }
           });
           
-          tableOrder.participantOrders = Array.from(participantOrdersMap.values());
+          sessionOrder.participantOrders = Array.from(participantOrdersMap.values());
         }
         
-        return tableOrder;
+        return sessionOrder;
       });
 
       setTableOrders(finalOrders);

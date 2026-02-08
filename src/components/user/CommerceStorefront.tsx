@@ -351,6 +351,32 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
       .order('number');
     
     if (tablesData) {
+      // For tables without session_id, check if there's an active session in table_sessions
+      const tablesWithoutSession = tablesData.filter(t => !t.session_id);
+      
+      if (tablesWithoutSession.length > 0) {
+        const { data: activeSessions } = await supabase
+          .from('table_sessions')
+          .select('id, table_id')
+          .in('table_id', tablesWithoutSession.map(t => t.id))
+          .eq('status', 'active');
+        
+        if (activeSessions && activeSessions.length > 0) {
+          const sessionMap = new Map(activeSessions.map(s => [s.table_id, s.id]));
+          
+          // Update tables with active session info
+          const updatedTables = tablesData.map(t => {
+            if (!t.session_id && sessionMap.has(t.id)) {
+              return { ...t, session_id: sessionMap.get(t.id), status: 'occupied' as const };
+            }
+            return t;
+          });
+          
+          setTables(updatedTables as Table[]);
+          return;
+        }
+      }
+      
       setTables(tablesData as Table[]);
     }
   };
@@ -1180,7 +1206,24 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
     }
 
     const normalizedStatus = (currentTable?.status ?? 'available') as string;
-    const hasActiveSession = !!currentTable?.session_id;
+    let sessionIdToCheck = currentTable?.session_id;
+    
+    // If table has no session_id, also check for active sessions in table_sessions table
+    // This handles the case where the table was released but session is still active
+    if (!sessionIdToCheck) {
+      const { data: activeSession } = await supabase
+        .from('table_sessions')
+        .select('id')
+        .eq('table_id', table.id)
+        .eq('status', 'active')
+        .maybeSingle();
+      
+      if (activeSession) {
+        sessionIdToCheck = activeSession.id;
+      }
+    }
+
+    const hasActiveSession = !!sessionIdToCheck;
 
     // If table has an active session, check if user can join (regardless of status)
     if (hasActiveSession) {
@@ -1188,7 +1231,7 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
       const { data: existingParticipant } = await supabase
         .from('table_participants')
         .select('id, session_id')
-        .eq('session_id', currentTable.session_id)
+        .eq('session_id', sessionIdToCheck)
         .eq('user_id', user.id)
         .maybeSingle();
 
@@ -1197,7 +1240,7 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
         const { data: sessionData } = await supabase
           .from('table_sessions')
           .select('*')
-          .eq('id', currentTable.session_id)
+          .eq('id', sessionIdToCheck)
           .single();
         
         if (sessionData) {
@@ -1212,7 +1255,7 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
 
       // Use RPC to get session info (bypasses RLS for joining purposes)
       const { data: sessionInfoArray, error: sessionError } = await supabase
-        .rpc('get_session_info_for_join', { p_session_id: currentTable.session_id });
+        .rpc('get_session_info_for_join', { p_session_id: sessionIdToCheck });
 
       const sessionInfo = sessionInfoArray?.[0];
 
