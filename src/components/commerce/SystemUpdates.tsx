@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { 
@@ -12,253 +13,20 @@ import {
   Tag,
   Truck,
   FileText,
-  ChefHat
+  ChefHat,
+  Loader2
 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 interface SystemUpdate {
   id: string;
-  date: string;
-  time: string;
-  type: 'create' | 'update' | 'config';
+  type: string;
   module: string;
   description: string;
+  published_at: string;
 }
-
-// Lista estática de atualizações do sistema - pode ser expandida para buscar do banco
-const systemUpdates: SystemUpdate[] = [
-  {
-    id: "insights1",
-    date: "04/02/2026",
-    time: "14:00",
-    type: "create",
-    module: "Visão Geral",
-    description: "Nova seção 'Insights Poderosos' com métricas de BI: ticket médio, horário/dia de pico, taxa de retenção, produto campeão e dicas de marketing personalizadas"
-  },
-  {
-    id: "pag1",
-    date: "04/02/2026",
-    time: "10:00",
-    type: "create",
-    module: "Financeiro",
-    description: "Novo sistema de controle de pagamentos: despesas com data de vencimento, botão 'Pago' para marcar quitação e cálculo automático nos cards A Pagar/Vencidos"
-  },
-  {
-    id: "pag2",
-    date: "04/02/2026",
-    time: "09:55",
-    type: "update",
-    module: "Impostos",
-    description: "Reset automático mensal do imposto: sistema agora verifica se pagamento foi feito no mês atual, exibindo botão 'Paguei' ao virar o mês"
-  },
-  {
-    id: "pag3",
-    date: "04/02/2026",
-    time: "09:50",
-    type: "update",
-    module: "Financeiro",
-    description: "Paginação implementada na lista de Faturas e Cobranças (5 itens por página) para melhor navegação"
-  },
-  {
-    id: "emp1",
-    date: "03/02/2026",
-    time: "14:00",
-    type: "create",
-    module: "Configurações",
-    description: "Novo sistema de Modo Funcionário/Gestão: configure quais itens do menu são visíveis para funcionários e defina senha de gestão"
-  },
-  {
-    id: "n0",
-    date: "02/02/2026",
-    time: "00:30",
-    type: "update",
-    module: "Caixa/PDV",
-    description: "Pedidos de Delivery agora são contabilizados automaticamente no Caixa/PDV ao serem finalizados, incluindo taxas"
-  },
-  {
-    id: "n01",
-    date: "02/02/2026",
-    time: "00:25",
-    type: "create",
-    module: "Delivery",
-    description: "Nova aba 'Acompanhar' na vitrine para clientes acompanharem pedidos de delivery após fechamento do modal"
-  },
-  {
-    id: "n1",
-    date: "01/02/2026",
-    time: "10:30",
-    type: "create",
-    module: "Vitrine",
-    description: "Novo botão de Mapa na vitrine do cliente para abrir localização do estabelecimento no Google Maps"
-  },
-  {
-    id: "n2",
-    date: "01/02/2026",
-    time: "10:25",
-    type: "update",
-    module: "Comanda",
-    description: "Tracker de status do pedido agora exibido diretamente na aba Comanda para acompanhamento contínuo"
-  },
-  {
-    id: "n3",
-    date: "01/02/2026",
-    time: "10:20",
-    type: "update",
-    module: "Fórum",
-    description: "Botão 'Marcar como Solução' movido para nível do tópico - indica que a discussão foi resolvida"
-  },
-  {
-    id: "n4",
-    date: "01/02/2026",
-    time: "10:15",
-    type: "update",
-    module: "Página Inicial",
-    description: "Cards de comércios na landing page agora clicáveis, abrindo diretamente a vitrine pública da loja"
-  },
-  {
-    id: "0",
-    date: "31/01/2026",
-    time: "00:15",
-    type: "create",
-    module: "Segurança",
-    description: "Nova aba de Segurança no painel admin para reset de senha temporária de comércios com exigência de troca no próximo login"
-  },
-  {
-    id: "0a",
-    date: "31/01/2026",
-    time: "00:10",
-    type: "create",
-    module: "Autenticação",
-    description: "Implementação do recurso de recuperação de senha via email para usuários e comércios"
-  },
-  {
-    id: "0b",
-    date: "31/01/2026",
-    time: "00:05",
-    type: "update",
-    module: "Treinamento",
-    description: "Seção de treinamento agora acessível durante período de aprovação, permitindo que comércios conheçam a plataforma enquanto aguardam"
-  },
-  {
-    id: "1",
-    date: "29/01/2026",
-    time: "00:45",
-    type: "update",
-    module: "Financeiro",
-    description: "Implementação de cálculo de faturamento líquido com desconto automático de taxas de operadoras (Débito/Crédito)"
-  },
-  {
-    id: "2", 
-    date: "29/01/2026",
-    time: "00:40",
-    type: "update",
-    module: "Visão Geral",
-    description: "Adição de tooltips de ajuda (?) em todos os cards de métricas para auxiliar na compreensão dos indicadores"
-  },
-  {
-    id: "3",
-    date: "29/01/2026",
-    time: "00:35",
-    type: "update",
-    module: "Mesas/Comandas",
-    description: "Correção: desconto de cupom agora aplicado corretamente ao host/solicitante no fechamento de conta separada"
-  },
-  {
-    id: "4",
-    date: "29/01/2026",
-    time: "00:30",
-    type: "update",
-    module: "Fórum",
-    description: "Correção de avatar do autor do tópico - agora utiliza logo do comércio quando author_type = commerce"
-  },
-  {
-    id: "5",
-    date: "29/01/2026",
-    time: "00:25",
-    type: "update",
-    module: "Pedidos",
-    description: "Correção de exibição no modal de detalhes - removido '0' indevido e adicionado suporte a coupon_code/discount"
-  },
-  {
-    id: "6",
-    date: "28/01/2026",
-    time: "23:50",
-    type: "create",
-    module: "Fórum",
-    description: "Adição de sistema de votação (Concordo/Não Concordo) para tópicos do fórum com contadores em tempo real"
-  },
-  {
-    id: "7",
-    date: "28/01/2026",
-    time: "22:00",
-    type: "config",
-    module: "Pagamentos",
-    description: "Novo sistema de configuração de taxas por método de pagamento (fee_percentage e fee_fixed) para cálculo preciso"
-  },
-  {
-    id: "8",
-    date: "28/01/2026",
-    time: "21:30",
-    type: "update",
-    module: "Estoque",
-    description: "Implementação de campo de custo de compra por produto para cálculo de margem de lucro real"
-  },
-  {
-    id: "9",
-    date: "28/01/2026",
-    time: "20:00",
-    type: "update",
-    module: "Financeiro",
-    description: "Migração de fonte de dados: cash_movements como fonte única de verdade para faturamento (evita duplicação)"
-  },
-  {
-    id: "10",
-    date: "28/01/2026",
-    time: "19:30",
-    type: "config",
-    module: "Sistema",
-    description: "Implementação de normalização de timezone (noon-anchoring) em dateUtils.ts para precisão no fuso BR (UTC-3)"
-  },
-  {
-    id: "11",
-    date: "28/01/2026",
-    time: "18:00",
-    type: "update",
-    module: "Financeiro",
-    description: "Novo card de Taxa de Crescimento com comparação automática do período anterior"
-  },
-  {
-    id: "12",
-    date: "28/01/2026",
-    time: "17:00",
-    type: "create",
-    module: "Impostos",
-    description: "Módulo de gestão tributária: configuração de regime, tipo de cálculo e alerta 2 dias antes do vencimento"
-  },
-  {
-    id: "13",
-    date: "28/01/2026",
-    time: "16:00",
-    type: "update",
-    module: "Caixa/PDV",
-    description: "Novo resumo detalhado no fechamento com totais por forma de pagamento e reconciliação de saldo"
-  },
-  {
-    id: "14",
-    date: "27/01/2026",
-    time: "22:00",
-    type: "update",
-    module: "Ranking",
-    description: "Adição de badges visuais por plano e destaque especial para líderes com gradientes e ícones"
-  },
-  {
-    id: "15",
-    date: "27/01/2026",
-    time: "20:00",
-    type: "create",
-    module: "Fórum",
-    description: "Lançamento do Fórum de Comunidade para adegas e tabacarias reportarem problemas e sugerirem melhorias"
-  }
-];
 
 const getTypeIcon = (type: string) => {
   switch (type) {
@@ -296,6 +64,24 @@ const getModuleIcon = (module: string) => {
 };
 
 const SystemUpdates = () => {
+  const [updates, setUpdates] = useState<SystemUpdate[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchUpdates = async () => {
+      const { data } = await supabase
+        .from('system_updates')
+        .select('id, type, module, description, published_at')
+        .order('published_at', { ascending: false })
+        .limit(15);
+      
+      setUpdates((data as SystemUpdate[]) || []);
+      setLoading(false);
+    };
+
+    fetchUpdates();
+  }, []);
+
   return (
     <Card>
       <CardHeader className="p-4 md:p-6 pb-2">
@@ -303,39 +89,47 @@ const SystemUpdates = () => {
           <History className="w-4 h-4 md:w-5 md:h-5" />
           Atualizações do Sistema
         </CardTitle>
-        <p className="text-xs text-muted-foreground">Últimas 15 modificações técnicas</p>
+        <p className="text-xs text-muted-foreground">Últimas {updates.length} modificações técnicas</p>
       </CardHeader>
       <CardContent className="p-3 md:p-6 pt-0 md:pt-0">
-        <div className="max-h-[400px] overflow-y-auto space-y-2 pr-1">
-          {systemUpdates.map((update) => (
-            <div 
-              key={update.id} 
-              className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
-            >
-              <div className="flex-shrink-0 mt-0.5">
-                {getModuleIcon(update.module)}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap mb-1">
-                  <Badge 
-                    variant="outline" 
-                    className={`text-xs ${getTypeColor(update.type)} border-none gap-1`}
-                  >
-                    {getTypeIcon(update.type)}
-                    {update.type === 'create' ? 'Novo' : update.type === 'update' ? 'Atualização' : 'Config'}
-                  </Badge>
-                  <span className="text-xs font-medium text-foreground">{update.module}</span>
+        {loading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : updates.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-8">Nenhuma atualização registrada.</p>
+        ) : (
+          <div className="max-h-[400px] overflow-y-auto space-y-2 pr-1">
+            {updates.map((update) => (
+              <div 
+                key={update.id} 
+                className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
+              >
+                <div className="flex-shrink-0 mt-0.5">
+                  {getModuleIcon(update.module)}
                 </div>
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  {update.description}
-                </p>
-                <p className="text-[10px] text-muted-foreground/70 mt-1">
-                  {update.date} às {update.time}
-                </p>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <Badge 
+                      variant="outline" 
+                      className={`text-xs ${getTypeColor(update.type)} border-none gap-1`}
+                    >
+                      {getTypeIcon(update.type)}
+                      {update.type === 'create' ? 'Novo' : update.type === 'update' ? 'Atualização' : 'Config'}
+                    </Badge>
+                    <span className="text-xs font-medium text-foreground">{update.module}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    {update.description}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground/70 mt-1">
+                    {format(new Date(update.published_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                  </p>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

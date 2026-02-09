@@ -1609,6 +1609,33 @@ export type Database = {
         }
         Relationships: []
       }
+      system_updates: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          module: string
+          published_at: string
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          id?: string
+          module: string
+          published_at?: string
+          type?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          module?: string
+          published_at?: string
+          type?: string
+        }
+        Relationships: []
+      }
       table_participants: {
         Row: {
           bill_requested: boolean | null
