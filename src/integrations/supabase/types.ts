@@ -1987,6 +1987,7 @@ export type Database = {
       get_active_sessions_for_tables: {
         Args: { p_table_ids: string[] }
         Returns: {
+          bill_mode: string
           session_id: string
           table_id: string
         }[]
