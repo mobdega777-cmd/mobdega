@@ -22,7 +22,7 @@ interface BenefitsCustomization {
 const userBenefits = [
   {
     icon: Truck,
-    title: "Entrega Rápida",
+    title: "Com o Delivery Próprio do Comércio",
     description: "Receba seus produtos em até 30 minutos na sua porta."
   },
   {

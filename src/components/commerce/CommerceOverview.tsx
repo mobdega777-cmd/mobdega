@@ -329,6 +329,9 @@ const CommerceOverview = ({ commerce }: CommerceOverviewProps) => {
                   ) : (
                     <p className="text-lg md:text-2xl font-bold mt-1">{stat.value}</p>
                   )}
+                  {'onClick' in stat && stat.onClick && (
+                    <p className="text-xs text-primary font-medium mt-0.5">Clique aqui!</p>
+                  )}
                 </div>
                 <div className={`p-2 md:p-3 rounded-xl ${stat.bgColor}`}>
                   <Icon className={`w-4 h-4 md:w-6 md:h-6 ${stat.color}`} />
