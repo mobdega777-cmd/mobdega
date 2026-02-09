@@ -4,7 +4,7 @@ import {
   Plus, 
   Search, 
   Send,
-  CalendarClock,
+  Power,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -92,6 +92,7 @@ const AdminInvoices = () => {
     amount: '',
     due_date: '',
   });
+  const [disabledRows, setDisabledRows] = useState<Set<string>>(new Set());
   const { toast } = useToast();
 
   useEffect(() => {
@@ -119,7 +120,7 @@ const AdminInvoices = () => {
       .from('commerces')
       .select('id, fantasy_name, neighborhood, city, owner_name, created_at, payment_due_day, auto_invoice_enabled, auto_invoice_day, coupon_code, plans!commerces_plan_id_fkey(price)')
       .eq('status', 'approved')
-      .order('fantasy_name');
+      .order('created_at', { ascending: false });
     
     setCommerces((data as Commerce[]) || []);
   };
@@ -193,6 +194,15 @@ const AdminInvoices = () => {
       due_date: '',
     });
     setCreateDialogOpen(true);
+  };
+
+  const toggleRowDisabled = (commerceId: string) => {
+    setDisabledRows(prev => {
+      const next = new Set(prev);
+      if (next.has(commerceId)) next.delete(commerceId);
+      else next.add(commerceId);
+      return next;
+    });
   };
 
   // Calculate invoice counts per commerce
@@ -310,8 +320,9 @@ const AdminInvoices = () => {
                 <TableBody>
                   {paginatedCommerces.map((commerce) => {
                     const counts = invoiceCounts[commerce.id] || { pending: 0, paid: 0 };
+                    const isDisabled = disabledRows.has(commerce.id);
                     return (
-                      <TableRow key={commerce.id}>
+                      <TableRow key={commerce.id} className={isDisabled ? 'opacity-50' : ''}>
                         <TableCell className="font-medium">{commerce.fantasy_name}</TableCell>
                         <TableCell>{commerce.neighborhood || '-'}</TableCell>
                         <TableCell>{commerce.city || '-'}</TableCell>
@@ -321,6 +332,7 @@ const AdminInvoices = () => {
                           <Select
                             value={String(commerce.payment_due_day || '')}
                             onValueChange={(v) => handleUpdateCommerceField(commerce.id, 'payment_due_day', parseInt(v))}
+                            disabled={isDisabled}
                           >
                             <SelectTrigger className="w-20 h-8 text-xs">
                               <SelectValue placeholder="—" />
@@ -338,6 +350,7 @@ const AdminInvoices = () => {
                           <Select
                             value={String(commerce.auto_invoice_day || '')}
                             onValueChange={(v) => handleUpdateCommerceField(commerce.id, 'auto_invoice_day', parseInt(v))}
+                            disabled={isDisabled}
                           >
                             <SelectTrigger className="w-20 h-8 text-xs">
                               <SelectValue placeholder="—" />
@@ -366,14 +379,26 @@ const AdminInvoices = () => {
                           )}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button
-                            size="sm"
-                            className="gap-1"
-                            onClick={() => handleSendInvoice(commerce)}
-                          >
-                            <Send className="w-3 h-3" />
-                            Enviar
-                          </Button>
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              size="sm"
+                              className="gap-1"
+                              onClick={() => handleSendInvoice(commerce)}
+                              disabled={isDisabled}
+                            >
+                              <Send className="w-3 h-3" />
+                              Enviar
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant={isDisabled ? "outline" : "destructive"}
+                              className="gap-1"
+                              onClick={() => toggleRowDisabled(commerce.id)}
+                            >
+                              <Power className="w-3 h-3" />
+                              {isDisabled ? 'Ativar' : 'Inativar'}
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     );
