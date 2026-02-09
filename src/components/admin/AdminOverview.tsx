@@ -286,9 +286,12 @@ const AdminOverview = () => {
               <TrendingUp className="w-6 h-6 text-accent" />
             </div>
             <div>
-              <h3 className="font-medium text-foreground">Ver Relatórios</h3>
+              <h3 className="font-medium text-foreground">Valuation Mobdega</h3>
               <p className="text-sm text-muted-foreground">
-                Análise completa
+                {formatCurrency(stats.monthlyRevenue * 12)}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Receita mensal × 12
               </p>
             </div>
           </CardContent>
