@@ -1,25 +1,51 @@
 
-# Correção: Bloquear acesso a mesas com Comanda Única
+# Reformulacao da Tela de Faturas - Master Admin
 
-## Problema
-Quando uma mesa está em modo "Comanda Única" (bill_mode = 'single'), outros usuários ainda conseguem ver o modal "Juntar-se à Mesa" e potencialmente entrar na sessão. O comportamento correto é bloquear o acesso, pois comanda única significa que apenas o host utiliza a mesa.
+## O que muda
 
-## Solução
-No componente `CommerceStorefront.tsx`, na lógica de seleção de mesa (por volta da linha 1254), adicionar uma verificação do `bill_mode` da sessão ativa. Se for `'single'`, em vez de abrir o `JoinSessionModal`, exibir um toast informando que a mesa está em uso com comanda única e não permite entrada de outros usuários.
+Substituir o layout atual (card de "Configurar Fatura Automatica por Comercio" com botoes + tabela de faturas) por uma **unica tabela de comercios** com todas as configuracoes e informacoes inline, 10 itens por pagina.
 
-Também atualizar a visualização no seletor de mesas: mesas com comanda única devem aparecer com indicador vermelho (Reservada/Fechada) ao invés de laranja (pode juntar-se), já que não é possível entrar nelas.
+## Remocoes
+- Botao "Gerar Faturas do Mes" do topo
+- Card "Configurar Fatura Automatica por Comercio" (os botoes laranja)
 
-## Detalhes Técnicos
+## Nova Tabela de Comercios
 
-**Arquivo:** `src/components/user/CommerceStorefront.tsx`
+A tabela principal listara todos os comercios aprovados com as seguintes colunas:
 
-**Mudança 1 - Bloquear join (linhas ~1254-1274):**
-Após obter `sessionInfo`, verificar `sessionInfo.bill_mode === 'single'`. Se verdadeiro:
-- Mostrar toast: "Esta mesa está em uso com comanda única e não permite novos participantes."
-- Não abrir o `JoinSessionModal`
-- Retornar sem ação
+| Coluna | Dados | Tipo |
+|---|---|---|
+| Nome | `fantasy_name` | Texto |
+| Bairro | `neighborhood` | Texto |
+| Cidade | `city` | Texto |
+| Proprietario | `owner_name` | Texto |
+| Cadastro | `created_at` | Data formatada dd/mm/yyyy |
+| Vencimento | `payment_due_day` | Seletor editavel (1-31) - dia do vencimento da fatura |
+| Emissao | `auto_invoice_day` | Seletor editavel (1-31) - dia em que a fatura deve ser gerada |
+| Pendentes | Contagem de faturas com status `pending` | Badge numerico |
+| Pagas | Contagem de faturas com status `paid` | Badge numerico |
+| Acao | Botao "Enviar Fatura" | Botao que gera/envia fatura manual para aquele comercio |
 
-**Mudança 2 - Indicador visual no seletor de mesas:**
-Na renderização dos cards de mesa, mesas ocupadas com `bill_mode === 'single'` devem exibir borda vermelha e texto "Ocupada" (sem "Juntar-se"), indicando que não é possível entrar. Apenas mesas com `bill_mode === 'split'` mostram a borda laranja com "Juntar-se".
+## Comportamento
 
-Nenhuma alteração de layout ou estrutura existente.
+- Os campos Vencimento e Emissao serao selects inline que ao mudar salvam automaticamente no banco (`payment_due_day` e `auto_invoice_day`)
+- O botao "Enviar Fatura" ao final de cada linha abre o dialog existente de "Nova Fatura" pre-preenchido com o comercio daquela linha
+- Paginacao de 10 itens por pagina (ja existente)
+- Busca por nome do comercio (reutilizar filtro existente)
+- Manter o botao "+ Nova Fatura" no topo
+- Contagens de pendentes/pagas serao calculadas a partir dos dados de invoices ja carregados
+
+## Detalhes Tecnicos
+
+**Arquivo:** `src/components/admin/AdminInvoices.tsx`
+
+**Mudancas principais:**
+1. Ampliar o `fetchCommerces` para incluir `neighborhood, city, owner_name, created_at, payment_due_day` nos campos do select
+2. Remover as linhas 343-346 (botao "Gerar Faturas do Mes")
+3. Remover as linhas 354-390 (card de configuracao automatica)
+4. Substituir a tabela de faturas (linhas 440-508) por uma tabela de comercios com as novas colunas
+5. Adicionar funcao para salvar `payment_due_day` e `auto_invoice_day` inline via update no Supabase
+6. Calcular contagens de faturas pendentes/pagas por comercio a partir dos dados ja carregados em `invoices`
+7. O botao "Enviar Fatura" pre-preenche `newInvoice.commerce_id` e abre o `createDialogOpen`
+
+A tabela de faturas detalhada existente (com status, valor, etc.) sera removida da visao principal, pois a nova visao foca nos comercios. Caso necessario no futuro, podera ser acessada via clique no comercio.
