@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Bell, CreditCard, AlertCircle, Check, CheckCheck } from "lucide-react";
+import { Bell, CreditCard, AlertCircle, Check, CheckCheck, BookOpen, ShoppingCart, Package, Utensils, Settings, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -26,11 +26,13 @@ interface Notification {
 interface CommerceNotificationBellProps {
   commerceId: string;
   onNavigateToInvoices: () => void;
+  onNavigateToSection?: (section: string) => void;
 }
 
 const CommerceNotificationBell = ({ 
   commerceId, 
-  onNavigateToInvoices 
+  onNavigateToInvoices,
+  onNavigateToSection
 }: CommerceNotificationBellProps) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isOpen, setIsOpen] = useState(false);
@@ -117,13 +119,26 @@ const CommerceNotificationBell = ({
     }
   };
 
+  const getNotificationTargetSection = (type: string): string | null => {
+    const sectionMap: Record<string, string> = {
+      'new_invoice': 'financial',
+      'new_training_video': 'training',
+      'new_review': 'overview',
+      'new_order': 'orders',
+    };
+    return sectionMap[type] || null;
+  };
+
   const handleNotificationClick = (notification: Notification) => {
     if (!notification.is_read) {
       markAsRead(notification.id);
     }
     
-    // If it's an invoice notification, navigate to financial/invoices
-    if (notification.type === 'new_invoice' && notification.invoice_id) {
+    const targetSection = getNotificationTargetSection(notification.type);
+    if (targetSection && onNavigateToSection) {
+      setIsOpen(false);
+      onNavigateToSection(targetSection);
+    } else if (notification.type === 'new_invoice' && notification.invoice_id) {
       setIsOpen(false);
       onNavigateToInvoices();
     }
@@ -133,6 +148,12 @@ const CommerceNotificationBell = ({
     switch (type) {
       case 'new_invoice':
         return <CreditCard className="w-4 h-4 text-primary" />;
+      case 'new_training_video':
+        return <BookOpen className="w-4 h-4 text-blue-500" />;
+      case 'new_review':
+        return <Trophy className="w-4 h-4 text-yellow-500" />;
+      case 'new_order':
+        return <ShoppingCart className="w-4 h-4 text-green-500" />;
       default:
         return <AlertCircle className="w-4 h-4 text-muted-foreground" />;
     }
