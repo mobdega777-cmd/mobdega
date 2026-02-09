@@ -589,6 +589,7 @@ const CommerceDashboard = () => {
             <CommerceNotificationBell 
               commerceId={commerce.id} 
               onNavigateToInvoices={() => setActiveSection("financial")}
+              onNavigateToSection={(section) => setActiveSection(section as CommerceSection)}
             />
           )}
           <Button
@@ -657,6 +658,7 @@ const CommerceDashboard = () => {
                 <CommerceNotificationBell 
                   commerceId={commerce.id} 
                   onNavigateToInvoices={() => setActiveSection("financial")}
+                  onNavigateToSection={(section) => setActiveSection(section as CommerceSection)}
                 />
               )}
               {/* Botão Upgrade - só aparece para planos basic e startup */}
