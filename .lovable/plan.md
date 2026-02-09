@@ -1,51 +1,79 @@
 
-# Reformulacao da Tela de Faturas - Master Admin
 
-## O que muda
+## Plano: Correcoes de Seguranca
 
-Substituir o layout atual (card de "Configurar Fatura Automatica por Comercio" com botoes + tabela de faturas) por uma **unica tabela de comercios** com todas as configuracoes e informacoes inline, 10 itens por pagina.
+### O que sera feito
 
-## Remocoes
-- Botao "Gerar Faturas do Mes" do topo
-- Card "Configurar Fatura Automatica por Comercio" (os botoes laranja)
+**3 alteracoes no banco de dados** (nenhum arquivo de codigo sera modificado):
 
-## Nova Tabela de Comercios
+---
 
-A tabela principal listara todos os comercios aprovados com as seguintes colunas:
+### 1. Restringir acesso a tabela `profiles`
 
-| Coluna | Dados | Tipo |
-|---|---|---|
-| Nome | `fantasy_name` | Texto |
-| Bairro | `neighborhood` | Texto |
-| Cidade | `city` | Texto |
-| Proprietario | `owner_name` | Texto |
-| Cadastro | `created_at` | Data formatada dd/mm/yyyy |
-| Vencimento | `payment_due_day` | Seletor editavel (1-31) - dia do vencimento da fatura |
-| Emissao | `auto_invoice_day` | Seletor editavel (1-31) - dia em que a fatura deve ser gerada |
-| Pendentes | Contagem de faturas com status `pending` | Badge numerico |
-| Pagas | Contagem de faturas com status `paid` | Badge numerico |
-| Acao | Botao "Enviar Fatura" | Botao que gera/envia fatura manual para aquele comercio |
+**Politica atual removida:**
+- "Authenticated users can view profiles" (qualquer logado ve tudo)
 
-## Comportamento
+**Novas politicas criadas:**
+- Usuarios veem apenas o proprio perfil
+- Donos de comercio veem perfis de clientes que fizeram pedidos no seu estabelecimento (necessario para fulfillment, entrega, e visualizacao de clientes)
+- Master admin ve todos os perfis
 
-- Os campos Vencimento e Emissao serao selects inline que ao mudar salvam automaticamente no banco (`payment_due_day` e `auto_invoice_day`)
-- O botao "Enviar Fatura" ao final de cada linha abre o dialog existente de "Nova Fatura" pre-preenchido com o comercio daquela linha
-- Paginacao de 10 itens por pagina (ja existente)
-- Busca por nome do comercio (reutilizar filtro existente)
-- Manter o botao "+ Nova Fatura" no topo
-- Contagens de pendentes/pagas serao calculadas a partir dos dados de invoices ja carregados
+**Impacto nos fluxos existentes:** Nenhum. Todos os locais do codigo ja buscam perfis dentro dessas 3 categorias.
 
-## Detalhes Tecnicos
+---
 
-**Arquivo:** `src/components/admin/AdminInvoices.tsx`
+### 2. Granularizar politicas de `cash_registers`
 
-**Mudancas principais:**
-1. Ampliar o `fetchCommerces` para incluir `neighborhood, city, owner_name, created_at, payment_due_day` nos campos do select
-2. Remover as linhas 343-346 (botao "Gerar Faturas do Mes")
-3. Remover as linhas 354-390 (card de configuracao automatica)
-4. Substituir a tabela de faturas (linhas 440-508) por uma tabela de comercios com as novas colunas
-5. Adicionar funcao para salvar `payment_due_day` e `auto_invoice_day` inline via update no Supabase
-6. Calcular contagens de faturas pendentes/pagas por comercio a partir dos dados ja carregados em `invoices`
-7. O botao "Enviar Fatura" pre-preenche `newInvoice.commerce_id` e abre o `createDialogOpen`
+**Politica atual removida:**
+- "Commerce owners can manage cash registers" (ALL generico)
 
-A tabela de faturas detalhada existente (com status, valor, etc.) sera removida da visao principal, pois a nova visao foca nos comercios. Caso necessario no futuro, podera ser acessada via clique no comercio.
+**Novas politicas criadas (4 separadas):**
+- SELECT: dono do comercio pode ver seus caixas
+- INSERT: dono do comercio pode criar caixas
+- UPDATE: dono do comercio pode atualizar seus caixas
+- DELETE: dono do comercio pode deletar seus caixas
+
+Todas usam `is_commerce_owner_or_admin(commerce_id)`. A mesma logica de antes, porem granular e explicita.
+
+**Impacto nos fluxos existentes:** Nenhum. O acesso continua identico, apenas mais bem definido.
+
+---
+
+### 3. Adicionar DELETE em `commerce_notifications`
+
+**Nova politica criada:**
+- Donos de comercio podem deletar notificacoes do seu proprio comercio
+
+**Impacto nos fluxos existentes:** Nenhum. Apenas adiciona uma capacidade que nao existia.
+
+---
+
+### Resumo de impacto
+
+| Fluxo | Antes | Depois |
+|-------|-------|--------|
+| Usuario ve proprio perfil | Funciona | Funciona |
+| Comerciante ve clientes | Funciona | Funciona |
+| Master admin ve todos | Funciona | Funciona |
+| Caixa registradora | Funciona | Funciona |
+| Notificacoes | Funciona (sem delete) | Funciona (com delete) |
+| Hacker rouba dados | Possivel | Bloqueado |
+
+---
+
+### Detalhes tecnicos
+
+Migracao SQL unica com:
+
+```text
+1. DROP POLICY "Authenticated users can view profiles" ON profiles
+2. CREATE POLICY para usuario ver proprio perfil (auth.uid() = user_id)
+3. CREATE POLICY para comerciante ver clientes com pedidos (EXISTS subquery em orders + commerces)
+4. CREATE POLICY para master_admin ver todos (is_master_admin())
+5. DROP POLICY "Commerce owners can manage cash registers" ON cash_registers
+6. CREATE 4 politicas granulares (SELECT/INSERT/UPDATE/DELETE) com is_commerce_owner_or_admin()
+7. CREATE POLICY DELETE em commerce_notifications para donos de comercio
+```
+
+Aplicacao da mesma politica `cash_movements` que ja usa o mesmo padrao granular.
+
