@@ -80,6 +80,7 @@ interface Table {
   capacity: number | null;
   status: string | null;
   session_id: string | null;
+  bill_mode?: string | null;
 }
 
 interface TableSession {
@@ -359,13 +360,13 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
         .rpc('get_active_sessions_for_tables', { p_table_ids: tableIds });
       
       if (activeSessions && activeSessions.length > 0) {
-        const sessionMap = new Map(activeSessions.map((s: { table_id: string; session_id: string }) => [s.table_id, s.session_id]));
+        const sessionMap = new Map(activeSessions.map((s: { table_id: string; session_id: string; bill_mode: string }) => [s.table_id, { session_id: s.session_id, bill_mode: s.bill_mode }]));
         
         // Update tables with active session info
         const updatedTables = tablesData.map(t => {
-          const activeSessionId = sessionMap.get(t.id);
-          if (activeSessionId) {
-            return { ...t, session_id: activeSessionId, status: 'occupied' as const };
+          const activeSession = sessionMap.get(t.id);
+          if (activeSession) {
+            return { ...t, session_id: activeSession.session_id, bill_mode: activeSession.bill_mode, status: 'occupied' as const };
           }
           return t;
         });
@@ -1252,6 +1253,17 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
       const sessionInfo = sessionInfoArray?.[0];
 
       if (sessionInfo && !sessionError) {
+        // Block access if session is single bill mode
+        if (sessionInfo.bill_mode === 'single') {
+          toast({ 
+            variant: "destructive",
+            title: "Mesa não disponível", 
+            description: "Esta mesa está em uso com comanda única e não permite novos participantes." 
+          });
+          fetchTables();
+          return;
+        }
+
         // Build session data for the modal
         const sessionData: TableSession = {
           id: sessionInfo.id,
@@ -2640,30 +2652,34 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
                   // Normalize status check - handle null/undefined as available
                   const tableStatus = table.status || 'available';
                   // A table is considered occupied if it has an active session (regardless of status)
-                  const hasSession = !!table.session_id;
-                  const isAvailable = !hasSession && tableStatus === 'available';
-                  const isOccupied = hasSession || tableStatus === 'occupied';
-                  const isReservedOrClosed = tableStatus === 'reserved' || tableStatus === 'closed';
+                   const hasSession = !!table.session_id;
+                   const isSingleBill = hasSession && table.bill_mode === 'single';
+                   const isAvailable = !hasSession && tableStatus === 'available';
+                   const isOccupied = hasSession || tableStatus === 'occupied';
+                   const isReservedOrClosed = tableStatus === 'reserved' || tableStatus === 'closed';
+                   const isBlocked = isReservedOrClosed || isSingleBill;
                   
                   return (
                     <Button
                       key={table.id}
                       variant="outline"
-                      disabled={isReservedOrClosed}
+                      disabled={isBlocked}
                       className={`h-20 flex flex-col border-2 ${
-                        isReservedOrClosed 
+                        isReservedOrClosed || isSingleBill
                           ? 'bg-red-500/10 border-red-500 text-red-600 cursor-not-allowed opacity-60' 
                           : isOccupied
                           ? 'bg-orange-500/10 border-orange-500 text-orange-700 hover:bg-orange-500/20'
                           : 'bg-green-500/10 border-green-500 text-green-700 hover:bg-green-500/20'
                       }`}
-                      onClick={() => !isReservedOrClosed && handleSelectTable(table)}
+                      onClick={() => !isBlocked && handleSelectTable(table)}
                     >
                       <span className="text-lg font-bold">Mesa {table.number}</span>
                       {table.name && <span className="text-xs opacity-70">{table.name}</span>}
                       <span className="text-xs opacity-70">
                         {isReservedOrClosed 
                           ? (tableStatus === 'reserved' ? 'Reservada' : 'Fechada')
+                          : isSingleBill
+                          ? 'Ocupada'
                           : isOccupied 
                           ? (hasSession ? 'Juntar-se' : 'Ocupada')
                           : `${table.capacity} lugares`}
