@@ -2018,6 +2018,13 @@ export type Database = {
           whatsapp: string
         }[]
       }
+      get_profile_names: {
+        Args: { p_user_ids: string[] }
+        Returns: {
+          full_name: string
+          user_id: string
+        }[]
+      }
       get_public_commerces: {
         Args: { p_limit?: number }
         Returns: {

@@ -981,7 +981,7 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
 
       // Top customers - fetch names
       const topCustomerIds = Object.entries(customerOrders).sort((a, b) => b[1].total - a[1].total).slice(0, 10);
-      const { data: profilesData } = await supabase.from('profiles').select('user_id, full_name').in('user_id', topCustomerIds.map(c => c[0]));
+      const { data: profilesData } = await supabase.rpc('get_profile_names', { p_user_ids: topCustomerIds.map(c => c[0]) });
       const profileMap = new Map(profilesData?.map(p => [p.user_id, p.full_name]) || []);
       const topCustomers = topCustomerIds.map(([uid, data]) => ({
         name: profileMap.get(uid) || 'Cliente',

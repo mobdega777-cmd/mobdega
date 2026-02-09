@@ -205,9 +205,7 @@ const AddToTabModal = ({
       // Fetch profiles for participant names
       const userIds = [...new Set(participantsData?.map(p => p.user_id) || [])];
       const { data: profilesData } = await supabase
-        .from('profiles')
-        .select('user_id, full_name')
-        .in('user_id', userIds);
+        .rpc('get_profile_names', { p_user_ids: userIds });
 
       const profilesMap = new Map(profilesData?.map(p => [p.user_id, p.full_name]) || []);
 
