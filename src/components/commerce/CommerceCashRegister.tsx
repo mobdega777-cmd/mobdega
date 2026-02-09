@@ -64,6 +64,7 @@ import { startOfDay, endOfDay, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { HelpTooltip } from "@/components/ui/help-tooltip";
 import AddToTabModal from "./AddToTabModal";
+import CashManagementModal from "./CashManagementModal";
 
 interface CommerceCashRegisterProps {
   commerceId: string;
@@ -202,6 +203,7 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
   // Add to Tab modal
   const [showAddToTabModal, setShowAddToTabModal] = useState(false);
   const [selectedTableOrderForTab, setSelectedTableOrderForTab] = useState<TableOrder | null>(null);
+  const [cashManagementOpen, setCashManagementOpen] = useState(false);
 
   // Date filter state - usa data local para evitar problemas de fuso horário UTC
   const getLocalToday = () => {
@@ -785,8 +787,9 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
   };
 
   const calculateTotals = () => {
-    // Always use filteredMovements to respect date filter
-    const movementsToCalculate = filteredMovements;
+    // When register is open, cards show ALL movements since opening (no date filter)
+    // When closed, use filtered movements
+    const movementsToCalculate = currentRegister ? movements : filteredMovements;
     const sales = movementsToCalculate.filter(m => m.type === 'sale').reduce((sum, m) => sum + Number(m.amount), 0);
     const deposits = movementsToCalculate.filter(m => m.type === 'deposit').reduce((sum, m) => sum + Number(m.amount), 0);
     const withdrawals = movementsToCalculate.filter(m => m.type === 'withdrawal').reduce((sum, m) => sum + Number(m.amount), 0);
@@ -800,8 +803,8 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
 
   // Calcular totais por forma de pagamento para o fechamento
   const calculatePaymentMethodTotals = () => {
-    // Always use filteredMovements to respect date filter
-    const movementsToCalculate = filteredMovements;
+    // When register is open, use ALL movements; when closed, use filtered
+    const movementsToCalculate = currentRegister ? movements : filteredMovements;
     const salesMovements = movementsToCalculate.filter(m => m.type === 'sale');
     
     const byPaymentMethod = {
@@ -1186,6 +1189,12 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
             </Dialog>
           ) : (
             <>
+              {/* Gestão Caixa Button */}
+              <Button variant="outline" className="gap-2 text-sm" size="sm" onClick={() => setCashManagementOpen(true)}>
+                <ClipboardList className="w-4 h-4" />
+                <span className="hidden xs:inline">Gestão</span> Caixa
+              </Button>
+
               {/* Lançar Venda Dialog */}
               <Dialog open={isSaleDialogOpen} onOpenChange={(open) => {
                 setIsSaleDialogOpen(open);
@@ -2405,6 +2414,13 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
           }))
         } : null}
         onSuccess={fetchData}
+      />
+
+      {/* Cash Management Modal */}
+      <CashManagementModal
+        open={cashManagementOpen}
+        onOpenChange={setCashManagementOpen}
+        commerceId={commerceId}
       />
     </div>
   );
