@@ -1,25 +1,38 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Download, X, Smartphone } from "lucide-react";
+import { Download, X, Smartphone, Share } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePWAInstall } from "@/hooks/usePWAInstall";
 
 const PWAInstallPrompt = () => {
-  const { shouldShowPrompt, promptInstall, dismissInstallPrompt } = usePWAInstall();
+  const { shouldShowPrompt, promptInstall, dismissInstallPrompt, isInstalled } = usePWAInstall();
   const [isVisible, setIsVisible] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
 
   useEffect(() => {
+    // Detect iOS
+    const ios = /iphone|ipad|ipod/i.test(navigator.userAgent) && !(window as any).MSStream;
+    setIsIOS(ios);
+
     // Show prompt after a short delay
     const timer = setTimeout(() => {
-      if (shouldShowPrompt) {
+      if (isInstalled) return;
+      // Show if native prompt available OR if iOS (manual instructions)
+      const dismissed = localStorage.getItem('pwa-install-dismissed');
+      if (dismissed) return;
+      if (shouldShowPrompt || ios) {
         setIsVisible(true);
       }
     }, 3000);
 
     return () => clearTimeout(timer);
-  }, [shouldShowPrompt]);
+  }, [shouldShowPrompt, isInstalled]);
 
   const handleInstall = async () => {
+    if (isIOS) {
+      // Can't programmatically install on iOS, just dismiss
+      return;
+    }
     const installed = await promptInstall();
     if (installed) {
       setIsVisible(false);
@@ -47,25 +60,33 @@ const PWAInstallPrompt = () => {
               <Smartphone className="w-6 h-6 text-primary" />
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-foreground">Instalar Mobdega</h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                Adicione à sua tela inicial para acesso rápido!
-              </p>
+              <h3 className="font-semibold text-foreground">Adicionar à Tela Inicial</h3>
+              {isIOS ? (
+                <p className="text-sm text-muted-foreground mt-1">
+                  Toque em <Share className="w-4 h-4 inline-block mx-0.5 -mt-0.5" /> e depois em <strong>"Adicionar à Tela de Início"</strong>
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground mt-1">
+                  Instale o Mobdega para acesso rápido direto da sua tela inicial!
+                </p>
+              )}
               <div className="flex gap-2 mt-3">
-                <Button 
-                  size="sm" 
-                  className="gap-2" 
-                  onClick={handleInstall}
-                >
-                  <Download className="w-4 h-4" />
-                  Instalar
-                </Button>
+                {!isIOS && (
+                  <Button 
+                    size="sm" 
+                    className="gap-2" 
+                    onClick={handleInstall}
+                  >
+                    <Download className="w-4 h-4" />
+                    Instalar
+                  </Button>
+                )}
                 <Button 
                   size="sm" 
                   variant="ghost" 
                   onClick={handleDismiss}
                 >
-                  Agora não
+                  {isIOS ? "Entendi" : "Agora não"}
                 </Button>
               </div>
             </div>

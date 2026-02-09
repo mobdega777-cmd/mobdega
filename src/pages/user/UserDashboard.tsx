@@ -132,6 +132,8 @@ const UserDashboard = () => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [ordersCount, setOrdersCount] = useState<number>(0);
+  const [ordersPage, setOrdersPage] = useState(0);
+  const ORDERS_PER_PAGE = 30;
   const [favorites, setFavorites] = useState<Favorite[]>([]);
   const [commerces, setCommerces] = useState<Commerce[]>([]);
   const [loading, setLoading] = useState(true);
@@ -245,8 +247,11 @@ const UserDashboard = () => {
     }
   };
 
-  const fetchOrders = async () => {
+  const fetchOrders = async (page = 0) => {
     if (!user) return;
+    
+    const from = page * ORDERS_PER_PAGE;
+    const to = from + ORDERS_PER_PAGE - 1;
     
     const { data, error, count } = await supabase
       .from('orders')
@@ -259,7 +264,7 @@ const UserDashboard = () => {
       )
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
-      .limit(50);
+      .range(from, to);
     
     if (error) {
       console.error('Error fetching orders:', error);
@@ -780,6 +785,39 @@ const UserDashboard = () => {
                           </div>
                         );
                       })}
+                      
+                      {/* Pagination */}
+                      {ordersCount > ORDERS_PER_PAGE && (
+                        <div className="flex items-center justify-center gap-4 pt-4">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={ordersPage === 0}
+                            onClick={() => {
+                              const newPage = ordersPage - 1;
+                              setOrdersPage(newPage);
+                              fetchOrders(newPage);
+                            }}
+                          >
+                            Anterior
+                          </Button>
+                          <span className="text-sm text-muted-foreground">
+                            {ordersPage + 1} de {Math.ceil(ordersCount / ORDERS_PER_PAGE)}
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={ordersPage >= Math.ceil(ordersCount / ORDERS_PER_PAGE) - 1}
+                            onClick={() => {
+                              const newPage = ordersPage + 1;
+                              setOrdersPage(newPage);
+                              fetchOrders(newPage);
+                            }}
+                          >
+                            Próximo
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </CardContent>
