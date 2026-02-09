@@ -11,7 +11,8 @@ import {
   CheckCircle,
   Truck,
   Settings,
-  Share2
+  Share2,
+  Star
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -28,6 +29,7 @@ import { formatCurrency } from "@/lib/formatCurrency";
 import { getSupabaseDateRange, getTodayDateRange } from "@/lib/dateUtils";
 import HelpTooltip from "@/components/ui/help-tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
+import CommerceReviewsModal from "./CommerceReviewsModal";
 
 interface OpeningHours {
   [key: string]: { open: string; close: string; enabled: boolean };
@@ -44,6 +46,8 @@ interface Stats {
   totalProducts: number;
   activeDeliveries: number;
   completedToday: number;
+  avgRating: number;
+  reviewsCount: number;
 }
 
 const DEFAULT_HOURS: OpeningHours = {
@@ -62,7 +66,8 @@ const DAY_NAMES: Record<string, string> = {
 };
 
 const CommerceOverview = ({ commerce }: CommerceOverviewProps) => {
-  const [stats, setStats] = useState<Stats>({ totalOrders: 0, pendingOrders: 0, todayRevenue: 0, totalProducts: 0, activeDeliveries: 0, completedToday: 0 });
+  const [stats, setStats] = useState<Stats>({ totalOrders: 0, pendingOrders: 0, todayRevenue: 0, totalProducts: 0, activeDeliveries: 0, completedToday: 0, avgRating: 0, reviewsCount: 0 });
+  const [reviewsModalOpen, setReviewsModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const todayRange = getTodayDateRange();
   const [dateFilter, setDateFilter] = useState({ start: todayRange.start, end: todayRange.end });
@@ -152,6 +157,17 @@ const CommerceOverview = ({ commerce }: CommerceOverviewProps) => {
       const completedCount = cashMovements?.length || 0;
       
       const { count: productsCount } = await supabase.from('products').select('id', { count: 'exact', head: true }).eq('commerce_id', commerce.id);
+
+      // Fetch reviews stats
+      const { data: reviewsData } = await supabase
+        .from('reviews')
+        .select('rating')
+        .eq('commerce_id', commerce.id);
+      
+      const reviewsCount = reviewsData?.length || 0;
+      const avgRating = reviewsCount > 0 
+        ? reviewsData!.reduce((sum, r) => sum + r.rating, 0) / reviewsCount 
+        : 0;
       
       setStats({ 
         totalOrders: orders?.length || 0, 
@@ -159,7 +175,9 @@ const CommerceOverview = ({ commerce }: CommerceOverviewProps) => {
         todayRevenue: netRevenue, 
         totalProducts: productsCount || 0, 
         activeDeliveries, 
-        completedToday: completedCount 
+        completedToday: completedCount,
+        avgRating,
+        reviewsCount
       });
       setLoading(false);
     };
@@ -205,6 +223,7 @@ const CommerceOverview = ({ commerce }: CommerceOverviewProps) => {
     { title: "Entregas Ativas", value: stats.activeDeliveries, icon: Truck, color: "text-blue-500", bgColor: "bg-blue-500/10", tooltip: "Pedidos de delivery que estão em rota de entrega neste momento." },
     { title: "Finalizados no Período", value: stats.completedToday, icon: CheckCircle, color: "text-emerald-500", bgColor: "bg-emerald-500/10", tooltip: "Quantidade de pedidos concluídos com sucesso no período selecionado." },
     { title: "Total de Produtos", value: stats.totalProducts, icon: Package, color: "text-purple-500", bgColor: "bg-purple-500/10", tooltip: "Quantidade de produtos cadastrados no seu cardápio." },
+    { title: "Avaliações", value: stats.reviewsCount > 0 ? `${stats.avgRating.toFixed(1)} (${stats.reviewsCount})` : "0", icon: Star, color: "text-yellow-500", bgColor: "bg-yellow-500/10", tooltip: "Nota média das avaliações dos clientes e total de resenhas.", onClick: () => setReviewsModalOpen(true) },
   ];
 
   return (
@@ -292,8 +311,12 @@ const CommerceOverview = ({ commerce }: CommerceOverviewProps) => {
       )}
 
       <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
-        {statCards.map((stat) => { const Icon = stat.icon; return (
-          <Card key={stat.title} className="border-border/50">
+        {statCards.map((stat) => { const Icon = stat.icon; const isClickable = 'onClick' in stat && !!stat.onClick; return (
+          <Card 
+            key={stat.title} 
+            className={`border-border/50 ${isClickable ? 'cursor-pointer hover:border-primary/50 transition-colors' : ''}`}
+            onClick={() => isClickable && (stat as any).onClick()}
+          >
             <CardContent className="p-3 md:p-6">
               <div className="flex items-center justify-between">
                 <div className="min-w-0 flex-1">
@@ -321,6 +344,13 @@ const CommerceOverview = ({ commerce }: CommerceOverviewProps) => {
 
       {/* Atualizações do Sistema - movido para o final */}
       <SystemUpdates />
+
+      {/* Modal de Avaliações */}
+      <CommerceReviewsModal 
+        open={reviewsModalOpen} 
+        onOpenChange={setReviewsModalOpen} 
+        commerceId={commerce.id} 
+      />
     </div>
   );
 };

@@ -1517,6 +1517,8 @@ export type Database = {
         Row: {
           comment: string | null
           commerce_id: string
+          commerce_reply: string | null
+          commerce_reply_at: string | null
           created_at: string
           id: string
           rating: number
@@ -1526,6 +1528,8 @@ export type Database = {
         Insert: {
           comment?: string | null
           commerce_id: string
+          commerce_reply?: string | null
+          commerce_reply_at?: string | null
           created_at?: string
           id?: string
           rating: number
@@ -1535,6 +1539,8 @@ export type Database = {
         Update: {
           comment?: string | null
           commerce_id?: string
+          commerce_reply?: string | null
+          commerce_reply_at?: string | null
           created_at?: string
           id?: string
           rating?: number
