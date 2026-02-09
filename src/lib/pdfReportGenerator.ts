@@ -397,6 +397,23 @@ export const generateSalesReportPDF = async (data: SalesReportData) => {
     doc.setTextColor(0, 0, 0);
     yPos += 50;
 
+    // Explicação do cálculo
+    doc.setFontSize(8);
+    doc.setTextColor(100, 100, 100);
+    doc.setFont('helvetica', 'italic');
+    const explanationLines = [
+      'Como é calculado: A Projeção de Faturamento Mensal é baseada na média diária de vendas do período multiplicada por 30 dias.',
+      'O Valuation do Negócio utiliza o método de múltiplo de lucro: Lucro Líquido Mensal Projetado × 12 meses.',
+      'Lucro Líquido = Faturamento Projetado − Custos (fixos + variáveis + taxas de operadoras + impostos).',
+    ];
+    explanationLines.forEach((line) => {
+      doc.text(line, 14, yPos);
+      yPos += 4;
+    });
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(0, 0, 0);
+    yPos += 6;
+
     // Estoque
     doc.setFontSize(12);
     doc.setFont('helvetica', 'bold');
