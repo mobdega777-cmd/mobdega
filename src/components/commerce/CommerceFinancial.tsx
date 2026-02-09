@@ -428,8 +428,45 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
       toast({ variant: "destructive", title: "Erro ao salvar configuração de impostos" });
     } else {
       setTaxConfig(config);
+
+      // Upsert expense for tax as fixed cost
+      const regimeLabel = getTaxRegimeLabel(config.tax_regime);
+      const expenseName = `Imposto - ${regimeLabel}`;
+      const today = new Date();
+      const dueDay = Math.min(config.tax_payment_day, new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate());
+      const dueDate = new Date(today.getFullYear(), today.getMonth(), dueDay);
+      const dueDateStr = dueDate.toISOString().split('T')[0];
+
+      // Check if tax expense already exists
+      const { data: existingExpense } = await supabase
+        .from('expenses')
+        .select('id')
+        .eq('commerce_id', commerceId)
+        .eq('type', 'fixed')
+        .ilike('name', 'Imposto%')
+        .maybeSingle();
+
+      if (existingExpense) {
+        await supabase
+          .from('expenses')
+          .update({ name: expenseName, amount: config.tax_value, due_date: dueDateStr })
+          .eq('id', existingExpense.id);
+      } else {
+        await supabase
+          .from('expenses')
+          .insert({
+            commerce_id: commerceId,
+            name: expenseName,
+            type: 'fixed',
+            amount: config.tax_value,
+            due_date: dueDateStr,
+            is_active: true,
+            is_paid: false,
+          });
+      }
+
       toast({ title: "Configuração de impostos salva com sucesso!" });
-      fetchData(); // Refresh stats with new tax calculation
+      fetchData();
     }
   };
 
@@ -1053,7 +1090,33 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
               tax_paid_at: new Date().toISOString()
             })
             .eq('id', commerceId);
+          // Sync expense
+          await supabase
+            .from('expenses')
+            .update({ is_paid: true, paid_at: new Date().toISOString() })
+            .eq('commerce_id', commerceId)
+            .eq('type', 'fixed')
+            .ilike('name', 'Imposto%');
           toast({ title: "Imposto marcado como pago!" });
+          fetchData();
+        };
+
+        const handleResetTaxPayment = async () => {
+          await supabase
+            .from('commerces')
+            .update({ 
+              tax_paid_current_month: false,
+              tax_paid_at: null
+            })
+            .eq('id', commerceId);
+          // Sync expense
+          await supabase
+            .from('expenses')
+            .update({ is_paid: false, paid_at: null })
+            .eq('commerce_id', commerceId)
+            .eq('type', 'fixed')
+            .ilike('name', 'Imposto%');
+          toast({ title: "Pagamento de imposto estornado!" });
           fetchData();
         };
 
@@ -1102,6 +1165,16 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
                        className={isAlertActive ? 'animate-pulse' : undefined}
                      >
                        Paguei
+                     </Button>
+                   )}
+                   {taxPaidThisMonth && (
+                     <Button
+                       variant="outline"
+                       size="sm"
+                       onClick={handleResetTaxPayment}
+                       className="text-destructive border-destructive/50 hover:bg-destructive/10"
+                     >
+                       Reset
                      </Button>
                    )}
                   <Button variant="outline" size="sm" onClick={() => setIsTaxModalOpen(true)}>
