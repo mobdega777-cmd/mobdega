@@ -1,111 +1,76 @@
 
-# Relatório de Segurança Completo - Mobdega
 
-## Resumo Executivo
+# Plano: Correção do Caixa/PDV e Nova Tela de Gestão de Caixa
 
-Analisei todos os alertas de segurança do seu projeto. Dos **8 erros** e **5 avisos** mostrados, a maioria já foi corrigida anteriormente ou representa comportamentos intencionais do seu negócio.
+## Problema Identificado
 
----
+O caixa da Adega Premium foi aberto em **06/02** e nunca foi fechado. Desde então, vendas foram registradas nos dias 07/02 e 08/02. Porém, os cards (Vendas, Entradas, Sangrias, etc.) filtram por "Hoje" como padrão, o que faz com que movimentações de dias anteriores **desapareçam dos cards**. O correto e que, enquanto o caixa estiver aberto, **todos os valores desde a abertura** apareçam nos cards, independente de ter passado meia-noite.
 
-## Status dos Erros (8 Erros)
-
-### ✅ JÁ CORRIGIDOS (3 erros - podem ser ignorados)
-
-| Erro | Status | Motivo |
-|------|--------|--------|
-| **Admin Creation Endpoint Publicly Accessible** | ✅ Ignorado | Já protegido com `ADMIN_SETUP_SECRET` - sem o secret correto, retorna 401 |
-| **Admin Password Hardcoded in Source Code** | ✅ Ignorado | Já usa variável de ambiente `ADMIN_DEFAULT_PASSWORD` |
-| **Commerce Assets Modifiable By Any User** | ✅ Ignorado | Políticas de storage já verificam ownership por pasta |
+## Solucao em 3 Partes
 
 ---
 
-### 🛡️ COMPORTAMENTOS INTENCIONAIS DO NEGÓCIO (5 erros)
+### Parte 1 -- Corrigir exibicao dos cards quando o caixa esta aberto
 
-Estes erros são **funcionalidades necessárias** para o funcionamento do sistema, não vulnerabilidades:
+**Comportamento atual:** Os cards usam `filteredMovements` (filtrados pelo dateFilter, que por padrao e "hoje").
 
-| Erro | Análise | Ação Recomendada |
-|------|---------|------------------|
-| **Customer Personal Data Could Be Stolen by Anyone** | Comerciantes precisam ver dados de clientes para entregas | Marcar como ignorado - é comportamento de negócio |
-| **Customer Order History and Addresses Exposed** | Necessário para gestão de pedidos e entregas | Marcar como ignorado |
-| **Business Financial Records (Invoices)** | Isolado por comércio via RLS - cada lojista só vê suas faturas | Marcar como ignorado |
-| **Business Bank Account Details (PIX)** | Clientes precisam ver chaves PIX para pagar | Marcar como ignorado |
-| **Business Owner Info Exposed to Platform** | Master Admin precisa gerenciar lojistas | Marcar como ignorado |
+**Comportamento correto:** Quando o caixa esta aberto, os cards devem usar **todos os movimentos do caixa aberto** (sem filtro de data). O filtro de data so deve afetar a tabela de Movimentacoes abaixo, nao os cards.
+
+- Alterar `calculateTotals()` para usar `movements` (todas do caixa) em vez de `filteredMovements` quando `currentRegister` estiver definido
+- Alterar `calculatePaymentMethodTotals()` da mesma forma
+- Manter `filteredMovements` apenas para a tabela de Movimentacoes
 
 ---
 
-## Status dos Avisos (5 Warnings)
+### Parte 2 -- Botao "Gestao Caixa" com tela de historico
 
-| Aviso | Risco Real | Ação |
-|-------|------------|------|
-| **Leaked Password Protection Disabled** | Médio | Requer ativação manual no Cloud |
-| **Function Search Path Mutable** | Baixo | Algumas funções internas sem `search_path` definido |
-| **RLS Policy Always True (2x)** | Baixo | Políticas permissivas em tabelas públicas (comportamento esperado) |
-| **Weak Password Requirements** | ✅ Corrigido | Já valida 8+ caracteres com complexidade |
+Adicionar um botao **"Gestao Caixa"** ao lado do botao "Venda", que abre um dialog/modal com:
 
----
-
-## Resposta: É Possível Ser Hackeado?
-
-### 🔒 Proteções Já Implementadas
-
-1. **Autenticação Segura**
-   - Supabase Auth gerencia sessões e tokens JWT
-   - Senhas hasheadas com bcrypt (nunca expostas)
-   - Tokens expiram automaticamente
-
-2. **Row Level Security (RLS)**
-   - Todas as tabelas têm RLS ativado
-   - Cada usuário só vê seus próprios dados
-   - Comerciantes isolados por `owner_id`
-
-3. **Proteção de APIs**
-   - Edge functions protegidas por secrets
-   - Validação de entrada em formulários
-   - Queries parametrizadas (previnem SQL Injection)
-
-4. **Proteção no Frontend**
-   - Rotas protegidas verificam autenticação
-   - Tokens não são expostos em localStorage de forma insegura
-
-### 🔍 O Que Alguém Poderia Tentar?
-
-| Tentativa | Resultado |
-|-----------|-----------|
-| **Inspecionar elemento para roubar dados** | ❌ Não funciona - os dados só carregam após autenticação válida |
-| **Copiar token JWT** | ⚠️ Tokens expiram, mas se roubado poderia ter acesso temporário |
-| **Modificar requests no DevTools** | ❌ RLS valida permissões no servidor - requests não autorizados falham |
-| **SQL Injection** | ❌ Supabase usa queries parametrizadas |
-| **Acessar dados de outro comércio** | ❌ RLS impede - cada query verifica `owner_id = auth.uid()` |
+- **Lista paginada** (10 registros por pagina) de todos os caixas fechados
+- Cada registro mostra:
+  - Data de abertura e fechamento (dia e hora)
+  - Valor de abertura
+  - Valor de fechamento
+  - Valor esperado
+  - Diferenca (positiva/negativa)
+  - Status de conferencia (100% conferido se diferenca = 0)
+  - Resumo por forma de pagamento (buscando movimentos daquele caixa)
+- **Insights por fechamento**: ao lado de cada registro, um mini-resumo com:
+  - Total de vendas
+  - Ticket medio
+  - Forma de pagamento mais usada
+  - Duracao do turno (abertura ate fechamento)
 
 ---
 
-## Ações Recomendadas
+### Parte 3 -- Detalhes Tecnicos
 
-### 1. Ignorar os Erros de Comportamento de Negócio
-Os 5 erros relacionados a "dados expostos" são funcionalidades necessárias:
-- Comerciante precisa ver dados do cliente para entregar
-- Cliente precisa ver PIX para pagar
-- Admin precisa gerenciar a plataforma
+**Arquivo principal modificado:** `src/components/commerce/CommerceCashRegister.tsx`
 
-### 2. Habilitar Leaked Password Protection
-Acesse **Lovable Cloud > Autenticação** e ative a proteção contra senhas vazadas.
+**Mudancas no `calculateTotals()`:**
+```text
+Quando currentRegister != null:
+  -> usar `movements` (todos do caixa aberto)
+Quando currentRegister == null:
+  -> usar `filteredMovements` (como hoje)
+```
 
-### 3. Melhorias Opcionais de Segurança
-- Adicionar 2FA para Master Admin
-- Implementar rate limiting em login
-- Logs de auditoria para ações críticas
+**Novo estado e funcoes:**
+- `cashManagementOpen` (boolean) para controlar o modal
+- `closedRegisters` (array) para armazenar o historico
+- `registersPage` (number) para paginacao
+- `fetchClosedRegisters()` para buscar caixas fechados com seus movimentos
 
----
+**Nova consulta:**
+- Buscar `cash_registers` com `status = 'closed'` ordenados por `closed_at DESC`
+- Para cada registro, buscar movimentos associados via `cash_register_id`
+- Calcular insights (ticket medio, forma mais usada, duracao)
 
-## Conclusão
+**Novo componente visual (dentro do mesmo arquivo):**
+- Modal "Gestao de Caixa" com cards expansiveis por fechamento
+- Paginacao com 10 itens por pagina
+- Badges de status (conferido/divergencia)
+- Cores: verde para diferenca = 0, vermelho para divergencia
 
-**Seu sistema está seguro.** Os erros mostrados são:
-- 3 já corrigidos
-- 5 comportamentos necessários do negócio
+**Icone sugerido:** `ClipboardList` ou `BarChart3` (ja importados)
 
-Ninguém pode "hackear" o sistema via inspecionar elemento porque:
-- Dados só carregam com autenticação válida
-- Todas as validações acontecem no servidor
-- RLS impede acesso cruzado entre usuários
-
-Posso marcar os erros como "ignorados" com as justificativas adequadas para limpar o painel de segurança.
