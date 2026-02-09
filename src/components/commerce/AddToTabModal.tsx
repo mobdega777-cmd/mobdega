@@ -550,25 +550,38 @@ const AddToTabModal = ({
                       {filteredProducts.length === 0 ? (
                         <p className="text-sm text-muted-foreground p-3">Nenhum produto encontrado</p>
                       ) : (
-                        filteredProducts.slice(0, 10).map((product) => (
-                          <div
-                            key={product.id}
-                            className="p-3 hover:bg-muted cursor-pointer border-b last:border-b-0"
-                            onClick={() => handleSelectProduct(product)}
-                          >
-                            <div className="flex justify-between items-center">
-                              <div>
-                                <p className="font-medium text-sm">{product.name}</p>
-                                {product.category?.name && (
-                                  <p className="text-xs text-muted-foreground">{product.category.name}</p>
-                                )}
+                        filteredProducts.slice(0, 10).map((product) => {
+                          const isOutOfStock = product.stock !== null && product.stock !== undefined && product.stock <= 0;
+                          const isLowStock = !isOutOfStock && product.stock !== null && product.stock !== undefined && product.stock <= 5;
+                          return (
+                            <div
+                              key={product.id}
+                              className={`p-3 border-b last:border-b-0 ${isOutOfStock ? 'opacity-50 cursor-not-allowed' : 'hover:bg-muted cursor-pointer'}`}
+                              onClick={() => !isOutOfStock && handleSelectProduct(product)}
+                            >
+                              <div className="flex justify-between items-center">
+                                <div>
+                                  <p className="font-medium text-sm">{product.name}</p>
+                                  {product.category?.name && (
+                                    <p className="text-xs text-muted-foreground">{product.category.name}</p>
+                                  )}
+                                  {isLowStock && (
+                                    <p className="text-xs text-yellow-600">Estoque: {product.stock} un.</p>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {isOutOfStock ? (
+                                    <span className="text-xs font-semibold text-destructive bg-destructive/10 px-2 py-0.5 rounded-full">Esgotado</span>
+                                  ) : (
+                                    <p className="font-semibold text-primary">
+                                      {formatCurrency(product.promotional_price || product.price)}
+                                    </p>
+                                  )}
+                                </div>
                               </div>
-                              <p className="font-semibold text-primary">
-                                {formatCurrency(product.promotional_price || product.price)}
-                              </p>
                             </div>
-                          </div>
-                        ))
+                          );
+                        })
                       )}
                     </div>
                   )}

@@ -437,12 +437,7 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
 
       // For split bill mode, group items by participant
       const finalOrders = Array.from(ordersBySession.values()).map(sessionOrder => {
-        const tableCouponDiscount = sessionOrder.coupon_discount || 0;
-        
-        // Subtrair o desconto do cupom do total da mesa
-        if (tableCouponDiscount > 0) {
-          sessionOrder.total = Math.max(0, sessionOrder.total - tableCouponDiscount);
-        }
+        // O order.total do banco já inclui o desconto do cupom, não subtrair novamente
         
         if (sessionOrder.session?.bill_mode === 'split') {
           const participantOrdersMap = new Map<string, ParticipantOrder>();
@@ -2107,21 +2102,50 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
                 </Badge>
               </div>
 
-              {/* Items */}
+              {/* Items - grouped by participant for split bills */}
               <div className="space-y-2">
                 <h4 className="font-medium">Itens do Pedido</h4>
-                <div className="space-y-2 max-h-60 overflow-y-auto">
-                  {selectedTableOrder.items.map((item, idx) => (
-                    <div key={idx} className="flex justify-between items-center p-2 bg-muted/30 rounded">
-                      <div>
-                        <p className="font-medium">{item.product_name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {item.quantity}x {formatCurrency(item.unit_price)}
-                        </p>
+                <div className="space-y-3 max-h-60 overflow-y-auto">
+                  {selectedTableOrder.participantOrders && selectedTableOrder.participantOrders.length > 0 ? (
+                    selectedTableOrder.participantOrders.map((po, pIdx) => (
+                      <div key={pIdx} className="space-y-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <User className="w-3 h-3 text-muted-foreground" />
+                          <span className="text-sm font-semibold">{po.participant.customer_name || 'Participante'}</span>
+                          <Badge variant={po.participant.is_host ? 'default' : 'secondary'} className="text-[10px] px-1.5 py-0">
+                            {po.participant.is_host ? 'Host' : 'Participante'}
+                          </Badge>
+                        </div>
+                        {po.items.map((item, idx) => (
+                          <div key={idx} className="flex justify-between items-center p-2 bg-muted/30 rounded ml-4">
+                            <div>
+                              <p className="font-medium">{item.product_name}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {item.quantity}x {formatCurrency(item.unit_price)}
+                              </p>
+                            </div>
+                            <span className="font-bold">{formatCurrency(item.total_price)}</span>
+                          </div>
+                        ))}
+                        <div className="flex justify-between items-center ml-4 pr-2 pt-1 border-t border-dashed">
+                          <span className="text-xs text-muted-foreground">Subtotal</span>
+                          <span className="text-sm font-semibold">{formatCurrency(po.total)}</span>
+                        </div>
                       </div>
-                      <span className="font-bold">{formatCurrency(item.total_price)}</span>
-                    </div>
-                  ))}
+                    ))
+                  ) : (
+                    selectedTableOrder.items.map((item, idx) => (
+                      <div key={idx} className="flex justify-between items-center p-2 bg-muted/30 rounded">
+                        <div>
+                          <p className="font-medium">{item.product_name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {item.quantity}x {formatCurrency(item.unit_price)}
+                          </p>
+                        </div>
+                        <span className="font-bold">{formatCurrency(item.total_price)}</span>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
 
