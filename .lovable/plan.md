@@ -1,128 +1,61 @@
 
-# Plano: Relatorio Gerencial Completo (PDF)
 
-## Resumo
+# Plano de Correções - Caixa/PDV
 
-Criar um botao "Relatorio Gerencial" na barra de botoes do Financeiro (ao lado de "Relatorio de Estoque") que gera um PDF completo com dados de **todos os modulos** do sistema: vendas, caixa, estoque, despesas, clientes, cupons, delivery, ranking e insights de BI.
+## 1. Indicar produtos esgotados no "Lançar em Comanda"
 
----
+**Problema:** Ao buscar um produto no modal "Lançar em Comanda", produtos com estoque zerado aparecem normalmente, sem indicar que estao esgotados.
 
-## O que o relatorio vai conter
+**Solucao:** No componente `AddToTabModal.tsx`, na lista de resultados da busca de produtos (linhas 553-572), adicionar:
+- Badge "Esgotado" em vermelho ao lado do preco quando `product.stock === 0`
+- Desabilitar o clique (nao permitir selecionar produto esgotado)
+- Estilizar o item com opacidade reduzida para indicar visualmente a indisponibilidade
+- Tambem exibir o estoque disponivel para produtos com estoque baixo
 
-O PDF sera organizado em secoes com headers coloridos, seguindo o padrao visual ja existente nos relatorios de vendas e estoque:
-
-### Pagina 1 -- Capa + Resumo Executivo
-- Nome do comercio, periodo, data de geracao
-- Cards resumo: Faturamento, Pedidos, Ticket Medio, Crescimento, Lucro Liquido, Valuation
-
-### Pagina 2 -- DRE (Demonstrativo de Resultado)
-- Tabela completa: Faturamento Bruto, Taxas, Receita Liquida, CPV, Lucro Bruto, Despesas Fixas, Impostos, Lucro Liquido
-- Reutiliza a mesma logica ja presente no relatorio de vendas
-
-### Pagina 3 -- Vendas Detalhadas
-- Vendas por forma de pagamento (tabela)
-- Categorias mais vendidas (tabela)
-- Vendas diarias do periodo (tabela)
-
-### Pagina 4 -- Fechamentos de Caixa
-- Ultimos fechamentos: data abertura/fechamento, saldo esperado vs real, diferenca, faturamento, ticket medio, metodo mais usado, duracao, status
-
-### Pagina 5 -- Estoque
-- Cards: Total produtos, Valor em estoque, Receita potencial
-- Produtos com estoque baixo (alerta)
-- Estoque por categoria (tabela)
-
-### Pagina 6 -- Despesas e Custos
-- Lista de despesas fixas e variaveis com status (pago/pendente)
-- Historico de compras de estoque
-- Configuracao tributaria
-
-### Pagina 7 -- Clientes (CRM)
-- Total de clientes, novos vs recorrentes
-- Top 10 clientes por gasto total
-
-### Pagina 8 -- Cupons
-- Cupons ativos: codigo, tipo desconto, usos, validade
-
-### Pagina 9 -- Delivery
-- Total pedidos delivery no periodo, valor total
-- Resumo de status (pendentes, em rota, entregues)
-
-### Pagina 10 -- Insights e BI
-- Ticket Medio e variacao
-- Horario e dia de pico
-- Produto mais vendido
-- Taxa de retencao de clientes
-- Dicas de marketing baseadas nos dados
-
-### Pagina 11 -- Ranking
-- Posicao atual do comercio nas categorias (Ouro, Top Delivery, Gestao 10)
-- Nota e avaliacoes
-
-### Pagina Final -- Projecoes e Valuation
-- Projecao de faturamento mensal
-- Valuation do negocio (12x lucro)
-- Nota explicativa de metodologia
+**Arquivo:** `src/components/commerce/AddToTabModal.tsx`
 
 ---
 
-## Mudancas Tecnicas
+## 2. Corrigir valor total da mesa com cupom de desconto
 
-### Arquivo: `src/lib/pdfReportGenerator.ts`
+**Problema:** O total da mesa esta sendo calculado incorretamente. O campo `order.total` no banco ja inclui o desconto do cupom (ex: Ricardo tem total=R$7.50 ao inves de R$15), porem o codigo subtrai o cupom novamente na linha 444.
 
-Criar nova funcao exportada `generateManagementReportPDF` que recebe uma interface `ManagementReportData` com todos os dados necessarios. A funcao seguira o mesmo padrao visual dos relatorios existentes (jsPDF + autoTable, headers coloridos, cards).
+**Dados confirmados no banco:**
+- Vitoria: 2 pedidos com total=15+16 = R$31 (sem cupom)
+- Ricardo: 1 pedido com total=R$7.50 (cupom ja aplicado, subtotal era R$15)
+- Soma correta: R$38.50
+- Valor exibido: R$31 (desconto subtraido duas vezes)
 
-**Nova interface:**
-```text
-ManagementReportData {
-  commerceName, logoUrl, period
-  // Financeiro
-  grossRevenue, netRevenue, operatorFees, productCostSold
-  taxAmount, taxRegime, taxPaymentDay, fixedExpenses
-  netProfit, projectedRevenue, businessValuation
-  totalOrders, avgTicket, growthRate, profitMargin
-  // Vendas
-  paymentMethodBreakdown, topCategories, dailySales
-  // Caixa
-  cashClosings: { openedAt, closedAt, openingAmount, closingAmount, expectedAmount, difference, totalSales, salesCount, ticketMedio, topPaymentMethod, durationMinutes }[]
-  // Estoque
-  totalProducts, stockValue, potentialRevenue
-  lowStockProducts, productsByCategory
-  // Despesas
-  expenses (fixas/variaveis com status pago)
-  stockPurchaseHistory
-  // Clientes
-  totalCustomers, newCustomers, returningCustomers, topCustomers
-  // Cupons
-  activeCoupons
-  // Delivery
-  deliveryStats: { total, delivered, pending, inRoute, totalValue }
-  // Insights
-  peakHour, peakDay, topProduct, retentionRate
-  // Ranking
-  rankingPosition, avgRating, reviewCount, favoritesCount
-}
-```
+**Solucao:** No componente `CommerceCashRegister.tsx`, remover as linhas 440-445 que fazem a dupla deducao do cupom. O `order.total` vindo do banco ja tem o desconto aplicado, entao o acumulo via soma dos totais ja gera o valor correto.
 
-### Arquivo: `src/components/commerce/CommerceFinancial.tsx`
+**Arquivo:** `src/components/commerce/CommerceCashRegister.tsx`
 
-- Adicionar funcao `handleGenerateManagementReport` que busca dados de todas as tabelas relevantes (cash_registers, products, expenses, customers via orders, coupons, orders delivery, reviews, favorites, ranking data)
-- Adicionar botao "Relatorio Gerencial" na barra de botoes, ao lado de "Relatorio de Estoque"
-- Reutilizar o estado `generatingPdf` com valor `'gerencial'`
+---
 
-**Queries necessarias na funcao:**
-1. `cash_registers` -- fechamentos do periodo
-2. `cash_movements` -- vendas por caixa
-3. `products` + `categories` -- estoque
-4. `expenses` -- despesas com status
-5. `orders` -- pedidos delivery
-6. `order_items` -- itens vendidos por categoria
-7. `coupons` -- cupons ativos
-8. `reviews` -- avaliacoes
-9. `favorites` -- favoritos
-10. `payment_methods` -- taxas
-11. `profiles` via orders -- clientes
+## 3. Separar itens por usuario no modal "Ver Detalhes"
 
-### Arquivos modificados:
-- `src/lib/pdfReportGenerator.ts` -- nova funcao `generateManagementReportPDF`
-- `src/components/commerce/CommerceFinancial.tsx` -- botao + funcao de coleta de dados
+**Problema:** O modal "Ver Detalhes" (Comanda - Mesa X) exibe todos os itens da mesa juntos, sem separar por participante, dificultando a leitura.
+
+**Solucao:** No modal de detalhes (linhas 2073-2161 do `CommerceCashRegister.tsx`), quando a mesa tiver comanda separada (`participantOrders` disponivel):
+- Exibir uma secao para cada participante com nome e badge (Host/Participante)
+- Listar os itens de cada participante agrupados
+- Mostrar subtotal individual de cada participante
+- Manter a exibicao do cupom por participante quando aplicavel
+- Manter o total geral da mesa no final
+
+Para comanda unica, manter o comportamento atual (todos os itens juntos com o nome do cliente no topo).
+
+**Arquivo:** `src/components/commerce/CommerceCashRegister.tsx`
+
+---
+
+## Resumo Tecnico
+
+| Correcao | Arquivo | Tipo |
+|---|---|---|
+| Estoque esgotado na busca | `AddToTabModal.tsx` | UI + logica |
+| Total mesa com cupom | `CommerceCashRegister.tsx` linhas 440-445 | Bug de calculo |
+| Ver Detalhes por participante | `CommerceCashRegister.tsx` linhas 2110-2125 | UI |
+
+Nenhuma mudanca de layout ou estrutura existente sera alterada. Apenas as 3 correcoes solicitadas.
+
