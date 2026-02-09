@@ -59,6 +59,7 @@ interface Expense {
   due_date: string | null;
   is_paid: boolean;
   paid_at: string | null;
+  created_at: string;
 }
 
 const EXPENSES_PER_PAGE = 10;
@@ -88,7 +89,52 @@ const CommerceExpenses = ({ commerceId, monthlyRevenue, operatorFees = 0, produc
       .order('created_at', { ascending: false });
 
     if (!error && data) {
-      setExpenses(data as Expense[]);
+      const now = new Date();
+      const currentMonth = now.getFullYear() * 12 + now.getMonth();
+      const updatePromises: Promise<any>[] = [];
+
+      for (const expense of data as Expense[]) {
+        if (expense.type === 'fixed' && expense.due_date) {
+          const dueDate = new Date(expense.due_date + 'T12:00:00');
+          const dueMonth = dueDate.getFullYear() * 12 + dueDate.getMonth();
+          if (dueMonth < currentMonth) {
+            const newDueDate = new Date(now.getFullYear(), now.getMonth(), dueDate.getDate());
+            const newDueDateStr = format(newDueDate, 'yyyy-MM-dd');
+            updatePromises.push(
+              Promise.resolve(
+                supabase
+                  .from('expenses')
+                  .update({ due_date: newDueDateStr, is_paid: false, paid_at: null })
+                  .eq('id', expense.id)
+              )
+            );
+            expense.due_date = newDueDateStr;
+            expense.is_paid = false;
+            expense.paid_at = null;
+          }
+        } else if (expense.type !== 'fixed') {
+          const createdDate = new Date(expense.created_at);
+          const createdMonth = createdDate.getFullYear() * 12 + createdDate.getMonth();
+          if (createdMonth < currentMonth) {
+            updatePromises.push(
+              Promise.resolve(
+                supabase
+                  .from('expenses')
+                  .update({ is_active: false })
+                  .eq('id', expense.id)
+              )
+            );
+            expense.is_active = false;
+          }
+        }
+      }
+
+      if (updatePromises.length > 0) {
+        await Promise.all(updatePromises);
+      }
+
+      const activeExpenses = (data as Expense[]).filter(e => e.is_active);
+      setExpenses(activeExpenses);
     }
     setLoading(false);
   };
@@ -381,6 +427,7 @@ const CommerceExpenses = ({ commerceId, monthlyRevenue, operatorFees = 0, produc
               <TableHeader>
                 <TableRow>
                   <TableHead>Nome</TableHead>
+                  <TableHead>Data Lançamento</TableHead>
                   <TableHead>Tipo</TableHead>
                   <TableHead>Valor</TableHead>
                   <TableHead>Vencimento</TableHead>
@@ -398,6 +445,9 @@ const CommerceExpenses = ({ commerceId, monthlyRevenue, operatorFees = 0, produc
                   return (
                     <TableRow key={expense.id} className={isOverdue ? 'bg-red-500/5' : ''}>
                       <TableCell className="font-medium">{expense.name}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {format(new Date(expense.created_at), 'dd/MM/yyyy', { locale: ptBR })}
+                      </TableCell>
                       <TableCell>
                         <Badge variant={expense.type === 'fixed' ? 'default' : expense.type === 'stock_purchase' ? 'outline' : 'secondary'}
                           className={expense.type === 'stock_purchase' ? 'bg-cyan-500/10 text-cyan-600 border-cyan-500/30' : ''}>
