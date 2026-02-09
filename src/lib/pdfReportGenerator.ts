@@ -218,7 +218,8 @@ export const generateSalesReportPDF = async (data: SalesReportData) => {
 
   // Sales Evolution Mini Chart (visual representation using bars)
   if (data.dailySales.length > 0) {
-    if (yPos > 200) {
+    // Ensure enough space for chart (~80px needed), otherwise new page
+    if (yPos > 180) {
       doc.addPage();
       yPos = 20;
     }
@@ -398,17 +399,19 @@ export const generateSalesReportPDF = async (data: SalesReportData) => {
     yPos += 50;
 
     // Explicação do cálculo
-    doc.setFontSize(8);
+    doc.setFontSize(7);
     doc.setTextColor(100, 100, 100);
     doc.setFont('helvetica', 'italic');
+    const maxTextWidth = pageWidth - 28;
     const explanationLines = [
       'Como é calculado: A Projeção de Faturamento Mensal é baseada na média diária de vendas do período multiplicada por 30 dias.',
       'O Valuation do Negócio utiliza o método de múltiplo de lucro: Lucro Líquido Mensal Projetado × 12 meses.',
       'Lucro Líquido = Faturamento Projetado − Custos (fixos + variáveis + taxas de operadoras + impostos).',
     ];
     explanationLines.forEach((line) => {
-      doc.text(line, 14, yPos);
-      yPos += 4;
+      const splitLines = doc.splitTextToSize(line, maxTextWidth);
+      doc.text(splitLines, 14, yPos);
+      yPos += splitLines.length * 4;
     });
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(0, 0, 0);
