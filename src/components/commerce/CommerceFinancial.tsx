@@ -44,7 +44,8 @@ import { ptBR } from "date-fns/locale";
 import { formatCurrency, formatPercentage } from "@/lib/formatCurrency";
 import { getSupabaseDateRange } from "@/lib/dateUtils";
 import HelpTooltip from "@/components/ui/help-tooltip";
-import { generateSalesReportPDF, generateStockReportPDF } from "@/lib/pdfReportGenerator";
+import { generateSalesReportPDF, generateStockReportPDF, generateManagementReportPDF } from "@/lib/pdfReportGenerator";
+import type { ManagementReportData } from "@/lib/pdfReportGenerator";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface CommerceFinancialProps {
@@ -796,6 +797,276 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
     setGeneratingPdf(null);
   };
 
+  const handleGenerateManagementReport = async () => {
+    if (!commerce) return;
+    setGeneratingPdf('gerencial');
+    
+    try {
+      const { startISO, endISO } = getSupabaseDateRange(dateFilter.start, dateFilter.end);
+      const periodLabel = `${format(dateFilter.start, 'dd/MM/yyyy')} a ${format(dateFilter.end, 'dd/MM/yyyy')}`;
+
+      // Parallel fetch all data
+      const [
+        cashMovementsRes,
+        paymentMethodsRes,
+        cashRegistersRes,
+        productsRes,
+        categoriesRes,
+        expensesRes,
+        ordersRes,
+        orderItemsRes,
+        couponsRes,
+        reviewsRes,
+        favoritesRes,
+        allOrdersRes,
+      ] = await Promise.all([
+        supabase.from('cash_movements').select('amount, payment_method, created_at').eq('commerce_id', commerceId).eq('type', 'sale').gte('created_at', startISO).lte('created_at', endISO),
+        supabase.from('payment_methods').select('type, name, fee_percentage, fee_fixed').eq('commerce_id', commerceId).eq('is_active', true),
+        supabase.from('cash_registers').select('*').eq('commerce_id', commerceId).order('opened_at', { ascending: false }).limit(20),
+        supabase.from('products').select('id, name, price, stock, category_id, is_active').eq('commerce_id', commerceId),
+        supabase.from('categories').select('id, name').eq('commerce_id', commerceId),
+        supabase.from('expenses').select('*').eq('commerce_id', commerceId).eq('is_active', true),
+        supabase.from('orders').select('id, total, status, order_type, user_id, created_at, payment_method').eq('commerce_id', commerceId).gte('created_at', startISO).lte('created_at', endISO),
+        supabase.from('order_items').select('total_price, product_id, quantity, product_name, orders!inner(commerce_id, status, created_at)').eq('orders.commerce_id', commerceId).eq('orders.status', 'delivered').gte('orders.created_at', startISO).lte('orders.created_at', endISO),
+        supabase.from('commerce_coupons').select('code, discount_type, discount_value, used_count, max_uses, valid_until, is_active').eq('commerce_id', commerceId).eq('is_active', true),
+        supabase.from('reviews').select('rating, comment, created_at').eq('commerce_id', commerceId),
+        supabase.from('favorites').select('id').eq('commerce_id', commerceId),
+        supabase.from('orders').select('user_id, total, created_at').eq('commerce_id', commerceId).eq('status', 'delivered'),
+      ]);
+
+      const cashMovements = cashMovementsRes.data || [];
+      const paymentMethods = paymentMethodsRes.data || [];
+      const products = productsRes.data || [];
+      const categories = categoriesRes.data || [];
+      const expenses = expensesRes.data || [];
+      const orders = ordersRes.data || [];
+      const orderItems = orderItemsRes.data || [];
+      const coupons = couponsRes.data || [];
+      const reviews = reviewsRes.data || [];
+      const favorites = favoritesRes.data || [];
+      const allOrders = allOrdersRes.data || [];
+      const cashRegisters = cashRegistersRes.data || [];
+
+      // Revenue from cash_movements
+      const grossRevenue = cashMovements.reduce((s, m) => s + Number(m.amount), 0);
+      const totalOrders = cashMovements.length;
+      const avgTicket = totalOrders > 0 ? grossRevenue / totalOrders : 0;
+
+      // Operator fees
+      const feeMap = new Map(paymentMethods.map(pm => [pm.type, { pct: pm.fee_percentage || 0, fixed: pm.fee_fixed || 0 }]));
+      let operatorFeesCalc = 0;
+      cashMovements.forEach(m => {
+        const fee = feeMap.get(m.payment_method || '');
+        if (fee) operatorFeesCalc += Number(m.amount) * (fee.pct / 100) + fee.fixed;
+      });
+      const netRevenue = grossRevenue - operatorFeesCalc;
+
+      // Payment method breakdown
+      const pmMap = new Map<string, { total: number; count: number }>();
+      const pmNameMap = new Map(paymentMethods.map(pm => [pm.type, pm.name]));
+      cashMovements.forEach(m => {
+        const method = pmNameMap.get(m.payment_method || '') || m.payment_method || 'Dinheiro';
+        const ex = pmMap.get(method) || { total: 0, count: 0 };
+        pmMap.set(method, { total: ex.total + Number(m.amount), count: ex.count + 1 });
+      });
+
+      // Daily sales
+      const dailyMap = new Map<string, { revenue: number; orders: number }>();
+      cashMovements.forEach(m => {
+        const date = format(new Date(m.created_at), 'dd/MM/yyyy');
+        const ex = dailyMap.get(date) || { revenue: 0, orders: 0 };
+        dailyMap.set(date, { revenue: ex.revenue + Number(m.amount), orders: ex.orders + 1 });
+      });
+      const dailySales = Array.from(dailyMap.entries()).map(([date, d]) => ({ date, ...d })).sort((a, b) => {
+        const [dA, mA, yA] = a.date.split('/').map(Number);
+        const [dB, mB, yB] = b.date.split('/').map(Number);
+        return new Date(yA, mA - 1, dA).getTime() - new Date(yB, mB - 1, dB).getTime();
+      });
+
+      // Categories
+      const categoryMap = new Map(categories.map(c => [c.id, c.name]));
+      const productCategoryMap = new Map(products.map(p => [p.id, p.category_id]));
+      const salesByCategory: Record<string, number> = {};
+      let productCostSold = 0;
+      orderItems.forEach(item => {
+        const catId = productCategoryMap.get(item.product_id || '');
+        const catName = catId ? categoryMap.get(catId) : 'Sem categoria';
+        salesByCategory[catName || 'Sem categoria'] = (salesByCategory[catName || 'Sem categoria'] || 0) + Number(item.total_price);
+        productCostSold += Number(item.total_price) * 0.6;
+      });
+      const topCategories = Object.entries(salesByCategory).sort((a, b) => b[1] - a[1]).map(([name, revenue]) => ({ name, revenue }));
+
+      // Fixed expenses & stock purchases
+      const fixedExpensesList = expenses.filter(e => e.type !== 'stock_purchase');
+      const stockPurchases = expenses.filter(e => e.type === 'stock_purchase');
+      const totalFixedExpenses = fixedExpensesList.reduce((s, e) => s + Number(e.amount), 0);
+
+      // Tax
+      let taxAmount = 0;
+      if (taxConfig) {
+        taxAmount = taxConfig.tax_type === 'fixed' ? taxConfig.tax_value : (grossRevenue * taxConfig.tax_value) / 100;
+      }
+
+      const netProfit = netRevenue - productCostSold - totalFixedExpenses - taxAmount;
+      const profitMargin = grossRevenue > 0 ? (netProfit / grossRevenue) * 100 : 0;
+
+      // Growth rate
+      const periodDays = Math.ceil((dateFilter.end.getTime() - dateFilter.start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      const prevStart = new Date(dateFilter.start);
+      prevStart.setDate(prevStart.getDate() - periodDays);
+      const prevEnd = new Date(dateFilter.start);
+      prevEnd.setDate(prevEnd.getDate() - 1);
+      const { startISO: pStartISO, endISO: pEndISO } = getSupabaseDateRange(prevStart, prevEnd);
+      const { data: prevMoves } = await supabase.from('cash_movements').select('amount').eq('commerce_id', commerceId).eq('type', 'sale').gte('created_at', pStartISO).lte('created_at', pEndISO);
+      const prevRevenue = prevMoves?.reduce((s, m) => s + Number(m.amount), 0) || 0;
+      const growthRate = prevRevenue > 0 ? ((grossRevenue - prevRevenue) / prevRevenue) * 100 : 0;
+
+      const projectedRevenue = periodDays > 0 ? (grossRevenue / periodDays) * 30 : 0;
+      const businessValuation = Math.max(netProfit, 0) * 12;
+
+      // Cash closings with movements
+      const cashClosingsData = await Promise.all(
+        cashRegisters.filter(cr => cr.status === 'closed').slice(0, 10).map(async (cr) => {
+          const { data: crMoves } = await supabase.from('cash_movements').select('amount, payment_method').eq('cash_register_id', cr.id).eq('type', 'sale');
+          const moves = crMoves || [];
+          const totalSales = moves.reduce((s, m) => s + Number(m.amount), 0);
+          const salesCount = moves.length;
+          const ticketMedio = salesCount > 0 ? totalSales / salesCount : 0;
+          // Top payment method
+          const pmCount: Record<string, number> = {};
+          moves.forEach(m => { pmCount[m.payment_method] = (pmCount[m.payment_method] || 0) + 1; });
+          const topPM = Object.entries(pmCount).sort((a, b) => b[1] - a[1])[0]?.[0] || '-';
+          const openedAt = format(new Date(cr.opened_at), 'dd/MM HH:mm');
+          const closedAt = cr.closed_at ? format(new Date(cr.closed_at), 'dd/MM HH:mm') : '-';
+          const durationMs = cr.closed_at ? new Date(cr.closed_at).getTime() - new Date(cr.opened_at).getTime() : 0;
+          const durationMinutes = Math.round(durationMs / 60000);
+          return {
+            openedAt, closedAt,
+            openingAmount: Number(cr.opening_amount),
+            closingAmount: Number(cr.closing_amount || 0),
+            expectedAmount: Number(cr.expected_amount || 0),
+            difference: Number(cr.difference || 0),
+            totalSales, salesCount, ticketMedio,
+            topPaymentMethod: pmNameMap.get(topPM) || topPM,
+            durationMinutes,
+            status: cr.status,
+          };
+        })
+      );
+
+      // Stock
+      const activeProducts = products.filter(p => p.is_active !== false);
+      const stockValue = activeProducts.reduce((s, p) => s + ((p.stock || 0) * p.price * 0.6), 0);
+      const potentialRevenue = activeProducts.reduce((s, p) => s + ((p.stock || 0) * p.price), 0);
+      const lowStockProducts = activeProducts.filter(p => (p.stock || 0) > 0 && (p.stock || 0) <= 5).map(p => ({ name: p.name, stock: p.stock || 0 }));
+      const catStats: Record<string, { productCount: number; totalValue: number }> = {};
+      activeProducts.forEach(p => {
+        const catName = categoryMap.get(p.category_id || '') || 'Sem categoria';
+        if (!catStats[catName]) catStats[catName] = { productCount: 0, totalValue: 0 };
+        catStats[catName].productCount += 1;
+        catStats[catName].totalValue += (p.stock || 0) * p.price;
+      });
+
+      // CRM - customers
+      const customerOrders: Record<string, { count: number; total: number }> = {};
+      allOrders.forEach(o => {
+        if (!customerOrders[o.user_id]) customerOrders[o.user_id] = { count: 0, total: 0 };
+        customerOrders[o.user_id].count += 1;
+        customerOrders[o.user_id].total += Number(o.total);
+      });
+      const totalCustomers = Object.keys(customerOrders).length;
+      const returningCustomers = Object.values(customerOrders).filter(c => c.count > 1).length;
+      const newCustomers = totalCustomers - returningCustomers;
+      const retentionRate = totalCustomers > 0 ? (returningCustomers / totalCustomers) * 100 : 0;
+
+      // Top customers - fetch names
+      const topCustomerIds = Object.entries(customerOrders).sort((a, b) => b[1].total - a[1].total).slice(0, 10);
+      const { data: profilesData } = await supabase.from('profiles').select('user_id, full_name').in('user_id', topCustomerIds.map(c => c[0]));
+      const profileMap = new Map(profilesData?.map(p => [p.user_id, p.full_name]) || []);
+      const topCustomers = topCustomerIds.map(([uid, data]) => ({
+        name: profileMap.get(uid) || 'Cliente',
+        totalSpent: data.total,
+        orderCount: data.count,
+      }));
+
+      // Delivery stats
+      const deliveryOrders = orders.filter(o => o.order_type === 'delivery');
+      const deliveryStats = {
+        total: deliveryOrders.length,
+        delivered: deliveryOrders.filter(o => o.status === 'delivered').length,
+        pending: deliveryOrders.filter(o => o.status === 'pending' || o.status === 'confirmed').length,
+        inRoute: deliveryOrders.filter(o => o.status === 'preparing' || o.status === 'delivering').length,
+        totalValue: deliveryOrders.reduce((s, o) => s + Number(o.total), 0),
+      };
+
+      // Insights - peak hour/day
+      const hourCount: Record<string, number> = {};
+      const dayCount: Record<string, number> = {};
+      const productCount: Record<string, number> = {};
+      cashMovements.forEach(m => {
+        const d = new Date(m.created_at);
+        const h = `${d.getHours().toString().padStart(2, '0')}:00`;
+        hourCount[h] = (hourCount[h] || 0) + 1;
+        const dayNames = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+        const dayName = dayNames[d.getDay()];
+        dayCount[dayName] = (dayCount[dayName] || 0) + 1;
+      });
+      orderItems.forEach(item => {
+        productCount[item.product_name] = (productCount[item.product_name] || 0) + Number(item.quantity);
+      });
+      const peakHour = Object.entries(hourCount).sort((a, b) => b[1] - a[1])[0]?.[0] || '-';
+      const peakDay = Object.entries(dayCount).sort((a, b) => b[1] - a[1])[0]?.[0] || '-';
+      const topProduct = Object.entries(productCount).sort((a, b) => b[1] - a[1])[0]?.[0] || '-';
+
+      const avgRating = reviews.length > 0 ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length : 0;
+
+      const reportData: ManagementReportData = {
+        commerceName: commerce.fantasy_name,
+        logoUrl: commerce.logo_url,
+        period: periodLabel,
+        grossRevenue, netRevenue, operatorFees: operatorFeesCalc,
+        productCostSold, taxAmount,
+        taxRegime: taxConfig?.tax_regime || 'simples',
+        taxPaymentDay: taxConfig?.tax_payment_day || 20,
+        fixedExpenses: totalFixedExpenses,
+        netProfit, projectedRevenue, businessValuation,
+        totalOrders, avgTicket, growthRate, profitMargin,
+        paymentMethodBreakdown: Array.from(pmMap.entries()).map(([method, d]) => ({ method, total: d.total, count: d.count })),
+        topCategories, dailySales,
+        cashClosings: cashClosingsData,
+        totalProducts: activeProducts.length,
+        stockValue, potentialRevenue, lowStockProducts,
+        productsByCategory: Object.entries(catStats).map(([name, d]) => ({ name, ...d })),
+        expenses: expenses.map(e => ({
+          name: e.name, type: e.type, amount: Number(e.amount),
+          isPaid: e.is_paid || false,
+          dueDate: e.due_date ? format(new Date(e.due_date), 'dd/MM/yyyy') : undefined,
+        })),
+        stockPurchaseHistory: stockPurchases.map(e => ({
+          name: e.name, amount: Number(e.amount),
+          date: format(new Date(e.created_at), 'dd/MM/yyyy'),
+        })),
+        totalCustomers, newCustomers, returningCustomers, topCustomers,
+        activeCoupons: coupons.map(c => ({
+          code: c.code, discountType: c.discount_type, discountValue: Number(c.discount_value),
+          usedCount: c.used_count || 0, maxUses: c.max_uses,
+          validUntil: c.valid_until ? format(new Date(c.valid_until), 'dd/MM/yyyy') : null,
+        })),
+        deliveryStats,
+        peakHour, peakDay, topProduct, retentionRate,
+        avgRating, reviewCount: reviews.length, favoritesCount: favorites.length,
+      };
+
+      await generateManagementReportPDF(reportData);
+      toast({ title: "Relatório Gerencial gerado com sucesso!" });
+    } catch (error) {
+      console.error('Management report error:', error);
+      toast({ variant: "destructive", title: "Erro ao gerar relatório gerencial" });
+    }
+    
+    setGeneratingPdf(null);
+  };
+
   const handlePayInvoice = (invoice: Invoice) => {
     setSelectedInvoice(invoice);
     setIsPaymentModalOpen(true);
@@ -851,6 +1122,20 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
               <Download className="w-4 h-4 mr-1 sm:mr-2" />
             )}
             <span className="hidden xs:inline">Relatório de</span> Estoque
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleGenerateManagementReport}
+            disabled={!!generatingPdf}
+            className="text-xs sm:text-sm bg-primary/10 border-primary/30 hover:bg-primary/20"
+          >
+            {generatingPdf === 'gerencial' ? (
+              <Loader2 className="w-4 h-4 mr-1 sm:mr-2 animate-spin" />
+            ) : (
+              <BarChart3 className="w-4 h-4 mr-1 sm:mr-2" />
+            )}
+            <span className="hidden xs:inline">Relatório</span> Gerencial
           </Button>
         </div>
       </div>
