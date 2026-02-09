@@ -69,6 +69,8 @@ interface Review {
   created_at: string;
   user_id: string;
   user_name?: string;
+  commerce_reply?: string | null;
+  commerce_reply_at?: string | null;
 }
 
 interface Table {
@@ -581,10 +583,10 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
     
     setProducts(productsData || []);
 
-    // Fetch reviews with user names
+    // Fetch reviews with user names and commerce replies
     const { data: reviewsData } = await supabase
       .from('reviews')
-      .select('id, rating, comment, created_at, user_id')
+      .select('id, rating, comment, created_at, user_id, commerce_reply, commerce_reply_at')
       .eq('commerce_id', commerceId)
       .order('created_at', { ascending: false })
       .limit(20);
@@ -2493,6 +2495,21 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
                   </div>
                   {review.comment && (
                     <p className="text-foreground">{review.comment}</p>
+                  )}
+                  {/* Commerce reply */}
+                  {(review as any).commerce_reply && (
+                    <div className="mt-3 ml-2 p-3 bg-primary/5 border-l-2 border-primary rounded-r-lg">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Store className="w-3.5 h-3.5 text-primary" />
+                        <span className="text-xs font-medium text-primary">Resposta do estabelecimento</span>
+                        {(review as any).commerce_reply_at && (
+                          <span className="text-xs text-muted-foreground">
+                            • {format(new Date((review as any).commerce_reply_at), "dd/MM/yyyy", { locale: ptBR })}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-foreground">{(review as any).commerce_reply}</p>
+                    </div>
                   )}
                 </CardContent>
               </Card>
