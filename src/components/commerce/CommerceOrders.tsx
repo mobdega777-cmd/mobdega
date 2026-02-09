@@ -37,7 +37,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Receipt,
-  CreditCard
+  CreditCard,
+  Printer
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -464,11 +465,61 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
     currentPage * ITEMS_PER_PAGE
   );
 
+  const handlePrintOrders = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const rows = filteredOrders.map(order => {
+      const status = statusConfig[order.status]?.label || order.status;
+      const type = order.order_type ? (orderTypeLabels[order.order_type] || order.order_type) : '-';
+      const payment = order.payment_method ? (paymentMethodLabels[order.payment_method] || order.payment_method) : '-';
+      const date = new Date(order.created_at).toLocaleString('pt-BR');
+      return `<tr>
+        <td>#${order.id.slice(0, 8)}</td>
+        <td>${order.customer_name || '-'}</td>
+        <td>${type}</td>
+        <td>${payment}</td>
+        <td>${formatCurrency(order.total)}</td>
+        <td>${status}</td>
+        <td>${date}</td>
+      </tr>`;
+    }).join('');
+
+    const totalValue = filteredOrders.reduce((sum, o) => sum + Number(o.total), 0);
+
+    printWindow.document.write(`<!DOCTYPE html><html><head><title>Pedidos</title>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 20px; font-size: 12px; }
+        h2 { margin-bottom: 4px; }
+        p { color: #666; margin-top: 0; }
+        table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+        th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; }
+        th { background: #f5f5f5; font-weight: 600; }
+        tfoot td { font-weight: 700; background: #f9f9f9; }
+        @media print { body { padding: 0; } }
+      </style></head><body>
+      <h2>Relatório de Pedidos</h2>
+      <p>${filteredOrders.length} pedido(s) — Período: ${dateFilter.start.toLocaleDateString('pt-BR')} a ${dateFilter.end.toLocaleDateString('pt-BR')}</p>
+      <table>
+        <thead><tr><th>Pedido</th><th>Cliente</th><th>Tipo</th><th>Pagamento</th><th>Total</th><th>Status</th><th>Data/Hora</th></tr></thead>
+        <tbody>${rows}</tbody>
+        <tfoot><tr><td colspan="4">Total</td><td colspan="3">${formatCurrency(totalValue)}</td></tr></tfoot>
+      </table></body></html>`);
+    printWindow.document.close();
+    printWindow.print();
+  };
+
   return (
     <div className="space-y-6">
-      <div className="min-w-0">
-        <h1 className="text-2xl sm:text-3xl font-bold">Pedidos</h1>
-        <p className="text-muted-foreground text-sm sm:text-base">Gerencie todos os pedidos do seu comércio (Delivery, PDV, Mesas)</p>
+      <div className="flex items-start justify-between min-w-0">
+        <div className="min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-bold">Pedidos</h1>
+          <p className="text-muted-foreground text-sm sm:text-base">Gerencie todos os pedidos do seu comércio (Delivery, PDV, Mesas)</p>
+        </div>
+        <Button variant="outline" size="sm" className="gap-2 shrink-0" onClick={handlePrintOrders}>
+          <Printer className="w-4 h-4" />
+          <span className="hidden sm:inline">Imprimir</span>
+        </Button>
       </div>
 
       <Card>
