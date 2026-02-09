@@ -596,9 +596,7 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
     if (reviewsData && reviewsData.length > 0) {
       const userIds = [...new Set(reviewsData.map(r => r.user_id))];
       const { data: profiles } = await supabase
-        .from('profiles')
-        .select('user_id, full_name')
-        .in('user_id', userIds);
+        .rpc('get_profile_names', { p_user_ids: userIds });
       
       const profileMap = new Map(profiles?.map(p => [p.user_id, p.full_name]) || []);
       const reviewsWithNames = reviewsData.map(r => ({
