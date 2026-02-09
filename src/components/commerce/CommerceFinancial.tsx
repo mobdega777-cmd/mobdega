@@ -1206,6 +1206,7 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
         monthlyRevenue={stats.monthlyRevenue}
         operatorFees={operatorFees}
         productCost={stats.productCostSold}
+        taxAmount={stats.taxAmount}
       />
 
       {/* Invoices Table */}

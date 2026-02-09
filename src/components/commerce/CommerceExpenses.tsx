@@ -47,6 +47,7 @@ interface CommerceExpensesProps {
   operatorFees?: number;
   productCost?: number;
   stockPurchasesTotal?: number;
+  taxAmount?: number;
 }
 
 interface Expense {
@@ -64,7 +65,7 @@ interface Expense {
 
 const EXPENSES_PER_PAGE = 10;
 
-const CommerceExpenses = ({ commerceId, monthlyRevenue, operatorFees = 0, productCost = 0, stockPurchasesTotal = 0 }: CommerceExpensesProps) => {
+const CommerceExpenses = ({ commerceId, monthlyRevenue, operatorFees = 0, productCost = 0, stockPurchasesTotal = 0, taxAmount = 0 }: CommerceExpensesProps) => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -237,7 +238,7 @@ const CommerceExpenses = ({ commerceId, monthlyRevenue, operatorFees = 0, produc
   const totalFixedExpenses = fixedExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
   const totalVariableExpenses = variableExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
   const totalStockPurchases = stockPurchaseExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
-  const totalExpenses = totalFixedExpenses + totalVariableExpenses + operatorFees;
+  const totalExpenses = totalFixedExpenses + totalVariableExpenses + operatorFees + taxAmount;
   const netProfit = monthlyRevenue - totalExpenses;
   const finalProfit = netProfit - productCost;
   const profitMargin = monthlyRevenue > 0 ? (finalProfit / monthlyRevenue) * 100 : 0;
@@ -287,11 +288,11 @@ const CommerceExpenses = ({ commerceId, monthlyRevenue, operatorFees = 0, produc
               <div>
                 <div className="flex items-center gap-2">
                   <p className="text-xs text-muted-foreground">Custos Totais</p>
-                  <HelpTooltip content="Soma de gastos fixos, variáveis e taxas de operadoras" />
+                  <HelpTooltip content="Soma de gastos fixos, variáveis, taxas de operadoras e impostos" />
                 </div>
                 <p className="text-xl font-bold text-red-600">{formatCurrency(totalExpenses)}</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Fixos: {formatCurrency(totalFixedExpenses)} | Var: {formatCurrency(totalVariableExpenses)} | Taxas: {formatCurrency(operatorFees)}
+                  Fixos: {formatCurrency(totalFixedExpenses)} | Var: {formatCurrency(totalVariableExpenses)} | Taxas: {formatCurrency(operatorFees)} | Impostos: {formatCurrency(taxAmount)}
                 </p>
               </div>
               <div className="p-2 rounded-lg bg-red-500/10">
