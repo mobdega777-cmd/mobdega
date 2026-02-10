@@ -621,6 +621,45 @@ export type Database = {
           },
         ]
       }
+      composite_product_items: {
+        Row: {
+          component_product_id: string
+          composite_product_id: string
+          created_at: string | null
+          id: string
+          quantity: number
+        }
+        Insert: {
+          component_product_id: string
+          composite_product_id: string
+          created_at?: string | null
+          id?: string
+          quantity?: number
+        }
+        Update: {
+          component_product_id?: string
+          composite_product_id?: string
+          created_at?: string | null
+          id?: string
+          quantity?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "composite_product_items_component_product_id_fkey"
+            columns: ["component_product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "composite_product_items_composite_product_id_fkey"
+            columns: ["composite_product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       delivery_zones: {
         Row: {
           cep_end: string
@@ -1387,12 +1426,19 @@ export type Database = {
         Row: {
           category_id: string | null
           commerce_id: string
+          cost_per_serving: number | null
           created_at: string
           description: string | null
+          fraction_per_serving: number | null
+          fraction_total: number | null
+          fraction_unit: string | null
+          hide_from_menu: boolean | null
           id: string
           image_url: string | null
           is_active: boolean | null
+          is_composite: boolean | null
           is_featured: boolean | null
+          is_fractioned: boolean | null
           name: string
           price: number
           promotional_price: number | null
@@ -1402,12 +1448,19 @@ export type Database = {
         Insert: {
           category_id?: string | null
           commerce_id: string
+          cost_per_serving?: number | null
           created_at?: string
           description?: string | null
+          fraction_per_serving?: number | null
+          fraction_total?: number | null
+          fraction_unit?: string | null
+          hide_from_menu?: boolean | null
           id?: string
           image_url?: string | null
           is_active?: boolean | null
+          is_composite?: boolean | null
           is_featured?: boolean | null
+          is_fractioned?: boolean | null
           name: string
           price: number
           promotional_price?: number | null
@@ -1417,12 +1470,19 @@ export type Database = {
         Update: {
           category_id?: string | null
           commerce_id?: string
+          cost_per_serving?: number | null
           created_at?: string
           description?: string | null
+          fraction_per_serving?: number | null
+          fraction_total?: number | null
+          fraction_unit?: string | null
+          hide_from_menu?: boolean | null
           id?: string
           image_url?: string | null
           is_active?: boolean | null
+          is_composite?: boolean | null
           is_featured?: boolean | null
+          is_fractioned?: boolean | null
           name?: string
           price?: number
           promotional_price?: number | null

@@ -18,6 +18,13 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import {
   Package,
@@ -35,7 +42,8 @@ import {
   Plus,
   Minus,
   Lightbulb,
-  ShoppingCart
+  ShoppingCart,
+  ArrowRightLeft
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -44,6 +52,11 @@ import { HelpTooltip } from "@/components/ui/help-tooltip";
 
 interface CommerceStockControlProps {
   commerceId: string;
+}
+
+interface Category {
+  id: string;
+  name: string;
 }
 
 interface Product {
@@ -55,7 +68,13 @@ interface Product {
   stock: number | null;
   is_active: boolean | null;
   image_url: string | null;
+  category_id: string | null;
   category?: { name: string };
+  is_fractioned?: boolean;
+  fraction_unit?: string | null;
+  fraction_total?: number | null;
+  fraction_per_serving?: number | null;
+  cost_per_serving?: number | null;
 }
 
 interface StockMovement {
@@ -80,6 +99,7 @@ interface StockStats {
 
 const CommerceStockControl = ({ commerceId }: CommerceStockControlProps) => {
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -87,6 +107,14 @@ const CommerceStockControl = ({ commerceId }: CommerceStockControlProps) => {
   const [adjustmentType, setAdjustmentType] = useState<'add' | 'remove'>('add');
   const [isAdjustDialogOpen, setIsAdjustDialogOpen] = useState(false);
   const [recentMovements, setRecentMovements] = useState<StockMovement[]>([]);
+  
+  // Transfer states
+  const [isTransferDialogOpen, setIsTransferDialogOpen] = useState(false);
+  const [transferSourceProduct, setTransferSourceProduct] = useState<Product | null>(null);
+  const [transferTargetCategoryId, setTransferTargetCategoryId] = useState("");
+  const [transferTargetProductId, setTransferTargetProductId] = useState("");
+  const [transferQuantity, setTransferQuantity] = useState("1");
+  
   const { toast } = useToast();
 
   const fetchProducts = async () => {
@@ -102,6 +130,15 @@ const CommerceStockControl = ({ commerceId }: CommerceStockControlProps) => {
       setProducts(data || []);
     }
     setLoading(false);
+  };
+
+  const fetchCategories = async () => {
+    const { data } = await supabase
+      .from('categories')
+      .select('id, name')
+      .eq('commerce_id', commerceId)
+      .order('name');
+    setCategories(data || []);
   };
 
   const fetchRecentSales = async () => {
@@ -132,6 +169,7 @@ const CommerceStockControl = ({ commerceId }: CommerceStockControlProps) => {
 
   useEffect(() => {
     fetchProducts();
+    fetchCategories();
     fetchRecentSales();
 
     // Subscribe to product changes for real-time updates
@@ -240,6 +278,73 @@ const CommerceStockControl = ({ commerceId }: CommerceStockControlProps) => {
     setAdjustmentType(type);
     setStockAdjustment("");
     setIsAdjustDialogOpen(true);
+  };
+
+  const openTransferDialog = (product: Product) => {
+    setTransferSourceProduct(product);
+    setTransferTargetCategoryId("");
+    setTransferTargetProductId("");
+    setTransferQuantity("1");
+    setIsTransferDialogOpen(true);
+  };
+
+  const transferTargetProducts = products.filter(p =>
+    p.id !== transferSourceProduct?.id &&
+    (transferTargetCategoryId && transferTargetCategoryId !== 'all' ? p.category_id === transferTargetCategoryId : true)
+  );
+
+  const handleTransferStock = async () => {
+    if (!transferSourceProduct || !transferTargetProductId || !transferQuantity) return;
+
+    const qty = parseInt(transferQuantity);
+    if (isNaN(qty) || qty <= 0) {
+      toast({ variant: "destructive", title: "Quantidade inválida" });
+      return;
+    }
+
+    const sourceStock = transferSourceProduct.stock || 0;
+    if (qty > sourceStock) {
+      toast({ variant: "destructive", title: "Quantidade maior que o estoque disponível" });
+      return;
+    }
+
+    const targetProduct = products.find(p => p.id === transferTargetProductId);
+    if (!targetProduct) return;
+
+    // Calculate the amount to add to the target
+    let addToTarget = qty;
+
+    // If transferring to a fractioned product, convert units
+    if (targetProduct.is_fractioned && targetProduct.fraction_total) {
+      // Each unit from source = fraction_total in the target's unit
+      addToTarget = qty * targetProduct.fraction_total;
+    }
+
+    const newSourceStock = Math.max(0, sourceStock - qty);
+    const newTargetStock = (targetProduct.stock || 0) + addToTarget;
+
+    // Update both products
+    const { error: err1 } = await supabase
+      .from('products')
+      .update({ stock: newSourceStock })
+      .eq('id', transferSourceProduct.id);
+
+    const { error: err2 } = await supabase
+      .from('products')
+      .update({ stock: newTargetStock })
+      .eq('id', targetProduct.id);
+
+    if (err1 || err2) {
+      toast({ variant: "destructive", title: "Erro na transferência", description: (err1 || err2)?.message });
+    } else {
+      const unitLabel = targetProduct.is_fractioned ? targetProduct.fraction_unit || 'un' : 'un';
+      toast({
+        title: "Transferência realizada!",
+        description: `${qty} un. de ${transferSourceProduct.name} → ${addToTarget} ${unitLabel} em ${targetProduct.name}`,
+      });
+      setIsTransferDialogOpen(false);
+      fetchProducts();
+    }
   };
 
   const getStockStatus = (stock: number | null): { label: string; color: string } => {
@@ -602,7 +707,9 @@ const CommerceStockControl = ({ commerceId }: CommerceStockControlProps) => {
                       </TableCell>
                       <TableCell>
                         <span className="text-lg font-bold">{stock}</span>
-                        <span className="text-muted-foreground ml-1">un.</span>
+                        <span className="text-muted-foreground ml-1">
+                          {product.is_fractioned ? (product.fraction_unit || 'un') : 'un'}.
+                        </span>
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className={stockStatus.color}>
@@ -616,23 +723,35 @@ const CommerceStockControl = ({ commerceId }: CommerceStockControlProps) => {
                         {formatCurrency(saleValue)}
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
+                        <div className="flex justify-end gap-0.5">
                           <Button
                             variant="outline"
-                            size="sm"
+                            size="icon"
+                            className="h-7 w-7"
                             onClick={() => openAdjustDialog(product, 'add')}
-                            className="gap-1"
+                            title="Adicionar estoque"
                           >
                             <Plus className="w-3 h-3" />
                           </Button>
                           <Button
                             variant="outline"
-                            size="sm"
+                            size="icon"
+                            className="h-7 w-7"
                             onClick={() => openAdjustDialog(product, 'remove')}
-                            className="gap-1"
                             disabled={stock === 0}
+                            title="Remover estoque"
                           >
                             <Minus className="w-3 h-3" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => openTransferDialog(product)}
+                            disabled={stock === 0}
+                            title="Transferir estoque"
+                          >
+                            <ArrowRightLeft className="w-3 h-3" />
                           </Button>
                         </div>
                       </TableCell>
@@ -693,6 +812,103 @@ const CommerceStockControl = ({ commerceId }: CommerceStockControlProps) => {
             </Button>
             <Button onClick={handleAdjustStock} disabled={!stockAdjustment || parseInt(stockAdjustment) <= 0}>
               {adjustmentType === 'add' ? 'Adicionar' : 'Remover'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de Transferência de Estoque */}
+      <Dialog open={isTransferDialogOpen} onOpenChange={setIsTransferDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ArrowRightLeft className="w-5 h-5" />
+              Transferir Estoque
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {transferSourceProduct && (
+              <div className="p-4 bg-muted rounded-lg">
+                <p className="text-xs text-muted-foreground">Produto de origem</p>
+                <p className="font-medium">{transferSourceProduct.name}</p>
+                <p className="text-sm text-muted-foreground">
+                  Estoque atual: <span className="font-medium">{transferSourceProduct.stock || 0} un.</span>
+                </p>
+              </div>
+            )}
+
+            <div>
+              <Label>Categoria de destino</Label>
+              <Select value={transferTargetCategoryId} onValueChange={(val) => {
+                setTransferTargetCategoryId(val);
+                setTransferTargetProductId("");
+              }}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Todas as categorias" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as categorias</SelectItem>
+                  {categories.map(c => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Produto de destino</Label>
+              <Select value={transferTargetProductId} onValueChange={setTransferTargetProductId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o produto..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {transferTargetProducts.map(p => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name} {p.is_fractioned ? `(Fracionado - ${p.fraction_unit})` : ''} — Estoque: {p.stock || 0}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Quantidade a transferir</Label>
+              <Input
+                type="number"
+                min="1"
+                max={transferSourceProduct?.stock || 0}
+                value={transferQuantity}
+                onChange={(e) => setTransferQuantity(e.target.value)}
+              />
+            </div>
+
+            {transferTargetProductId && transferQuantity && parseInt(transferQuantity) > 0 && (() => {
+              const target = products.find(p => p.id === transferTargetProductId);
+              if (!target) return null;
+              const qty = parseInt(transferQuantity);
+              const addAmount = target.is_fractioned && target.fraction_total ? qty * target.fraction_total : qty;
+              const unitLabel = target.is_fractioned ? target.fraction_unit || 'un' : 'un';
+              return (
+                <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/30 space-y-1">
+                  <p className="text-sm">
+                    <strong>{transferSourceProduct?.name}:</strong> {(transferSourceProduct?.stock || 0)} → {Math.max(0, (transferSourceProduct?.stock || 0) - qty)} un.
+                  </p>
+                  <p className="text-sm">
+                    <strong>{target.name}:</strong> {target.stock || 0} → {(target.stock || 0) + addAmount} {unitLabel}
+                  </p>
+                </div>
+              );
+            })()}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsTransferDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleTransferStock}
+              disabled={!transferTargetProductId || !transferQuantity || parseInt(transferQuantity) <= 0}
+            >
+              Transferir
             </Button>
           </DialogFooter>
         </DialogContent>

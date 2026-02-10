@@ -577,12 +577,15 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
     // Fetch products (including stock for out-of-stock logic)
     const { data: productsData } = await supabase
       .from('products')
-      .select('id, name, description, price, promotional_price, image_url, category_id, is_featured, stock')
+      .select('id, name, description, price, promotional_price, image_url, category_id, is_featured, stock, hide_from_menu')
       .eq('commerce_id', commerceId)
       .eq('is_active', true)
       .order('name');
     
-    setProducts(productsData || []);
+    // Filter out products hidden from menu
+    const visibleProducts = (productsData || []).filter((p: any) => !p.hide_from_menu);
+    
+    setProducts(visibleProducts);
 
     // Fetch reviews with user names and commerce replies
     const { data: reviewsData } = await supabase

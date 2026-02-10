@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -27,6 +28,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { 
   Plus, 
   Pencil, 
@@ -42,7 +44,10 @@ import {
   BarChart3,
   ArrowUpCircle,
   ArrowDownCircle,
-  Percent
+  Percent,
+  Layers,
+  Scissors,
+  EyeOff
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -56,19 +61,33 @@ interface Product {
   id: string;
   name: string;
   description: string | null;
-  price: number; // Agora é custo
-  promotional_price: number | null; // Agora é preço de venda
+  price: number;
+  promotional_price: number | null;
   stock: number | null;
   is_active: boolean | null;
   is_featured: boolean | null;
   image_url: string | null;
   category_id: string | null;
   category?: { name: string };
+  is_composite?: boolean;
+  is_fractioned?: boolean;
+  hide_from_menu?: boolean;
+  fraction_unit?: string | null;
+  fraction_total?: number | null;
+  fraction_per_serving?: number | null;
+  cost_per_serving?: number | null;
 }
 
 interface Category {
   id: string;
   name: string;
+}
+
+interface CompositeItem {
+  component_product_id: string;
+  product_name: string;
+  quantity: number;
+  unit_cost: number;
 }
 
 interface StockStats {
@@ -96,11 +115,22 @@ const CommerceProducts = ({ commerceId }: CommerceProductsProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
+  // New product type states
+  const [isComposite, setIsComposite] = useState(false);
+  const [isFractioned, setIsFractioned] = useState(false);
+  const [hideFromMenu, setHideFromMenu] = useState(false);
+  const [compositeItems, setCompositeItems] = useState<CompositeItem[]>([]);
+  const [compositeSearch, setCompositeSearch] = useState("");
+  const [fractionUnit, setFractionUnit] = useState("ml");
+  const [fractionTotal, setFractionTotal] = useState("");
+  const [fractionPerServing, setFractionPerServing] = useState("");
+  const [costPerServing, setCostPerServing] = useState("");
+
   const [formData, setFormData] = useState({
     name: "",
     description: "",
-    cost: "", // era price
-    sale_price: "", // era promotional_price
+    cost: "",
+    sale_price: "",
     stock: "",
     is_active: true,
     is_featured: false,
@@ -272,18 +302,35 @@ const CommerceProducts = ({ commerceId }: CommerceProductsProps) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const productData = {
+    const productData: any = {
       commerce_id: commerceId,
       name: formData.name,
       description: formData.description || null,
-      price: parseFloat(formData.cost), // cost -> price no banco
-      promotional_price: formData.sale_price ? parseFloat(formData.sale_price) : null, // sale_price -> promotional_price
+      price: parseFloat(formData.cost),
+      promotional_price: formData.sale_price ? parseFloat(formData.sale_price) : null,
       stock: formData.stock ? parseInt(formData.stock) : 0,
       is_active: formData.is_active,
       is_featured: formData.is_featured,
       category_id: formData.category_id || null,
       image_url: formData.image_url || null,
+      is_composite: isComposite,
+      is_fractioned: isFractioned,
+      hide_from_menu: hideFromMenu,
+      fraction_unit: isFractioned ? fractionUnit : null,
+      fraction_total: isFractioned && fractionTotal ? parseFloat(fractionTotal) : null,
+      fraction_per_serving: isFractioned && fractionPerServing ? parseFloat(fractionPerServing) : null,
+      cost_per_serving: isFractioned && costPerServing ? parseFloat(costPerServing) : null,
     };
+
+    // For fractioned products, auto-calculate cost from servings
+    if (isFractioned && costPerServing && fractionTotal && fractionPerServing) {
+      const totalServings = parseFloat(fractionTotal) / parseFloat(fractionPerServing);
+      productData.price = parseFloat(costPerServing) * totalServings;
+      // Stock in total units (e.g., ml)
+      if (formData.stock) {
+        productData.stock = parseInt(formData.stock);
+      }
+    }
 
     if (editingProduct) {
       const { error } = await supabase
@@ -294,18 +341,27 @@ const CommerceProducts = ({ commerceId }: CommerceProductsProps) => {
       if (error) {
         toast({ variant: "destructive", title: "Erro ao atualizar produto", description: error.message });
       } else {
+        // Update composite items if needed
+        if (isComposite) {
+          await saveCompositeItems(editingProduct.id);
+        }
         toast({ title: "Produto atualizado com sucesso!" });
         setIsDialogOpen(false);
         fetchProducts();
       }
     } else {
-      const { error } = await supabase
+      const { data: newProduct, error } = await supabase
         .from('products')
-        .insert(productData);
+        .insert(productData)
+        .select()
+        .single();
 
       if (error) {
         toast({ variant: "destructive", title: "Erro ao criar produto", description: error.message });
       } else {
+        if (isComposite && newProduct) {
+          await saveCompositeItems(newProduct.id);
+        }
         toast({ title: "Produto criado com sucesso!" });
         setIsDialogOpen(false);
         fetchProducts();
@@ -313,6 +369,57 @@ const CommerceProducts = ({ commerceId }: CommerceProductsProps) => {
     }
     resetForm();
   };
+
+  const saveCompositeItems = async (productId: string) => {
+    // Delete existing items first
+    await supabase
+      .from('composite_product_items')
+      .delete()
+      .eq('composite_product_id', productId);
+
+    if (compositeItems.length > 0) {
+      const items = compositeItems.map(item => ({
+        composite_product_id: productId,
+        component_product_id: item.component_product_id,
+        quantity: item.quantity,
+      }));
+      await supabase.from('composite_product_items').insert(items);
+    }
+  };
+
+  const addCompositeItem = (product: Product) => {
+    if (compositeItems.find(i => i.component_product_id === product.id)) {
+      toast({ variant: "destructive", title: "Produto já adicionado" });
+      return;
+    }
+    const isFrac = product.is_fractioned;
+    setCompositeItems([...compositeItems, {
+      component_product_id: product.id,
+      product_name: product.name,
+      quantity: isFrac ? (product.fraction_per_serving || 1) : 1,
+      unit_cost: isFrac ? (product.cost_per_serving || product.price) : product.price,
+    }]);
+    setCompositeSearch("");
+  };
+
+  const removeCompositeItem = (index: number) => {
+    setCompositeItems(compositeItems.filter((_, i) => i !== index));
+  };
+
+  const updateCompositeItemQty = (index: number, qty: number) => {
+    const updated = [...compositeItems];
+    updated[index].quantity = qty;
+    setCompositeItems(updated);
+  };
+
+  const compositeTotalCost = compositeItems.reduce((sum, item) => {
+    return sum + (item.unit_cost * item.quantity);
+  }, 0);
+
+  const filteredCompositeProducts = products.filter(p =>
+    p.name.toLowerCase().includes(compositeSearch.toLowerCase()) &&
+    p.id !== editingProduct?.id
+  );
 
   const handleDelete = async (id: string) => {
     if (!confirm('Tem certeza que deseja excluir este produto?')) return;
@@ -330,7 +437,7 @@ const CommerceProducts = ({ commerceId }: CommerceProductsProps) => {
     }
   };
 
-  const handleEdit = (product: Product) => {
+  const handleEdit = async (product: Product) => {
     setEditingProduct(product);
     setFormData({
       name: product.name,
@@ -344,6 +451,38 @@ const CommerceProducts = ({ commerceId }: CommerceProductsProps) => {
       image_url: product.image_url || "",
     });
     setImagePreview(product.image_url || null);
+    setIsComposite(product.is_composite ?? false);
+    setIsFractioned(product.is_fractioned ?? false);
+    setHideFromMenu(product.hide_from_menu ?? false);
+    setFractionUnit(product.fraction_unit || "ml");
+    setFractionTotal(product.fraction_total?.toString() || "");
+    setFractionPerServing(product.fraction_per_serving?.toString() || "");
+    setCostPerServing(product.cost_per_serving?.toString() || "");
+
+    // Load composite items if composite
+    if (product.is_composite) {
+      const { data: items } = await supabase
+        .from('composite_product_items')
+        .select('component_product_id, quantity')
+        .eq('composite_product_id', product.id);
+
+      if (items) {
+        const composites: CompositeItem[] = [];
+        for (const item of items) {
+          const comp = products.find(p => p.id === item.component_product_id);
+          composites.push({
+            component_product_id: item.component_product_id,
+            product_name: comp?.name || 'Produto removido',
+            quantity: item.quantity,
+            unit_cost: comp?.is_fractioned ? (comp.cost_per_serving || comp.price) : (comp?.price || 0),
+          });
+        }
+        setCompositeItems(composites);
+      }
+    } else {
+      setCompositeItems([]);
+    }
+
     setIsDialogOpen(true);
   };
 
@@ -363,6 +502,15 @@ const CommerceProducts = ({ commerceId }: CommerceProductsProps) => {
     setImagePreview(null);
     setShowNewCategoryInput(false);
     setNewCategoryName("");
+    setIsComposite(false);
+    setIsFractioned(false);
+    setHideFromMenu(false);
+    setCompositeItems([]);
+    setCompositeSearch("");
+    setFractionUnit("ml");
+    setFractionTotal("");
+    setFractionPerServing("");
+    setCostPerServing("");
   };
 
   const filteredProducts = products.filter(product =>
@@ -411,6 +559,186 @@ const CommerceProducts = ({ commerceId }: CommerceProductsProps) => {
                     required
                   />
                 </div>
+
+                {/* Product Type Checkboxes */}
+                <div className="col-span-2 flex flex-wrap gap-4 p-3 rounded-lg bg-muted/30 border">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="is_composite"
+                      checked={isComposite}
+                      onCheckedChange={(checked) => {
+                        setIsComposite(!!checked);
+                        if (checked) setIsFractioned(false);
+                      }}
+                    />
+                    <Label htmlFor="is_composite" className="flex items-center gap-1.5 cursor-pointer text-sm">
+                      <Layers className="w-4 h-4 text-blue-500" />
+                      Produto Composto
+                    </Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="is_fractioned"
+                      checked={isFractioned}
+                      onCheckedChange={(checked) => {
+                        setIsFractioned(!!checked);
+                        if (checked) setIsComposite(false);
+                      }}
+                    />
+                    <Label htmlFor="is_fractioned" className="flex items-center gap-1.5 cursor-pointer text-sm">
+                      <Scissors className="w-4 h-4 text-orange-500" />
+                      Produto Fracionado
+                    </Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="hide_from_menu"
+                      checked={hideFromMenu}
+                      onCheckedChange={(checked) => setHideFromMenu(!!checked)}
+                    />
+                    <Label htmlFor="hide_from_menu" className="flex items-center gap-1.5 cursor-pointer text-sm">
+                      <EyeOff className="w-4 h-4 text-red-500" />
+                      Não Aparecer no Cardápio
+                    </Label>
+                  </div>
+                </div>
+
+                {/* Fractioned Product Config */}
+                {isFractioned && (
+                  <div className="col-span-2 p-4 rounded-lg border border-orange-500/30 bg-orange-500/5 space-y-3">
+                    <h4 className="font-medium flex items-center gap-2 text-sm">
+                      <Scissors className="w-4 h-4 text-orange-500" />
+                      Configuração do Produto Fracionado
+                    </h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label className="text-xs">Unidade de Medida</Label>
+                        <Select value={fractionUnit} onValueChange={setFractionUnit}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="ml">ml (mililitros)</SelectItem>
+                            <SelectItem value="g">g (gramas)</SelectItem>
+                            <SelectItem value="un">un (unidades)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label className="text-xs">Total ({fractionUnit})</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={fractionTotal}
+                          onChange={(e) => setFractionTotal(e.target.value)}
+                          placeholder="Ex: 1000"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Qtd por dose ({fractionUnit})</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={fractionPerServing}
+                          onChange={(e) => setFractionPerServing(e.target.value)}
+                          placeholder="Ex: 50"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Custo por dose (R$)</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={costPerServing}
+                          onChange={(e) => setCostPerServing(e.target.value)}
+                          placeholder="Ex: 2.00"
+                        />
+                      </div>
+                    </div>
+                    {fractionTotal && fractionPerServing && costPerServing && (
+                      <div className="p-2 rounded bg-orange-500/10 text-sm">
+                        <p>
+                          <strong>{Math.floor(parseFloat(fractionTotal) / parseFloat(fractionPerServing))}</strong> doses de {fractionPerServing}{fractionUnit} · 
+                          Custo total: <strong>{formatCurrency(parseFloat(costPerServing) * Math.floor(parseFloat(fractionTotal) / parseFloat(fractionPerServing)))}</strong>
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Composite Product Config */}
+                {isComposite && (
+                  <div className="col-span-2 p-4 rounded-lg border border-blue-500/30 bg-blue-500/5 space-y-3">
+                    <h4 className="font-medium flex items-center gap-2 text-sm">
+                      <Layers className="w-4 h-4 text-blue-500" />
+                      Composição do Produto
+                    </h4>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        value={compositeSearch}
+                        onChange={(e) => setCompositeSearch(e.target.value)}
+                        placeholder="Buscar produto para adicionar..."
+                        className="pl-10"
+                      />
+                    </div>
+                    {compositeSearch && (
+                      <div className="max-h-32 overflow-y-auto border rounded-lg divide-y">
+                        {filteredCompositeProducts.slice(0, 5).map(p => (
+                          <div
+                            key={p.id}
+                            className="flex items-center justify-between p-2 hover:bg-muted/50 cursor-pointer text-sm"
+                            onClick={() => addCompositeItem(p)}
+                          >
+                            <div>
+                              <span className="font-medium">{p.name}</span>
+                              {p.is_fractioned && (
+                                <Badge variant="outline" className="ml-2 text-xs">Fracionado</Badge>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground">
+                                Custo: {formatCurrency(p.is_fractioned ? (p.cost_per_serving || p.price) : p.price)}
+                              </span>
+                              <Plus className="w-4 h-4 text-primary" />
+                            </div>
+                          </div>
+                        ))}
+                        {filteredCompositeProducts.length === 0 && (
+                          <p className="p-2 text-xs text-muted-foreground text-center">Nenhum produto encontrado</p>
+                        )}
+                      </div>
+                    )}
+
+                    {compositeItems.length > 0 && (
+                      <div className="space-y-2">
+                        {compositeItems.map((item, idx) => (
+                          <div key={idx} className="flex items-center gap-2 p-2 bg-background rounded border">
+                            <span className="flex-1 text-sm font-medium truncate">{item.product_name}</span>
+                            <Input
+                              type="number"
+                              min="0.01"
+                              step="0.01"
+                              value={item.quantity}
+                              onChange={(e) => updateCompositeItemQty(idx, parseFloat(e.target.value) || 0)}
+                              className="w-20 text-center"
+                            />
+                            <span className="text-xs text-muted-foreground w-20 text-right">
+                              {formatCurrency(item.unit_cost * item.quantity)}
+                            </span>
+                            <Button type="button" size="icon" variant="ghost" onClick={() => removeCompositeItem(idx)} className="shrink-0">
+                              <X className="w-4 h-4 text-red-500" />
+                            </Button>
+                          </div>
+                        ))}
+                        <div className="p-2 rounded bg-blue-500/10 text-sm font-medium">
+                          Custo total da composição: {formatCurrency(compositeTotalCost)}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="col-span-2">
                   <Label htmlFor="description">Descrição</Label>
                   <Textarea
