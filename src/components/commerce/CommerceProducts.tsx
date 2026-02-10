@@ -1172,10 +1172,13 @@ const CommerceProducts = ({ commerceId }: CommerceProductsProps) => {
               </TableHeader>
               <TableBody>
                 {filteredProducts.map((product) => {
-                  const productMargin = product.promotional_price && product.price 
-                    ? ((product.promotional_price - product.price) / product.price) * 100 
+                  const effectiveCost = product.is_fractioned && product.cost_per_serving
+                    ? product.cost_per_serving
+                    : product.price;
+                  const productMargin = product.promotional_price && effectiveCost
+                    ? ((product.promotional_price - effectiveCost) / effectiveCost) * 100 
                     : 0;
-                  const stockValue = (product.promotional_price || 0) * (product.stock || 0);
+                  const stockValue = effectiveCost * (product.stock || 0);
                   
                   return (
                     <TableRow key={product.id}>
