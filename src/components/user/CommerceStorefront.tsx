@@ -572,7 +572,7 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
       .eq('is_active', true)
       .order('sort_order');
     
-    setCategories(categoriesData || []);
+    // Categories will be filtered after products are loaded below
 
     // Fetch products (including stock for out-of-stock logic)
     const { data: productsData } = await supabase
@@ -586,6 +586,11 @@ const CommerceStorefront = ({ commerceId, onBack }: CommerceStorefrontProps) => 
     const visibleProducts = (productsData || []).filter((p: any) => !p.hide_from_menu);
     
     setProducts(visibleProducts);
+
+    // Filter categories to only show those with at least one visible product
+    const visibleCategoryIds = new Set(visibleProducts.map((p: any) => p.category_id).filter(Boolean));
+    const filteredCategories = (categoriesData || []).filter((cat: any) => visibleCategoryIds.has(cat.id));
+    setCategories(filteredCategories);
 
     // Fetch reviews with user names and commerce replies
     const { data: reviewsData } = await supabase
