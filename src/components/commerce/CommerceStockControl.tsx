@@ -263,6 +263,8 @@ const CommerceStockControl = ({ commerceId }: CommerceStockControlProps) => {
     if (error) {
       toast({ variant: "destructive", title: "Erro ao ajustar estoque", description: error.message });
     } else {
+      // Recalculate composite products that depend on this product
+      await recalculateCompositeStocks([selectedProduct.id]);
       toast({ 
         title: "Estoque atualizado!", 
         description: `${selectedProduct.name}: ${currentStock} → ${newStock} unidades` 
