@@ -88,6 +88,7 @@ interface CompositeItem {
   product_name: string;
   quantity: number;
   unit_cost: number;
+  component_stock: number;
 }
 
 interface StockStats {
@@ -398,6 +399,7 @@ const CommerceProducts = ({ commerceId }: CommerceProductsProps) => {
       product_name: product.name,
       quantity: isFrac ? (product.fraction_per_serving || 1) : 1,
       unit_cost: isFrac ? (product.cost_per_serving || product.price) : product.price,
+      component_stock: product.stock || 0,
     }]);
     setCompositeSearch("");
   };
@@ -415,6 +417,39 @@ const CommerceProducts = ({ commerceId }: CommerceProductsProps) => {
   const compositeTotalCost = compositeItems.reduce((sum, item) => {
     return sum + (item.unit_cost * item.quantity);
   }, 0);
+
+  const compositeMaxStock = compositeItems.length > 0
+    ? Math.min(...compositeItems.map(item => 
+        item.quantity > 0 ? Math.floor(item.component_stock / item.quantity) : 0
+      ))
+    : 0;
+
+  // Auto-fill cost/stock for fractioned products
+  useEffect(() => {
+    if (!isFractioned) return;
+    const ft = parseFloat(fractionTotal);
+    const fps = parseFloat(fractionPerServing);
+    const cps = parseFloat(costPerServing);
+    if (ft > 0 && fps > 0 && cps > 0) {
+      const totalServings = Math.floor(ft / fps);
+      const totalCost = (cps * totalServings).toFixed(2);
+      setFormData(prev => ({
+        ...prev,
+        cost: totalCost,
+        stock: ft.toString(),
+      }));
+    }
+  }, [isFractioned, fractionTotal, fractionPerServing, costPerServing]);
+
+  // Auto-fill cost/stock for composite products
+  useEffect(() => {
+    if (!isComposite || compositeItems.length === 0) return;
+    setFormData(prev => ({
+      ...prev,
+      cost: compositeTotalCost.toFixed(2),
+      stock: compositeMaxStock.toString(),
+    }));
+  }, [isComposite, compositeItems, compositeTotalCost, compositeMaxStock]);
 
   const filteredCompositeProducts = products.filter(p =>
     p.name.toLowerCase().includes(compositeSearch.toLowerCase()) &&
@@ -475,6 +510,7 @@ const CommerceProducts = ({ commerceId }: CommerceProductsProps) => {
             product_name: comp?.name || 'Produto removido',
             quantity: item.quantity,
             unit_cost: comp?.is_fractioned ? (comp.cost_per_serving || comp.price) : (comp?.price || 0),
+            component_stock: comp?.stock || 0,
           });
         }
         setCompositeItems(composites);
@@ -733,6 +769,9 @@ const CommerceProducts = ({ commerceId }: CommerceProductsProps) => {
                         ))}
                         <div className="p-2 rounded bg-blue-500/10 text-sm font-medium">
                           Custo total da composição: {formatCurrency(compositeTotalCost)}
+                        </div>
+                        <div className="p-2 rounded bg-blue-500/10 text-sm">
+                          Estoque calculado: <strong>{compositeMaxStock}</strong> combinações possíveis
                         </div>
                       </div>
                     )}
