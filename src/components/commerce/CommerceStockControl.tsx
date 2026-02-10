@@ -203,16 +203,13 @@ const CommerceStockControl = ({ commerceId }: CommerceStockControlProps) => {
 
     products.forEach((product) => {
       const stock = product.stock || 0;
-      // For fractioned products, calculate based on number of doses
-      const effectiveUnits = (product.is_fractioned && product.fraction_per_serving && product.fraction_per_serving > 0)
-        ? stock / product.fraction_per_serving
-        : stock;
+      // Stock for fractioned products is already stored in doses, no conversion needed
       const unitCost = (product.is_fractioned && product.cost_per_serving) ? product.cost_per_serving : (product.price || 0);
-      const unitSale = (product.is_fractioned && product.fraction_per_serving) ? (product.price || 0) : (product.promotional_price || 0);
+      const unitSale = (product.is_fractioned) ? (product.price || 0) : (product.promotional_price || 0);
 
       totalItems += stock;
-      totalCostValue += unitCost * effectiveUnits;
-      totalSaleValue += unitSale * effectiveUnits;
+      totalCostValue += unitCost * stock;
+      totalSaleValue += unitSale * stock;
 
       if (stock === 0) outOfStockCount++;
       else if (stock <= 10) lowStockCount++;
@@ -315,13 +312,13 @@ const CommerceStockControl = ({ commerceId }: CommerceStockControlProps) => {
     const targetProduct = products.find(p => p.id === transferTargetProductId);
     if (!targetProduct) return;
 
-    // Calculate the amount to add to the target
+    // Calculate the amount to add to the target (in the target's stock unit)
     let addToTarget = qty;
 
-    // If transferring to a fractioned product, convert units
-    if (targetProduct.is_fractioned && targetProduct.fraction_total) {
-      // Each unit from source = fraction_total in the target's unit
-      addToTarget = qty * targetProduct.fraction_total;
+    // If transferring to a fractioned product, convert units to doses
+    if (targetProduct.is_fractioned && targetProduct.fraction_total && targetProduct.fraction_per_serving) {
+      // Each unit from source = fraction_total in ml, divided by per_serving = number of doses
+      addToTarget = qty * (targetProduct.fraction_total / targetProduct.fraction_per_serving);
     }
 
     const newSourceStock = Math.max(0, sourceStock - qty);
@@ -683,14 +680,11 @@ const CommerceStockControl = ({ commerceId }: CommerceStockControlProps) => {
               {filteredProducts.map((product) => {
                   const stock = product.stock ?? 0;
                   const stockStatus = getStockStatus(stock);
-                  // For fractioned products, calculate values based on number of doses
-                  const effectiveUnits = (product.is_fractioned && product.fraction_per_serving && product.fraction_per_serving > 0)
-                    ? stock / product.fraction_per_serving
-                    : stock;
+                  // Stock for fractioned products is already stored in doses
                   const unitCost = (product.is_fractioned && product.cost_per_serving) ? product.cost_per_serving : (product.price || 0);
-                  const unitSale = (product.is_fractioned && product.fraction_per_serving) ? (product.price || 0) : (product.promotional_price || 0);
-                  const costValue = unitCost * effectiveUnits;
-                  const saleValue = unitSale * effectiveUnits;
+                  const unitSale = (product.is_fractioned) ? (product.price || 0) : (product.promotional_price || 0);
+                  const costValue = unitCost * stock;
+                  const saleValue = unitSale * stock;
 
                   return (
                     <TableRow key={product.id} className={stock === 0 ? 'bg-red-500/5' : ''}>
@@ -896,8 +890,10 @@ const CommerceStockControl = ({ commerceId }: CommerceStockControlProps) => {
               const target = products.find(p => p.id === transferTargetProductId);
               if (!target) return null;
               const qty = parseInt(transferQuantity);
-              const addAmount = target.is_fractioned && target.fraction_total ? qty * target.fraction_total : qty;
-              const unitLabel = target.is_fractioned ? target.fraction_unit || 'un' : 'un';
+              const addAmount = (target.is_fractioned && target.fraction_total && target.fraction_per_serving)
+                ? qty * (target.fraction_total / target.fraction_per_serving)
+                : qty;
+              const unitLabel = target.is_fractioned ? 'doses' : 'un';
               return (
                 <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/30 space-y-1">
                   <p className="text-sm">
