@@ -203,12 +203,16 @@ const CommerceStockControl = ({ commerceId }: CommerceStockControlProps) => {
 
     products.forEach((product) => {
       const stock = product.stock || 0;
-      const cost = product.price || 0;
-      const salePrice = product.promotional_price || 0;
+      // For fractioned products, calculate based on number of doses
+      const effectiveUnits = (product.is_fractioned && product.fraction_per_serving && product.fraction_per_serving > 0)
+        ? stock / product.fraction_per_serving
+        : stock;
+      const unitCost = (product.is_fractioned && product.cost_per_serving) ? product.cost_per_serving : (product.price || 0);
+      const unitSale = (product.is_fractioned && product.fraction_per_serving) ? (product.price || 0) : (product.promotional_price || 0);
 
       totalItems += stock;
-      totalCostValue += cost * stock;
-      totalSaleValue += salePrice * stock;
+      totalCostValue += unitCost * effectiveUnits;
+      totalSaleValue += unitSale * effectiveUnits;
 
       if (stock === 0) outOfStockCount++;
       else if (stock <= 10) lowStockCount++;
@@ -676,11 +680,17 @@ const CommerceStockControl = ({ commerceId }: CommerceStockControlProps) => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredProducts.map((product) => {
+              {filteredProducts.map((product) => {
                   const stock = product.stock ?? 0;
                   const stockStatus = getStockStatus(stock);
-                  const costValue = (product.price || 0) * stock;
-                  const saleValue = (product.promotional_price || 0) * stock;
+                  // For fractioned products, calculate values based on number of doses
+                  const effectiveUnits = (product.is_fractioned && product.fraction_per_serving && product.fraction_per_serving > 0)
+                    ? stock / product.fraction_per_serving
+                    : stock;
+                  const unitCost = (product.is_fractioned && product.cost_per_serving) ? product.cost_per_serving : (product.price || 0);
+                  const unitSale = (product.is_fractioned && product.fraction_per_serving) ? (product.price || 0) : (product.promotional_price || 0);
+                  const costValue = unitCost * effectiveUnits;
+                  const saleValue = unitSale * effectiveUnits;
 
                   return (
                     <TableRow key={product.id} className={stock === 0 ? 'bg-red-500/5' : ''}>
