@@ -1207,7 +1207,7 @@ const CommerceProducts = ({ commerceId }: CommerceProductsProps) => {
                       </TableCell>
                       <TableCell>{product.category?.name || "-"}</TableCell>
                       <TableCell className="text-muted-foreground">
-                        {formatCurrency(product.price)}
+                        {formatCurrency(product.is_fractioned && product.cost_per_serving ? product.cost_per_serving : product.price)}
                       </TableCell>
                       <TableCell className="font-medium">
                         {product.promotional_price 
