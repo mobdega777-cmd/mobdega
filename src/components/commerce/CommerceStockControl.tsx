@@ -203,8 +203,8 @@ const CommerceStockControl = ({ commerceId }: CommerceStockControlProps) => {
 
     products.forEach((product) => {
       const stock = product.stock || 0;
-      // Stock for fractioned products is already stored in doses, no conversion needed
-      const unitCost = (product.is_fractioned && product.cost_per_serving) ? product.cost_per_serving : (product.price || 0);
+      // Stock is in sellable units (doses for fractioned). Use cost_per_serving for fractioned cost.
+      const unitCost = (product.is_fractioned && product.cost_per_serving != null) ? product.cost_per_serving : (product.price || 0);
       const unitSale = (product.is_fractioned) ? (product.price || 0) : (product.promotional_price || 0);
 
       totalItems += stock;
@@ -338,13 +338,63 @@ const CommerceStockControl = ({ commerceId }: CommerceStockControlProps) => {
     if (err1 || err2) {
       toast({ variant: "destructive", title: "Erro na transferência", description: (err1 || err2)?.message });
     } else {
-      const unitLabel = targetProduct.is_fractioned ? targetProduct.fraction_unit || 'un' : 'un';
+      // Recalculate composite products that depend on source or target
+      await recalculateCompositeStocks([transferSourceProduct.id, targetProduct.id]);
+
+      const unitLabel = targetProduct.is_fractioned ? 'doses' : 'un';
       toast({
         title: "Transferência realizada!",
         description: `${qty} un. de ${transferSourceProduct.name} → ${addToTarget} ${unitLabel} em ${targetProduct.name}`,
       });
       setIsTransferDialogOpen(false);
       fetchProducts();
+    }
+  };
+
+  const recalculateCompositeStocks = async (changedProductIds: string[]) => {
+    // Find all composite products that use any of the changed products as components
+    const { data: affectedComposites } = await supabase
+      .from('composite_product_items')
+      .select('composite_product_id')
+      .in('component_product_id', changedProductIds);
+
+    if (!affectedComposites || affectedComposites.length === 0) return;
+
+    const compositeIds = [...new Set(affectedComposites.map(c => c.composite_product_id))];
+
+    for (const compositeId of compositeIds) {
+      // Get all components of this composite product
+      const { data: components } = await supabase
+        .from('composite_product_items')
+        .select('quantity, component_product_id')
+        .eq('composite_product_id', compositeId);
+
+      if (!components || components.length === 0) continue;
+
+      // Get current stock of all components
+      const componentIds = components.map(c => c.component_product_id);
+      const { data: componentProducts } = await supabase
+        .from('products')
+        .select('id, stock')
+        .in('id', componentIds);
+
+      if (!componentProducts) continue;
+
+      // Calculate bottleneck: min(component_stock / required_qty)
+      let minAvailable = Infinity;
+      for (const comp of components) {
+        const prod = componentProducts.find(p => p.id === comp.component_product_id);
+        const prodStock = prod?.stock ?? 0;
+        const available = comp.quantity > 0 ? Math.floor(prodStock / comp.quantity) : 0;
+        minAvailable = Math.min(minAvailable, available);
+      }
+
+      const newStock = minAvailable === Infinity ? 0 : minAvailable;
+
+      await supabase
+        .from('products')
+        .update({ stock: newStock })
+        .eq('id', compositeId);
     }
   };
 
@@ -680,8 +730,8 @@ const CommerceStockControl = ({ commerceId }: CommerceStockControlProps) => {
               {filteredProducts.map((product) => {
                   const stock = product.stock ?? 0;
                   const stockStatus = getStockStatus(stock);
-                  // Stock for fractioned products is already stored in doses
-                  const unitCost = (product.is_fractioned && product.cost_per_serving) ? product.cost_per_serving : (product.price || 0);
+                  // Stock is in sellable units. For fractioned, use cost_per_serving for cost column.
+                  const unitCost = (product.is_fractioned && product.cost_per_serving != null) ? product.cost_per_serving : (product.price || 0);
                   const unitSale = (product.is_fractioned) ? (product.price || 0) : (product.promotional_price || 0);
                   const costValue = unitCost * stock;
                   const saleValue = unitSale * stock;
