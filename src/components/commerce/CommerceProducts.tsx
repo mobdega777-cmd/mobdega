@@ -398,7 +398,7 @@ const CommerceProducts = ({ commerceId }: CommerceProductsProps) => {
     setCompositeItems([...compositeItems, {
       component_product_id: product.id,
       product_name: product.name,
-      quantity: isFrac ? (product.fraction_per_serving || 1) : 1,
+      quantity: 1,
       unit_cost: isFrac ? (product.cost_per_serving || product.price) : product.price,
       component_stock: product.stock || 0,
     }]);
