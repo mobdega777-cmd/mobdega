@@ -205,7 +205,7 @@ const CommerceStockControl = ({ commerceId }: CommerceStockControlProps) => {
       const stock = product.stock || 0;
       // Stock is in sellable units (doses for fractioned). Use cost_per_serving for fractioned cost.
       const unitCost = (product.is_fractioned && product.cost_per_serving != null) ? product.cost_per_serving : (product.price || 0);
-      const unitSale = (product.is_fractioned) ? (product.price || 0) : (product.promotional_price || 0);
+      const unitSale = product.promotional_price || 0;
 
       totalItems += stock;
       totalCostValue += unitCost * stock;
@@ -734,7 +734,7 @@ const CommerceStockControl = ({ commerceId }: CommerceStockControlProps) => {
                   const stockStatus = getStockStatus(stock);
                   // Stock is in sellable units. For fractioned, use cost_per_serving for cost column.
                   const unitCost = (product.is_fractioned && product.cost_per_serving != null) ? product.cost_per_serving : (product.price || 0);
-                  const unitSale = (product.is_fractioned) ? (product.price || 0) : (product.promotional_price || 0);
+                  const unitSale = product.promotional_price || 0;
                   const costValue = unitCost * stock;
                   const saleValue = unitSale * stock;
 
