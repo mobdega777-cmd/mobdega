@@ -2039,19 +2039,10 @@ export type Database = {
       }
     }
     Functions: {
-      apply_stock_deduction_for_order:
-        | {
-            Args: { _order_id: string }
-            Returns: {
-              error: true
-            } & "Could not choose the best candidate function between: public.apply_stock_deduction_for_order(_order_id => text), public.apply_stock_deduction_for_order(_order_id => uuid). Try renaming the parameters or the function itself in the database so function overloading can be resolved"
-          }
-        | {
-            Args: { _order_id: string }
-            Returns: {
-              error: true
-            } & "Could not choose the best candidate function between: public.apply_stock_deduction_for_order(_order_id => text), public.apply_stock_deduction_for_order(_order_id => uuid). Try renaming the parameters or the function itself in the database so function overloading can be resolved"
-          }
+      apply_stock_deduction_for_order: {
+        Args: { _order_id: string }
+        Returns: undefined
+      }
       can_manage_order: { Args: { _order_id: string }; Returns: boolean }
       get_active_sessions_for_tables: {
         Args: { p_table_ids: string[] }
