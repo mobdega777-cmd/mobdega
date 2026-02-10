@@ -126,6 +126,7 @@ const CommerceProducts = ({ commerceId }: CommerceProductsProps) => {
   const [fractionTotal, setFractionTotal] = useState("");
   const [fractionPerServing, setFractionPerServing] = useState("");
   const [costPerServing, setCostPerServing] = useState("");
+  const [fractionTotalCost, setFractionTotalCost] = useState("");
 
   const [formData, setFormData] = useState({
     name: "",
@@ -492,6 +493,13 @@ const CommerceProducts = ({ commerceId }: CommerceProductsProps) => {
     setFractionTotal(product.fraction_total?.toString() || "");
     setFractionPerServing(product.fraction_per_serving?.toString() || "");
     setCostPerServing(product.cost_per_serving?.toString() || "");
+    // Calculate total cost from cost_per_serving * doses for edit
+    if (product.fraction_total && product.fraction_per_serving && product.cost_per_serving) {
+      const doses = Math.floor(product.fraction_total / product.fraction_per_serving);
+      setFractionTotalCost((product.cost_per_serving * doses).toFixed(2));
+    } else {
+      setFractionTotalCost("");
+    }
 
     // Load composite items if composite
     if (product.is_composite) {
@@ -546,6 +554,7 @@ const CommerceProducts = ({ commerceId }: CommerceProductsProps) => {
     setFractionTotal("");
     setFractionPerServing("");
     setCostPerServing("");
+    setFractionTotalCost("");
   };
 
   const filteredProducts = products.filter(product =>
@@ -677,6 +686,27 @@ const CommerceProducts = ({ commerceId }: CommerceProductsProps) => {
                           value={fractionPerServing}
                           onChange={(e) => setFractionPerServing(e.target.value)}
                           placeholder="Ex: 50"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Custo total (R$)</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={fractionTotalCost}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setFractionTotalCost(val);
+                            const ft = parseFloat(fractionTotal);
+                            const fps = parseFloat(fractionPerServing);
+                            if (ft > 0 && fps > 0 && parseFloat(val) > 0) {
+                              const doses = Math.floor(ft / fps);
+                              if (doses > 0) {
+                                setCostPerServing((parseFloat(val) / doses).toFixed(2));
+                              }
+                            }
+                          }}
+                          placeholder="Ex: 40.00"
                         />
                       </div>
                       <div>
