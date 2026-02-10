@@ -432,11 +432,10 @@ const CommerceProducts = ({ commerceId }: CommerceProductsProps) => {
     const cps = parseFloat(costPerServing);
     if (ft > 0 && fps > 0 && cps > 0) {
       const totalServings = Math.floor(ft / fps);
-      const totalCost = (cps * totalServings).toFixed(2);
       setFormData(prev => ({
         ...prev,
-        cost: totalCost,
-        stock: ft.toString(),
+        cost: cps.toFixed(2),
+        stock: totalServings.toString(),
       }));
     }
   }, [isFractioned, fractionTotal, fractionPerServing, costPerServing]);
