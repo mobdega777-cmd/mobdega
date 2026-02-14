@@ -733,69 +733,6 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
     setGeneratingPdf(null);
   };
 
-  const handleGenerateStockReport = async () => {
-    if (!commerce) return;
-    setGeneratingPdf('estoque');
-    
-    try {
-      const { data: products } = await supabase
-        .from('products')
-        .select('id, name, price, stock, category_id')
-        .eq('commerce_id', commerceId)
-        .eq('is_active', true);
-
-      const { data: categoriesData } = await supabase
-        .from('categories')
-        .select('id, name')
-        .eq('commerce_id', commerceId);
-
-      const categoryMap = new Map(categoriesData?.map(c => [c.id, c.name]) || []);
-
-      const productsWithValue = (products || []).map(p => ({
-        name: p.name,
-        category: categoryMap.get(p.category_id || '') || 'Sem categoria',
-        stock: p.stock || 0,
-        price: p.price,
-        value: (p.stock || 0) * p.price
-      }));
-
-      const lowStockProducts = productsWithValue
-        .filter(p => p.stock <= 5 && p.stock > 0)
-        .map(p => ({ name: p.name, stock: p.stock, minStock: 5 }));
-
-      // Group by category
-      const categoryStats: Record<string, { productCount: number; totalValue: number }> = {};
-      productsWithValue.forEach(p => {
-        if (!categoryStats[p.category]) {
-          categoryStats[p.category] = { productCount: 0, totalValue: 0 };
-        }
-        categoryStats[p.category].productCount += 1;
-        categoryStats[p.category].totalValue += p.value;
-      });
-
-      await generateStockReportPDF({
-        commerceName: commerce.fantasy_name,
-        logoUrl: commerce.logo_url,
-        period: format(new Date(), 'dd/MM/yyyy'),
-        totalProducts: products?.length || 0,
-        stockValue: stats.stockCostValue,
-        potentialRevenue: stats.stockSaleValue,
-        lowStockProducts,
-        products: productsWithValue,
-        categories: Object.entries(categoryStats).map(([name, data]) => ({
-          name,
-          productCount: data.productCount,
-          totalValue: data.totalValue
-        }))
-      });
-
-      toast({ title: "Relatório de Estoque gerado com sucesso!" });
-    } catch (error) {
-      toast({ variant: "destructive", title: "Erro ao gerar relatório" });
-    }
-    
-    setGeneratingPdf(null);
-  };
 
   const handleGenerateManagementReport = async () => {
     if (!commerce) return;
@@ -1108,20 +1045,6 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
               <Download className="w-4 h-4 mr-1 sm:mr-2" />
             )}
             <span className="hidden xs:inline">Relatório de</span> Vendas
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handleGenerateStockReport}
-            disabled={!!generatingPdf}
-            className="text-xs sm:text-sm"
-          >
-            {generatingPdf === 'estoque' ? (
-              <Loader2 className="w-4 h-4 mr-1 sm:mr-2 animate-spin" />
-            ) : (
-              <Download className="w-4 h-4 mr-1 sm:mr-2" />
-            )}
-            <span className="hidden xs:inline">Relatório de</span> Estoque
           </Button>
           <Button 
             variant="outline" 
