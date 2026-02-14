@@ -43,12 +43,16 @@ import {
   Minus,
   Lightbulb,
   ShoppingCart,
-  ArrowRightLeft
+  ArrowRightLeft,
+  Download,
+  Loader2
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { HelpTooltip } from "@/components/ui/help-tooltip";
+import { generateStockReportPDF } from "@/lib/pdfReportGenerator";
+import { format } from "date-fns";
 
 interface CommerceStockControlProps {
   commerceId: string;
@@ -115,6 +119,7 @@ const CommerceStockControl = ({ commerceId }: CommerceStockControlProps) => {
   const [transferTargetProductId, setTransferTargetProductId] = useState("");
   const [transferQuantity, setTransferQuantity] = useState("1");
   
+  const [generatingPdf, setGeneratingPdf] = useState(false);
   const { toast } = useToast();
 
   const fetchProducts = async () => {
@@ -240,6 +245,63 @@ const CommerceStockControl = ({ commerceId }: CommerceStockControlProps) => {
   };
 
   const stats = calculateStats();
+
+  const handleGenerateStockReport = async () => {
+    setGeneratingPdf(true);
+    
+    try {
+      const { data: commerceData } = await supabase
+        .from('commerces')
+        .select('fantasy_name, logo_url')
+        .eq('id', commerceId)
+        .single();
+
+      const categoryMap = new Map(categories.map(c => [c.id, c.name]));
+
+      const productsWithValue = products.filter(p => p.is_active).map(p => ({
+        name: p.name,
+        category: categoryMap.get(p.category_id || '') || 'Sem categoria',
+        stock: p.stock || 0,
+        price: p.price,
+        value: (p.stock || 0) * p.price
+      }));
+
+      const lowStockProducts = productsWithValue
+        .filter(p => p.stock <= 5 && p.stock > 0)
+        .map(p => ({ name: p.name, stock: p.stock, minStock: 5 }));
+
+      const categoryStats: Record<string, { productCount: number; totalValue: number }> = {};
+      productsWithValue.forEach(p => {
+        if (!categoryStats[p.category]) {
+          categoryStats[p.category] = { productCount: 0, totalValue: 0 };
+        }
+        categoryStats[p.category].productCount += 1;
+        categoryStats[p.category].totalValue += p.value;
+      });
+
+      await generateStockReportPDF({
+        commerceName: commerceData?.fantasy_name || '',
+        logoUrl: commerceData?.logo_url,
+        period: format(new Date(), 'dd/MM/yyyy'),
+        totalProducts: productsWithValue.length,
+        stockValue: stats.totalCostValue,
+        potentialRevenue: stats.totalSaleValue,
+        lowStockProducts,
+        products: productsWithValue,
+        categories: Object.entries(categoryStats).map(([name, data]) => ({
+          name,
+          productCount: data.productCount,
+          totalValue: data.totalValue
+        }))
+      });
+
+      toast({ title: "Relatório de Estoque gerado com sucesso!" });
+    } catch (error) {
+      toast({ variant: "destructive", title: "Erro ao gerar relatório" });
+    }
+    
+    setGeneratingPdf(false);
+  };
 
   const handleAdjustStock = async () => {
     if (!selectedProduct || !stockAdjustment) return;
@@ -462,10 +524,26 @@ const CommerceStockControl = ({ commerceId }: CommerceStockControlProps) => {
           <h1 className="text-3xl font-bold">Controle de Estoque</h1>
           <p className="text-muted-foreground">Gerencie níveis de estoque, ajustes e movimentações</p>
         </div>
-        <Button variant="outline" onClick={() => { fetchProducts(); fetchRecentSales(); }} className="gap-2">
-          <RefreshCw className="w-4 h-4" />
-          Atualizar
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={handleGenerateStockReport}
+            disabled={generatingPdf}
+            className="text-xs sm:text-sm"
+          >
+            {generatingPdf ? (
+              <Loader2 className="w-4 h-4 mr-1 sm:mr-2 animate-spin" />
+            ) : (
+              <Download className="w-4 h-4 mr-1 sm:mr-2" />
+            )}
+            <span className="hidden xs:inline">Relatório de</span> Estoque
+          </Button>
+          <Button variant="outline" onClick={() => { fetchProducts(); fetchRecentSales(); }} className="gap-2">
+            <RefreshCw className="w-4 h-4" />
+            Atualizar
+          </Button>
+        </div>
       </div>
 
       {/* Cards de Estatísticas Principais */}
