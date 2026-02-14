@@ -7,7 +7,8 @@ import {
   BookOpen,
   Clock,
   GraduationCap,
-  CheckCircle2
+  CheckCircle2,
+  Info
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -174,6 +175,15 @@ const CommerceTraining = ({ isPendingApproval = false }: CommerceTrainingProps) 
         </div>
       )}
 
+      {/* Loading tip */}
+      <Alert className="bg-blue-500/10 border-blue-500/30">
+        <Info className="h-5 w-5 text-blue-500" />
+        <AlertTitle className="text-blue-600 dark:text-blue-400 font-semibold">Dica</AlertTitle>
+        <AlertDescription className="text-muted-foreground">
+          Os vídeos podem levar alguns segundos para carregar. Por favor, aguarde um momento após clicar em um vídeo.
+        </AlertDescription>
+      </Alert>
+
       {/* Pending Approval Banner */}
       {isPendingApproval && (
         <motion.div
@@ -252,6 +262,7 @@ const CommerceTraining = ({ isPendingApproval = false }: CommerceTrainingProps) 
                       <img 
                         src={thumbnail} 
                         alt={video.title} 
+                        loading="lazy"
                         className={`w-full h-full object-cover ${isCompleted ? 'opacity-70' : ''}`}
                       />
                     ) : (
@@ -328,6 +339,7 @@ const CommerceTraining = ({ isPendingApproval = false }: CommerceTrainingProps) 
                     src={selectedVideo.video_url}
                     controls
                     autoPlay
+                    preload="metadata"
                     onTimeUpdate={handleTimeUpdate}
                     className="w-full aspect-video rounded-lg bg-black"
                   >
@@ -339,6 +351,7 @@ const CommerceTraining = ({ isPendingApproval = false }: CommerceTrainingProps) 
                     className="w-full aspect-video rounded-lg"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowFullScreen
+                    loading="lazy"
                   />
                 ) : (
                   <div className="flex flex-col items-center justify-center aspect-video bg-muted rounded-lg">
