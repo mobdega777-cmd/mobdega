@@ -92,6 +92,15 @@ export const toSupabaseISOString = (date: Date, isEndOfDay: boolean = false): st
  * Retorna o range de datas formatado para queries Supabase
  * Usa o timezone correto do Brasil (UTC-3)
  */
+/**
+ * Converte uma string de data (YYYY-MM-DD) para Date sem
+ * conversao de timezone, evitando o problema de voltar 1 dia.
+ */
+export const parseDateOnly = (dateStr: string): Date => {
+  const [year, month, day] = dateStr.split('T')[0].split('-').map(Number);
+  return new Date(year, month - 1, day);
+};
+
 export const getSupabaseDateRange = (start: Date, end: Date): { startISO: string; endISO: string } => {
   return {
     startISO: toSupabaseISOString(start, false),

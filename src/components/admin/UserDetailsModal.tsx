@@ -18,6 +18,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
+import { format } from "date-fns";
+import { parseDateOnly } from "@/lib/dateUtils";
 
 interface Profile {
   id: string;
@@ -207,7 +209,7 @@ const UserDetailsModal = ({ user, open, onOpenChange }: UserDetailsModalProps) =
                 {user.birthday && (
                   <div className="flex items-center gap-3 text-sm">
                     <Calendar className="w-4 h-4 text-muted-foreground" />
-                    <span>{new Date(user.birthday).toLocaleDateString('pt-BR')}</span>
+                    <span>{format(parseDateOnly(user.birthday), "dd/MM/yyyy")}</span>
                   </div>
                 )}
               </div>
