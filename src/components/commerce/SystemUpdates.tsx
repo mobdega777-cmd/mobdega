@@ -80,6 +80,20 @@ const SystemUpdates = () => {
     };
 
     fetchUpdates();
+
+    // Realtime subscription
+    const channel = supabase
+      .channel('system-updates-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'system_updates' },
+        () => fetchUpdates()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   return (

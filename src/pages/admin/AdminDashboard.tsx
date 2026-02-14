@@ -19,7 +19,8 @@ import {
   BookOpen,
   Trophy,
   Database,
-  MessageSquare
+  MessageSquare,
+  History as HistoryIcon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -45,6 +46,7 @@ import AdminTraining from "@/components/admin/AdminTraining";
 import AdminRanking from "@/components/admin/AdminRanking";
 import AdminDatabase from "@/components/admin/AdminDatabase";
 import AdminForum from "@/components/admin/AdminForum";
+import AdminSystemUpdates from "@/components/admin/AdminSystemUpdates";
 
 type AdminSection = 
   | "overview" 
@@ -61,6 +63,7 @@ type AdminSection =
   | "ranking"
   | "database"
   | "forum"
+  | "system-updates"
   | "settings";
 
 const menuItems = [
@@ -77,6 +80,7 @@ const menuItems = [
   { id: "ranking" as AdminSection, label: "Ranking", icon: Trophy },
   { id: "database" as AdminSection, label: "Banco de Dados", icon: Database },
   { id: "forum" as AdminSection, label: "Fórum", icon: MessageSquare },
+  { id: "system-updates" as AdminSection, label: "Atualizações", icon: HistoryIcon },
   { id: "customization" as AdminSection, label: "Personalização", icon: Palette },
   { id: "settings" as AdminSection, label: "Configurações", icon: Settings },
 ];
@@ -178,6 +182,8 @@ const AdminDashboard = () => {
         return <AdminDatabase />;
       case "forum":
         return <AdminForum />;
+      case "system-updates":
+        return <AdminSystemUpdates />;
       case "customization":
         return <AdminCustomization />;
       case "settings":
