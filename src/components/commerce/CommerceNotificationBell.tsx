@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Bell, CreditCard, AlertCircle, Check, CheckCheck, BookOpen, ShoppingCart, Package, Utensils, Settings, Trophy } from "lucide-react";
+import { Bell, CreditCard, AlertCircle, Check, CheckCheck, BookOpen, ShoppingCart, Package, Settings, Trophy, MessageSquare, Heart, Banknote } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -125,6 +125,12 @@ const CommerceNotificationBell = ({
       'new_training_video': 'training',
       'new_review': 'overview',
       'new_order': 'orders',
+      'new_forum_topic': 'forum',
+      'new_favorite': 'overview',
+      'low_stock': 'stock',
+      'new_system_update': 'updates',
+      'forum_reply': 'forum',
+      'cash_register_event': 'cash-register',
     };
     return sectionMap[type] || null;
   };
@@ -154,6 +160,18 @@ const CommerceNotificationBell = ({
         return <Trophy className="w-4 h-4 text-yellow-500" />;
       case 'new_order':
         return <ShoppingCart className="w-4 h-4 text-green-500" />;
+      case 'new_forum_topic':
+        return <MessageSquare className="w-4 h-4 text-blue-400" />;
+      case 'new_favorite':
+        return <Heart className="w-4 h-4 text-pink-500" />;
+      case 'low_stock':
+        return <Package className="w-4 h-4 text-orange-500" />;
+      case 'new_system_update':
+        return <Settings className="w-4 h-4 text-muted-foreground" />;
+      case 'forum_reply':
+        return <MessageSquare className="w-4 h-4 text-purple-500" />;
+      case 'cash_register_event':
+        return <Banknote className="w-4 h-4 text-yellow-600" />;
       default:
         return <AlertCircle className="w-4 h-4 text-muted-foreground" />;
     }
