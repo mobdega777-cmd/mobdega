@@ -1,39 +1,45 @@
 
 
-## Registrar as 20 Ultimas Implementacoes no Feed (Mais Recentes no Topo)
+## 3 Melhorias de UI no Controle de Estoque e Ranking
 
-### Esclarecimento
+### 1. Paginacao nas Ultimas Vendas (Saidas de Estoque)
 
-O componente `SystemUpdates.tsx` ja ordena por `published_at DESC` (mais recente primeiro). Basta que os timestamps estejam corretos na insercao. As implementacoes mais recentes (notificacoes, treinamento) aparecerao no topo, e as mais antigas (forum, ranking) ficam embaixo.
+Atualmente a lista exibe apenas os 5 primeiros registros (`recentMovements.slice(0, 5)`). A mudanca sera:
 
-### Ordem de exibicao no feed (de cima para baixo)
+- Remover o `slice(0, 5)` e usar paginacao com 10 itens por pagina
+- Aumentar o `limit` na query de `10` para um valor maior (ex: 50) para ter mais dados disponiveis
+- Adicionar estado de pagina e controles de navegacao (Anterior/Proximo) abaixo da lista
+- Usar o componente `Pagination` existente do projeto
 
-| # | Data | Tipo | Modulo | Descricao |
-|---|------|------|--------|-----------|
-| 1 | 14/02 | create | Notificacoes | Sistema completo de alertas: novos pedidos, estoque baixo, favoritos, forum, caixa e atualizacoes do sistema |
-| 2 | 14/02 | create | Treinamento | Checkbox de progresso nos videos de treinamento para acompanhar o que ja foi assistido |
-| 3 | 09/02 | update | Seguranca | Politicas de seguranca refinadas para perfis, caixa e notificacoes com acesso granular |
-| 4 | 09/02 | create | Estoque | Produtos compostos e fracionados com deducao automatica de componentes ao entregar pedido |
-| 5 | 08/02 | create | Avaliacoes | Sistema de avaliacoes com estrelas, resposta do comercio e notificacao automatica |
-| 6 | 04/02 | create | Treinamento | Central de Treinamento com upload de videos, bucket de armazenamento e controle de acesso |
-| 7 | 04/02 | create | Vitrine | Redes sociais (Instagram e Facebook) no perfil do comercio e exibicao na vitrine |
-| 8 | 04/02 | create | Notificacoes | Sistema de notificacoes do comercio com sino no cabecalho e alertas de novas faturas |
-| 9 | 03/02 | create | Configuracoes | Sistema de Modo Funcionario/Gestao com controle de visibilidade de menu e senha de gestao |
-| 10 | 02/02 | update | Caixa/PDV | Pedidos de Delivery contabilizados automaticamente no Caixa/PDV ao serem finalizados |
-| 11 | 02/02 | create | Delivery | Aba "Acompanhar" na vitrine para clientes acompanharem pedidos de delivery em tempo real |
-| 12 | 31/01 | create | Autenticacao | Recurso de recuperacao de senha via email para usuarios e comercios |
-| 13 | 31/01 | create | Seguranca | Aba de Seguranca no painel admin para reset de senha temporaria de comercios |
-| 14 | 29/01 | update | Financeiro | Calculo de faturamento liquido com desconto automatico de taxas de operadoras (Debito/Credito) |
-| 15 | 28/01 | create | Forum | Sistema de votacao (Concordo/Nao Concordo) para topicos do forum com contadores em tempo real |
-| 16 | 28/01 | config | Pagamentos | Sistema de configuracao de taxas por metodo de pagamento para calculo preciso de faturamento liquido |
-| 17 | 28/01 | update | Caixa/PDV | Resumo detalhado no fechamento com totais por forma de pagamento e reconciliacao de saldo |
-| 18 | 28/01 | create | Impostos | Modulo de gestao tributaria com configuracao de regime, tipo de calculo e alerta antes do vencimento |
-| 19 | 27/01 | update | Ranking | Badges visuais por plano e destaque especial para lideres com gradientes e icones |
-| 20 | 27/01 | create | Forum | Lancamento do Forum de Comunidade para adegas e tabacarias reportarem problemas e sugerirem melhorias |
+**Arquivo:** `src/components/commerce/CommerceStockControl.tsx`
+- Linha 162: Aumentar `.limit(10)` para `.limit(50)`
+- Linha 751: Substituir `recentMovements.slice(0, 5)` por logica de paginacao (10 por pagina)
+- Adicionar estado `salesPage` e controles de paginacao no final da lista
+
+### 2. Barra de rolagem na tabela de produtos
+
+A tabela de produtos atualmente cresce indefinidamente. A mudanca sera:
+
+- Envolver a `Table` em um `ScrollArea` com altura maxima definida (ex: `max-h-[500px]`)
+- Importar `ScrollArea` de `@/components/ui/scroll-area`
+
+**Arquivo:** `src/components/commerce/CommerceStockControl.tsx`
+- Linha ~796-797: Envolver o bloco da `Table` com `<ScrollArea className="max-h-[500px]">`
+
+### 3. Barra de rolagem no dropdown de regioes do Ranking
+
+O `SelectContent` do seletor de regioes ja tem `max-h-[400px]` mas nao tem `overflow-y-auto` nem um `ScrollArea`. A mudanca sera:
+
+- Adicionar `overflow-y-auto` ao `SelectContent` para garantir a rolagem
+- O Radix Select ja suporta scroll internamente, mas pode ser necessario ajustar o estilo para funcionar corretamente com muitos grupos
+
+**Arquivo:** `src/components/commerce/CommerceRanking.tsx`
+- Linha 602: Ajustar o `SelectContent` para incluir scroll adequado, ex: `className="max-h-[300px] overflow-y-auto"`
 
 ### Detalhes tecnicos
 
-**Migracao SQL**: Deletar os 3 registros atuais e inserir 20 novos com timestamps escalonados. A ordenacao `ORDER BY published_at DESC` do componente garante que o item #1 (14/02) aparece no topo e o #20 (27/01) fica por ultimo.
-
-**Nenhuma alteracao de codigo frontend necessaria.**
+- Nenhuma alteracao de banco de dados
+- Nenhuma nova dependencia
+- Componentes `ScrollArea` e `Pagination` ja existem no projeto
+- O layout existente nao sera alterado, apenas adicionados controles dentro dos cards ja existentes
 
