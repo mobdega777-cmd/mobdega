@@ -18,6 +18,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { fetchAddressByCep, formatCep, getCepProximityScore } from "@/lib/viaCepService";
 import { format, formatDistanceToNow } from "date-fns";
+import { parseDateOnly } from "@/lib/dateUtils";
 import { ptBR } from "date-fns/locale";
 import logoMobdega from "@/assets/logo-mobdega.png";
 import CommerceStorefront from "@/components/user/CommerceStorefront";
@@ -989,7 +990,7 @@ const UserDashboard = () => {
                         ) : (
                           <div className="flex items-center gap-2 p-2.5 bg-muted/50 rounded-lg text-foreground">
                             <Calendar className="w-4 h-4 text-muted-foreground" />
-                            {profile?.birthday ? format(new Date(profile.birthday), "dd/MM/yyyy") : "Não informado"}
+                            {profile?.birthday ? format(parseDateOnly(profile.birthday), "dd/MM/yyyy") : "Não informado"}
                           </div>
                         )}
                       </div>

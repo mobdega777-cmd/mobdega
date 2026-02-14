@@ -33,6 +33,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format, formatDistanceToNow } from "date-fns";
+import { parseDateOnly } from "@/lib/dateUtils";
 import { ptBR } from "date-fns/locale";
 
 interface Customer {
@@ -497,7 +498,7 @@ const AdminCustomers = () => {
                         <p className="text-sm text-muted-foreground">Data de Nascimento</p>
                         <p className="font-medium">
                           {selectedCustomer.birthday 
-                            ? format(new Date(selectedCustomer.birthday), "dd/MM/yyyy")
+                            ? format(parseDateOnly(selectedCustomer.birthday), "dd/MM/yyyy")
                             : "Não informado"}
                         </p>
                       </div>
