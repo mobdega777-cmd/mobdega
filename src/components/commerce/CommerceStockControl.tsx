@@ -53,6 +53,15 @@ import { formatCurrency } from "@/lib/formatCurrency";
 import { HelpTooltip } from "@/components/ui/help-tooltip";
 import { generateStockReportPDF } from "@/lib/pdfReportGenerator";
 import { format } from "date-fns";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 interface CommerceStockControlProps {
   commerceId: string;
@@ -120,6 +129,7 @@ const CommerceStockControl = ({ commerceId }: CommerceStockControlProps) => {
   const [transferQuantity, setTransferQuantity] = useState("1");
   
   const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [salesPage, setSalesPage] = useState(1);
   const { toast } = useToast();
 
   const fetchProducts = async () => {
@@ -159,7 +169,7 @@ const CommerceStockControl = ({ commerceId }: CommerceStockControlProps) => {
       .eq('order.commerce_id', commerceId)
       .eq('order.status', 'delivered')
       .order('created_at', { ascending: false })
-      .limit(10);
+      .limit(50);
 
     if (orderItems) {
       const movements: StockMovement[] = orderItems.map(item => ({
@@ -748,7 +758,7 @@ const CommerceStockControl = ({ commerceId }: CommerceStockControlProps) => {
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {recentMovements.slice(0, 5).map((movement, index) => (
+              {recentMovements.slice((salesPage - 1) * 10, salesPage * 10).map((movement, index) => (
                 <div key={index} className="flex items-center justify-between py-2 border-b last:border-0">
                   <div className="flex items-center gap-3">
                     <div className="p-1.5 rounded bg-red-500/10">
@@ -768,6 +778,35 @@ const CommerceStockControl = ({ commerceId }: CommerceStockControlProps) => {
                 </div>
               ))}
             </div>
+            {recentMovements.length > 10 && (
+              <Pagination className="mt-4">
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      onClick={() => setSalesPage(p => Math.max(1, p - 1))}
+                      className={salesPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                    />
+                  </PaginationItem>
+                  {Array.from({ length: Math.ceil(recentMovements.length / 10) }, (_, i) => (
+                    <PaginationItem key={i + 1}>
+                      <PaginationLink
+                        isActive={salesPage === i + 1}
+                        onClick={() => setSalesPage(i + 1)}
+                        className="cursor-pointer"
+                      >
+                        {i + 1}
+                      </PaginationLink>
+                    </PaginationItem>
+                  ))}
+                  <PaginationItem>
+                    <PaginationNext
+                      onClick={() => setSalesPage(p => Math.min(Math.ceil(recentMovements.length / 10), p + 1))}
+                      className={salesPage === Math.ceil(recentMovements.length / 10) ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            )}
           </CardContent>
         </Card>
       )}
@@ -794,6 +833,7 @@ const CommerceStockControl = ({ commerceId }: CommerceStockControlProps) => {
               <p className="text-muted-foreground">Nenhum produto encontrado</p>
             </div>
           ) : (
+            <ScrollArea className="max-h-[500px] overflow-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -894,6 +934,7 @@ const CommerceStockControl = ({ commerceId }: CommerceStockControlProps) => {
                 })}
               </TableBody>
             </Table>
+            </ScrollArea>
           )}
         </CardContent>
       </Card>
