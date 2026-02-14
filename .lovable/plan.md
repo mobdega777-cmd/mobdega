@@ -1,39 +1,53 @@
 
+## Correcao: Data de Nascimento exibida 1 dia antes
 
-## Correcao: Valor de Venda de Produtos Fracionados
+### Problema
 
-### Problema Identificado
-
-O campo "Valor de Venda" para produtos fracionados esta usando `price` (preco da garrafa inteira = R$40) multiplicado pelo estoque em doses (20), resultando em R$800.
-
-O correto e usar `promotional_price` (preco por dose = R$5), pois o estoque ja esta em doses:
-- 20 doses x R$5 = **R$100** de valor de venda
+Quando a data de nascimento e armazenada como `"1996-01-24"` (formato YYYY-MM-DD), o JavaScript interpreta como meia-noite UTC. No fuso horario do Brasil (UTC-3), isso vira 23/01/1996 as 21h, mostrando o dia anterior.
 
 ### Solucao
 
-Alterar **2 trechos** no arquivo `src/components/commerce/CommerceStockControl.tsx`:
+Criar uma funcao utilitaria que faz o parse da data sem conversao de timezone, e aplicar nos 3 locais onde a data de nascimento e exibida.
 
-1. **Linha 208** (calculo das estatisticas/cards): trocar `product.price` por `product.promotional_price` para fracionados
-2. **Linha 737** (tabela de produtos): mesma correcao
+### Arquivos a alterar
 
-**De:**
+**1. `src/lib/dateUtils.ts`** - Adicionar funcao utilitaria:
+
 ```typescript
-const unitSale = (product.is_fractioned) ? (product.price || 0) : (product.promotional_price || 0);
+/**
+ * Converte uma string de data (YYYY-MM-DD) para Date sem
+ * conversao de timezone, evitando o problema de voltar 1 dia.
+ */
+export const parseDateOnly = (dateStr: string): Date => {
+  const [year, month, day] = dateStr.split('T')[0].split('-').map(Number);
+  return new Date(year, month - 1, day);
+};
 ```
 
-**Para:**
+**2. `src/pages/user/UserDashboard.tsx`** (linha 992):
 ```typescript
-const unitSale = product.promotional_price || 0;
+// De:
+format(new Date(profile.birthday), "dd/MM/yyyy")
+// Para:
+format(parseDateOnly(profile.birthday), "dd/MM/yyyy")
 ```
 
-Como `promotional_price` ja contem o preco de venda por dose para fracionados e o preco de venda para produtos normais, a logica fica simplificada sem necessidade de condicional.
+**3. `src/components/admin/UserDetailsModal.tsx`** (linha 210):
+```typescript
+// De:
+new Date(user.birthday).toLocaleDateString('pt-BR')
+// Para:
+format(parseDateOnly(user.birthday), "dd/MM/yyyy")
+```
 
-### Resultado esperado
+**4. `src/components/admin/AdminCustomers.tsx`** (linha 500):
+```typescript
+// De:
+format(new Date(selectedCustomer.birthday), "dd/MM/yyyy")
+// Para:
+format(parseDateOnly(selectedCustomer.birthday), "dd/MM/yyyy")
+```
 
-| Campo | Antes | Depois |
-|-------|-------|--------|
-| Valor Venda (Dose Jack) | R$800,00 | R$100,00 |
-| Lucro Potencial | inflado | correto |
+### Resultado
 
-Alteracao em 1 arquivo, 2 linhas.
-
+A data cadastrada (24/01/1996) sera exibida corretamente em todos os locais, sem deslocamento por timezone.
