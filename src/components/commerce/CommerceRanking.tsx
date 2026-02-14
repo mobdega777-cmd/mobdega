@@ -599,7 +599,7 @@ const CommerceRanking = ({ currentCommerceId }: CommerceRankingProps) => {
               {ALL_ZONES.find(z => z.id === activeZone)?.name || "Selecione uma região"}
             </SelectValue>
           </SelectTrigger>
-          <SelectContent className="max-h-[400px]">
+          <SelectContent className="max-h-[300px] overflow-y-auto">
             {ZONE_GROUPS.map((group) => (
               <div key={group.label}>
                 <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground bg-muted/50">
