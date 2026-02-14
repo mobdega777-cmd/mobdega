@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { motion } from "framer-motion";
 import { 
   Play, 
@@ -7,14 +7,17 @@ import {
   BookOpen,
   Clock,
   GraduationCap,
-  X
+  CheckCircle2
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 interface TrainingVideo {
   id: string;
@@ -30,14 +33,27 @@ interface CommerceTrainingProps {
 }
 
 const CommerceTraining = ({ isPendingApproval = false }: CommerceTrainingProps) => {
+  const { user } = useAuth();
   const [videos, setVideos] = useState<TrainingVideo[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [selectedVideo, setSelectedVideo] = useState<TrainingVideo | null>(null);
+  const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const autoMarkedRef = useRef(false);
 
   useEffect(() => {
     fetchVideos();
   }, []);
+
+  useEffect(() => {
+    if (user) fetchProgress();
+  }, [user]);
+
+  // Reset auto-mark flag when selected video changes
+  useEffect(() => {
+    autoMarkedRef.current = false;
+  }, [selectedVideo?.id]);
 
   const fetchVideos = async () => {
     setLoading(true);
@@ -55,10 +71,64 @@ const CommerceTraining = ({ isPendingApproval = false }: CommerceTrainingProps) 
     setLoading(false);
   };
 
+  const fetchProgress = async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from('training_video_progress')
+      .select('video_id')
+      .eq('user_id', user.id)
+      .eq('completed', true);
+
+    if (data) {
+      setCompletedIds(new Set(data.map(d => d.video_id)));
+    }
+  };
+
+  const toggleComplete = async (videoId: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    if (!user) return;
+
+    const isCompleted = completedIds.has(videoId);
+    const newSet = new Set(completedIds);
+
+    if (isCompleted) {
+      newSet.delete(videoId);
+      setCompletedIds(newSet);
+      await supabase
+        .from('training_video_progress')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('video_id', videoId);
+    } else {
+      newSet.add(videoId);
+      setCompletedIds(newSet);
+      await supabase
+        .from('training_video_progress')
+        .upsert({
+          user_id: user.id,
+          video_id: videoId,
+          completed: true,
+          completed_at: new Date().toISOString(),
+        }, { onConflict: 'user_id,video_id' });
+    }
+  };
+
+  const handleTimeUpdate = useCallback(() => {
+    if (!videoRef.current || !selectedVideo || autoMarkedRef.current) return;
+    const { currentTime, duration } = videoRef.current;
+    if (duration > 0 && currentTime / duration >= 0.98 && !completedIds.has(selectedVideo.id)) {
+      autoMarkedRef.current = true;
+      toggleComplete(selectedVideo.id);
+    }
+  }, [selectedVideo, completedIds]);
+
   const categories = [...new Set(videos.map(v => v.category))];
   const filteredVideos = activeCategory 
     ? videos.filter(v => v.category === activeCategory)
     : videos;
+
+  const completedCount = videos.filter(v => completedIds.has(v.id)).length;
+  const progressPercent = videos.length > 0 ? Math.round((completedCount / videos.length) * 100) : 0;
 
   const getYouTubeId = (url: string): string | null => {
     const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
@@ -68,10 +138,6 @@ const CommerceTraining = ({ isPendingApproval = false }: CommerceTrainingProps) 
 
   const isDirectVideoUrl = (url: string): boolean => {
     return url.includes('.mp4') || url.includes('.webm') || url.includes('.ogg') || url.includes('.mov');
-  };
-
-  const handleVideoClick = (video: TrainingVideo) => {
-    setSelectedVideo(video);
   };
 
   if (loading) {
@@ -93,6 +159,20 @@ const CommerceTraining = ({ isPendingApproval = false }: CommerceTrainingProps) 
           Aprenda a usar todas as funcionalidades da plataforma
         </p>
       </div>
+
+      {/* Progress Bar */}
+      {videos.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground flex items-center gap-1.5">
+              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+              {completedCount} de {videos.length} vídeos concluídos
+            </span>
+            <span className="font-medium text-foreground">{progressPercent}%</span>
+          </div>
+          <Progress value={progressPercent} className="h-2" />
+        </div>
+      )}
 
       {/* Pending Approval Banner */}
       {isPendingApproval && (
@@ -154,6 +234,7 @@ const CommerceTraining = ({ isPendingApproval = false }: CommerceTrainingProps) 
             const thumbnail = video.thumbnail_url || (youtubeId 
               ? `https://img.youtube.com/vi/${youtubeId}/maxresdefault.jpg`
               : null);
+            const isCompleted = completedIds.has(video.id);
 
             return (
               <motion.div
@@ -162,32 +243,56 @@ const CommerceTraining = ({ isPendingApproval = false }: CommerceTrainingProps) 
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
               >
-                <Card className="overflow-hidden hover:border-primary/50 transition-colors cursor-pointer group"
-                  onClick={() => handleVideoClick(video)}
+                <Card 
+                  className={`overflow-hidden hover:border-primary/50 transition-colors cursor-pointer group ${isCompleted ? 'border-emerald-500/40' : ''}`}
+                  onClick={() => setSelectedVideo(video)}
                 >
                   <div className="aspect-video bg-muted relative">
                     {thumbnail ? (
                       <img 
                         src={thumbnail} 
                         alt={video.title} 
-                        className="w-full h-full object-cover"
+                        className={`w-full h-full object-cover ${isCompleted ? 'opacity-70' : ''}`}
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
                         <Video className="w-12 h-12 text-muted-foreground" />
                       </div>
                     )}
-                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                      <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center">
-                        <Play className="w-8 h-8 text-primary-foreground ml-1" />
+                    {/* Completed overlay */}
+                    {isCompleted && (
+                      <div className="absolute inset-0 bg-emerald-500/10 flex items-center justify-center pointer-events-none">
+                        <CheckCircle2 className="w-12 h-12 text-emerald-500 drop-shadow-md" />
                       </div>
+                    )}
+                    {/* Play overlay */}
+                    {!isCompleted && (
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center">
+                          <Play className="w-8 h-8 text-primary-foreground ml-1" />
+                        </div>
+                      </div>
+                    )}
+                    {/* Checkbox */}
+                    <div 
+                      className="absolute top-2 left-2 z-10"
+                      onClick={(e) => toggleComplete(video.id, e)}
+                    >
+                      <Checkbox
+                        checked={isCompleted}
+                        className="h-5 w-5 border-2 border-white bg-black/30 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500"
+                      />
                     </div>
                     <Badge className="absolute top-2 right-2 capitalize">{video.category}</Badge>
                   </div>
                   <CardContent className="p-4">
-                    <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors flex items-center gap-2">
+                    <h3 className={`font-semibold group-hover:text-primary transition-colors flex items-center gap-2 ${isCompleted ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
                       {video.title}
-                      <Play className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      {isCompleted ? (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                      ) : (
+                        <Play className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                      )}
                     </h3>
                     {video.description && (
                       <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
@@ -209,6 +314,9 @@ const CommerceTraining = ({ isPendingApproval = false }: CommerceTrainingProps) 
             <DialogTitle className="flex items-center gap-2">
               <Video className="w-5 h-5 text-primary" />
               {selectedVideo?.title}
+              {selectedVideo && completedIds.has(selectedVideo.id) && (
+                <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+              )}
             </DialogTitle>
           </DialogHeader>
           <div className="p-4 pt-2">
@@ -216,9 +324,11 @@ const CommerceTraining = ({ isPendingApproval = false }: CommerceTrainingProps) 
               <>
                 {isDirectVideoUrl(selectedVideo.video_url) ? (
                   <video
+                    ref={videoRef}
                     src={selectedVideo.video_url}
                     controls
                     autoPlay
+                    onTimeUpdate={handleTimeUpdate}
                     className="w-full aspect-video rounded-lg bg-black"
                   >
                     Seu navegador não suporta a reprodução de vídeos.
@@ -248,6 +358,18 @@ const CommerceTraining = ({ isPendingApproval = false }: CommerceTrainingProps) 
                     {selectedVideo.description}
                   </p>
                 )}
+                {/* Manual mark button in modal */}
+                <div className="flex items-center gap-2 mt-4 pt-3 border-t">
+                  <Checkbox
+                    id="modal-complete"
+                    checked={completedIds.has(selectedVideo.id)}
+                    onCheckedChange={() => toggleComplete(selectedVideo.id)}
+                    className="data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500"
+                  />
+                  <label htmlFor="modal-complete" className="text-sm text-muted-foreground cursor-pointer">
+                    Marcar como concluído
+                  </label>
+                </div>
               </>
             )}
           </div>
