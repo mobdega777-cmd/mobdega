@@ -1,45 +1,33 @@
 
 
-## 3 Melhorias de UI no Controle de Estoque e Ranking
+## Atualizar Valores do MEI 2026 no Modal de Impostos
 
-### 1. Paginacao nas Ultimas Vendas (Saidas de Estoque)
+### O que muda
 
-Atualmente a lista exibe apenas os 5 primeiros registros (`recentMovements.slice(0, 5)`). A mudanca sera:
+O valor informativo do MEI no modal de configuracao de impostos esta desatualizado. Sera corrigido de "R$ 71,60 a R$ 76,60/mes" para "R$ 82,05 a R$ 87,05/mes", refletindo o reajuste do salario minimo para R$ 1.621,00 em 2026.
 
-- Remover o `slice(0, 5)` e usar paginacao com 10 itens por pagina
-- Aumentar o `limit` na query de `10` para um valor maior (ex: 50) para ter mais dados disponiveis
-- Adicionar estado de pagina e controles de navegacao (Anterior/Proximo) abaixo da lista
-- Usar o componente `Pagination` existente do projeto
+### Referencia dos novos valores (DAS MEI 2026)
 
-**Arquivo:** `src/components/commerce/CommerceStockControl.tsx`
-- Linha 162: Aumentar `.limit(10)` para `.limit(50)`
-- Linha 751: Substituir `recentMovements.slice(0, 5)` por logica de paginacao (10 por pagina)
-- Adicionar estado `salesPage` e controles de paginacao no final da lista
+| Atividade | INSS (5%) | ICMS | ISS | Total |
+|---|---|---|---|---|
+| Comercio/Industria | R$ 81,05 | R$ 1,00 | - | R$ 82,05 |
+| Servicos | R$ 81,05 | - | R$ 5,00 | R$ 86,05 |
+| Comercio + Servicos | R$ 81,05 | R$ 1,00 | R$ 5,00 | R$ 87,05 |
 
-### 2. Barra de rolagem na tabela de produtos
+### Alteracao
 
-A tabela de produtos atualmente cresce indefinidamente. A mudanca sera:
+**Arquivo:** `src/components/commerce/TaxConfigModal.tsx`
+- Linha 86: Alterar `taxRange` do MEI de `"Fixo: R$ 71,60 a R$ 76,60/mes"` para `"Fixo: R$ 82,05 a R$ 87,05/mes"`
 
-- Envolver a `Table` em um `ScrollArea` com altura maxima definida (ex: `max-h-[500px]`)
-- Importar `ScrollArea` de `@/components/ui/scroll-area`
+### Registro no feed de atualizacoes
 
-**Arquivo:** `src/components/commerce/CommerceStockControl.tsx`
-- Linha ~796-797: Envolver o bloco da `Table` com `<ScrollArea className="max-h-[500px]">`
-
-### 3. Barra de rolagem no dropdown de regioes do Ranking
-
-O `SelectContent` do seletor de regioes ja tem `max-h-[400px]` mas nao tem `overflow-y-auto` nem um `ScrollArea`. A mudanca sera:
-
-- Adicionar `overflow-y-auto` ao `SelectContent` para garantir a rolagem
-- O Radix Select ja suporta scroll internamente, mas pode ser necessario ajustar o estilo para funcionar corretamente com muitos grupos
-
-**Arquivo:** `src/components/commerce/CommerceRanking.tsx`
-- Linha 602: Ajustar o `SelectContent` para incluir scroll adequado, ex: `className="max-h-[300px] overflow-y-auto"`
+Inserir 1 registro na tabela `system_updates`:
+- Tipo: `update`
+- Modulo: `Financeiro`
+- Descricao: "Valores do DAS MEI atualizados para 2026 (R$ 82,05 a R$ 87,05/mes) conforme novo salario minimo de R$ 1.621,00"
 
 ### Detalhes tecnicos
 
-- Nenhuma alteracao de banco de dados
+- Apenas uma string alterada em um arquivo
+- Nenhuma alteracao de banco de dados estrutural
 - Nenhuma nova dependencia
-- Componentes `ScrollArea` e `Pagination` ja existem no projeto
-- O layout existente nao sera alterado, apenas adicionados controles dentro dos cards ja existentes
-
