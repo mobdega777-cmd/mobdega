@@ -87,7 +87,7 @@ const TaxConfigModal = ({ isOpen, onClose, commerceId, currentConfig, onSave }: 
     mei: {
       name: "MEI",
       description: "Microempreendedor Individual",
-      taxRange: "Fixo: R$ 71,60 a R$ 76,60/mês",
+      taxRange: "Fixo: R$ 82,05 a R$ 87,05/mês",
       paymentDeadline: "Dia 20 de cada mês",
     },
     simples: {
