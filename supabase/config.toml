@@ -1,1 +1,4 @@
 project_id = "jwvcgqkuheeoroaxeofk"
+
+[functions.update-commerce-password]
+verify_jwt = false
