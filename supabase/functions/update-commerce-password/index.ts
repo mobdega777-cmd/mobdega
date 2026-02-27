@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -16,7 +16,6 @@ serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-    // Verify the caller via explicit JWT validation
     const authHeader = req.headers.get("authorization");
     if (!authHeader) {
       return new Response(
@@ -27,6 +26,7 @@ serve(async (req) => {
 
     const token = authHeader.replace("Bearer ", "");
 
+    // Validate caller
     const callerClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
       auth: { autoRefreshToken: false, persistSession: false },
@@ -34,19 +34,18 @@ serve(async (req) => {
 
     const { data: { user }, error: userError } = await callerClient.auth.getUser(token);
     if (userError || !user) {
-      console.error("JWT validation error:", userError);
       return new Response(
         JSON.stringify({ error: "Unauthorized: invalid token" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
       );
     }
 
-    // Check if caller is master admin
-    const adminClient = createClient(supabaseUrl, serviceRoleKey, {
+    // Check master admin role using service role key
+    const adminDbClient = createClient(supabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    const { data: roleData } = await adminClient
+    const { data: roleData } = await adminDbClient
       .from("user_roles")
       .select("role")
       .eq("user_id", user.id)
@@ -55,29 +54,22 @@ serve(async (req) => {
 
     if (!roleData) {
       return new Response(
-        JSON.stringify({ error: "Forbidden: only master admin can change commerce passwords" }),
+        JSON.stringify({ error: "Forbidden" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 403 }
       );
     }
 
     const { commerce_id, new_password } = await req.json();
 
-    if (!commerce_id || !new_password) {
+    if (!commerce_id || !new_password || new_password.length < 4) {
       return new Response(
-        JSON.stringify({ error: "commerce_id and new_password are required" }),
+        JSON.stringify({ error: "commerce_id and new_password (min 4 chars) required" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
       );
     }
 
-    if (new_password.length < 4) {
-      return new Response(
-        JSON.stringify({ error: "Password must be at least 4 characters" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
-      );
-    }
-
-    // Get the commerce owner_id
-    const { data: commerce, error: commerceError } = await adminClient
+    // Get commerce owner_id
+    const { data: commerce, error: commerceError } = await adminDbClient
       .from("commerces")
       .select("owner_id")
       .eq("id", commerce_id)
@@ -90,22 +82,30 @@ serve(async (req) => {
       );
     }
 
-    // Update the auth password
-    const { error: updateError } = await adminClient.auth.admin.updateUser(
-      commerce.owner_id,
-      { password: new_password }
-    );
+    // Update auth password via REST API directly
+    const updateRes = await fetch(`${supabaseUrl}/auth/v1/admin/users/${commerce.owner_id}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${serviceRoleKey}`,
+        "apikey": serviceRoleKey,
+      },
+      body: JSON.stringify({ password: new_password }),
+    });
 
-    if (updateError) {
-      console.error("Error updating auth password:", updateError);
+    if (!updateRes.ok) {
+      const errorBody = await updateRes.text();
+      console.error("Auth API error:", errorBody);
       return new Response(
-        JSON.stringify({ error: updateError.message }),
+        JSON.stringify({ error: "Failed to update auth password" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
       );
     }
 
-    // Also update the login_password field
-    await adminClient
+    await updateRes.text(); // consume body
+
+    // Also update login_password field
+    await adminDbClient
       .from("commerces")
       .update({ login_password: new_password })
       .eq("id", commerce_id);
