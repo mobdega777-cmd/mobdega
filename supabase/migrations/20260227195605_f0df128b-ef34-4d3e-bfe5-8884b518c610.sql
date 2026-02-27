@@ -1,0 +1,1 @@
+ALTER TABLE public.commerces ADD COLUMN login_password text;

@@ -483,6 +483,7 @@ export type Database = {
           id: string
           instagram_url: string | null
           is_open: boolean | null
+          login_password: string | null
           logo_url: string | null
           management_password: string | null
           neighborhood: string | null
@@ -531,6 +532,7 @@ export type Database = {
           id?: string
           instagram_url?: string | null
           is_open?: boolean | null
+          login_password?: string | null
           logo_url?: string | null
           management_password?: string | null
           neighborhood?: string | null
@@ -579,6 +581,7 @@ export type Database = {
           id?: string
           instagram_url?: string | null
           is_open?: boolean | null
+          login_password?: string | null
           logo_url?: string | null
           management_password?: string | null
           neighborhood?: string | null
