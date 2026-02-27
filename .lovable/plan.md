@@ -1,33 +1,27 @@
 
 
-## Atualizar Valores do MEI 2026 no Modal de Impostos
+## Mostrar e alterar senha de gestao diretamente no modal de edicao
 
 ### O que muda
 
-O valor informativo do MEI no modal de configuracao de impostos esta desatualizado. Sera corrigido de "R$ 71,60 a R$ 76,60/mes" para "R$ 82,05 a R$ 87,05/mes", refletindo o reajuste do salario minimo para R$ 1.621,00 em 2026.
+A aba "Seguranca" do modal de edicao de comercio deixa de enviar email de reset e passa a:
+1. Mostrar a senha de gestao atual do comercio (com toggle para ver/ocultar)
+2. Permitir que o admin altere a senha diretamente, salvando no banco
 
-### Referencia dos novos valores (DAS MEI 2026)
+### Alteracoes
 
-| Atividade | INSS (5%) | ICMS | ISS | Total |
-|---|---|---|---|---|
-| Comercio/Industria | R$ 81,05 | R$ 1,00 | - | R$ 82,05 |
-| Servicos | R$ 81,05 | - | R$ 5,00 | R$ 86,05 |
-| Comercio + Servicos | R$ 81,05 | R$ 1,00 | R$ 5,00 | R$ 87,05 |
+**Arquivo 1: `src/components/admin/AdminCommerces.tsx`**
+- Adicionar `management_password: string | null` na interface `Commerce` (linha ~77)
 
-### Alteracao
+**Arquivo 2: `src/components/admin/CommerceEditModal.tsx`**
+- Adicionar `management_password` na interface `Commerce`
+- Substituir toda a `TabsContent value="seguranca"` por:
+  - Exibicao da senha atual com botao de ver/ocultar (se existir, senao mostra "Nenhuma senha configurada")
+  - Campo para digitar nova senha com botao de gerar senha aleatoria
+  - Botao "Salvar Nova Senha" que faz update direto na tabela `commerces`
+- Remover imports e estados relacionados ao reset por email (`resetPasswordForEmail`, `tempPassword`, etc.)
 
-**Arquivo:** `src/components/commerce/TaxConfigModal.tsx`
-- Linha 86: Alterar `taxRange` do MEI de `"Fixo: R$ 71,60 a R$ 76,60/mes"` para `"Fixo: R$ 82,05 a R$ 87,05/mes"`
+**Banco de dados**: Nenhuma alteracao necessaria, `management_password` ja existe como texto na tabela.
 
-### Registro no feed de atualizacoes
+**Registro no feed**: 1 insert em `system_updates` documentando a mudanca.
 
-Inserir 1 registro na tabela `system_updates`:
-- Tipo: `update`
-- Modulo: `Financeiro`
-- Descricao: "Valores do DAS MEI atualizados para 2026 (R$ 82,05 a R$ 87,05/mes) conforme novo salario minimo de R$ 1.621,00"
-
-### Detalhes tecnicos
-
-- Apenas uma string alterada em um arquivo
-- Nenhuma alteracao de banco de dados estrutural
-- Nenhuma nova dependencia
