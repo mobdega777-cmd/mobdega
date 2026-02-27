@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 serve(async (req) => {
@@ -16,7 +16,7 @@ serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-    // Verify the caller is a master admin
+    // Verify the caller via explicit JWT validation
     const authHeader = req.headers.get("authorization");
     if (!authHeader) {
       return new Response(
@@ -25,15 +25,18 @@ serve(async (req) => {
       );
     }
 
+    const token = authHeader.replace("Bearer ", "");
+
     const callerClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { authorization: authHeader } },
+      global: { headers: { Authorization: authHeader } },
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    const { data: callerData, error: callerError } = await callerClient.auth.getUser();
-    if (callerError || !callerData.user) {
+    const { data: { user }, error: userError } = await callerClient.auth.getUser(token);
+    if (userError || !user) {
+      console.error("JWT validation error:", userError);
       return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
+        JSON.stringify({ error: "Unauthorized: invalid token" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
       );
     }
@@ -46,7 +49,7 @@ serve(async (req) => {
     const { data: roleData } = await adminClient
       .from("user_roles")
       .select("role")
-      .eq("user_id", callerData.user.id)
+      .eq("user_id", user.id)
       .eq("role", "master_admin")
       .maybeSingle();
 
@@ -101,7 +104,7 @@ serve(async (req) => {
       );
     }
 
-    // Also update the login_password field in commerces table
+    // Also update the login_password field
     await adminClient
       .from("commerces")
       .update({ login_password: new_password })
