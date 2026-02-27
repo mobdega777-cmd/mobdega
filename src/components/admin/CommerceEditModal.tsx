@@ -145,7 +145,6 @@ const CommerceEditModal = ({ commerce, isOpen, onClose, onSave }: CommerceEditMo
 
   const handleSavePassword = async (type: 'management' | 'login') => {
     const password = type === 'management' ? newPassword : newLoginPassword;
-    const field = type === 'management' ? 'management_password' : 'login_password';
     const label = type === 'management' ? 'gestão' : 'login';
 
     if (!commerce || !password) {
@@ -160,24 +159,49 @@ const CommerceEditModal = ({ commerce, isOpen, onClose, onSave }: CommerceEditMo
     if (type === 'management') setSavingPassword(true);
     else setSavingLoginPassword(true);
 
-    const { error } = await supabase
-      .from('commerces')
-      .update({ [field]: password })
-      .eq('id', commerce.id);
+    if (type === 'login') {
+      // Use edge function to update the actual auth password
+      const { data: sessionData } = await supabase.auth.getSession();
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/update-commerce-password`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${sessionData.session?.access_token}`,
+          },
+          body: JSON.stringify({
+            commerce_id: commerce.id,
+            new_password: password,
+          }),
+        }
+      );
 
-    if (type === 'management') setSavingPassword(false);
-    else setSavingLoginPassword(false);
+      setSavingLoginPassword(false);
 
-    if (error) {
-      toast({ variant: 'destructive', title: `Erro ao salvar senha de ${label}`, description: error.message });
-    } else {
-      toast({ title: `Senha de ${label} atualizada com sucesso!` });
-      if (type === 'management') {
-        setNewPassword('');
-        setFormData({ ...formData, management_password: password });
+      if (!response.ok) {
+        const errorData = await response.json();
+        toast({ variant: 'destructive', title: 'Erro ao salvar senha de login', description: errorData.error || 'Erro desconhecido' });
       } else {
+        toast({ title: 'Senha de login atualizada com sucesso!' });
         setNewLoginPassword('');
         setFormData({ ...formData, login_password: password });
+      }
+    } else {
+      // Management password - just update the field
+      const { error } = await supabase
+        .from('commerces')
+        .update({ management_password: password })
+        .eq('id', commerce.id);
+
+      setSavingPassword(false);
+
+      if (error) {
+        toast({ variant: 'destructive', title: 'Erro ao salvar senha de gestão', description: error.message });
+      } else {
+        toast({ title: 'Senha de gestão atualizada com sucesso!' });
+        setNewPassword('');
+        setFormData({ ...formData, management_password: password });
       }
     }
   };
