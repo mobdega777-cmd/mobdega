@@ -76,6 +76,7 @@ interface Commerce {
   auto_invoice_day: number | null;
   auto_invoice_enabled: boolean | null;
   management_password: string | null;
+  login_password: string | null;
 }
 
 interface CommerceStats {

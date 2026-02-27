@@ -21,7 +21,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Shield, KeyRound, Eye, EyeOff, RefreshCw } from "lucide-react";
+import { Loader2, Shield, KeyRound, Eye, EyeOff, RefreshCw, Lock } from "lucide-react";
 
 interface Plan {
   id: string;
@@ -50,6 +50,7 @@ interface Commerce {
   auto_invoice_day: number | null;
   auto_invoice_enabled: boolean | null;
   management_password: string | null;
+  login_password: string | null;
 }
 
 interface CommerceEditModalProps {
@@ -64,9 +65,13 @@ const CommerceEditModal = ({ commerce, isOpen, onClose, onSave }: CommerceEditMo
   const [plans, setPlans] = useState<Plan[]>([]);
   const [saving, setSaving] = useState(false);
   const [newPassword, setNewPassword] = useState("");
+  const [newLoginPassword, setNewLoginPassword] = useState("");
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showCurrentLoginPassword, setShowCurrentLoginPassword] = useState(false);
+  const [showNewLoginPassword, setShowNewLoginPassword] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
+  const [savingLoginPassword, setSavingLoginPassword] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -138,27 +143,42 @@ const CommerceEditModal = ({ commerce, isOpen, onClose, onSave }: CommerceEditMo
     setNewPassword(password);
   };
 
-  const handleSavePassword = async () => {
-    if (!commerce || !newPassword) {
+  const handleSavePassword = async (type: 'management' | 'login') => {
+    const password = type === 'management' ? newPassword : newLoginPassword;
+    const field = type === 'management' ? 'management_password' : 'login_password';
+    const label = type === 'management' ? 'gestão' : 'login';
+
+    if (!commerce || !password) {
       toast({ variant: 'destructive', title: 'Erro', description: 'Digite uma nova senha.' });
       return;
     }
-    if (newPassword.length < 4) {
+    if (password.length < 4) {
       toast({ variant: 'destructive', title: 'Senha muito curta', description: 'A senha deve ter pelo menos 4 caracteres.' });
       return;
     }
-    setSavingPassword(true);
+
+    if (type === 'management') setSavingPassword(true);
+    else setSavingLoginPassword(true);
+
     const { error } = await supabase
       .from('commerces')
-      .update({ management_password: newPassword })
+      .update({ [field]: password })
       .eq('id', commerce.id);
-    setSavingPassword(false);
+
+    if (type === 'management') setSavingPassword(false);
+    else setSavingLoginPassword(false);
+
     if (error) {
-      toast({ variant: 'destructive', title: 'Erro ao salvar senha', description: error.message });
+      toast({ variant: 'destructive', title: `Erro ao salvar senha de ${label}`, description: error.message });
     } else {
-      toast({ title: 'Senha de gestão atualizada com sucesso!' });
-      setNewPassword('');
-      setFormData({ ...formData, management_password: newPassword });
+      toast({ title: `Senha de ${label} atualizada com sucesso!` });
+      if (type === 'management') {
+        setNewPassword('');
+        setFormData({ ...formData, management_password: password });
+      } else {
+        setNewLoginPassword('');
+        setFormData({ ...formData, login_password: password });
+      }
     }
   };
 
@@ -381,27 +401,72 @@ const CommerceEditModal = ({ commerce, isOpen, onClose, onSave }: CommerceEditMo
           </TabsContent>
 
           {/* Security Tab */}
-          <TabsContent value="seguranca" className="space-y-4 mt-4">
+          <TabsContent value="seguranca" className="space-y-6 mt-4">
+            {/* LOGIN PASSWORD SECTION */}
+            <div className="space-y-4 p-4 rounded-lg border border-border bg-muted/30">
+              <div className="flex items-center gap-2 mb-2">
+                <Lock className="w-5 h-5 text-primary" />
+                <h4 className="font-medium">Senha de Login (Cadastro)</h4>
+              </div>
+
+              {formData.login_password ? (
+                <div className="flex items-center gap-2">
+                  <Input
+                    type={showCurrentLoginPassword ? 'text' : 'password'}
+                    value={formData.login_password}
+                    readOnly
+                    className="font-mono"
+                  />
+                  <Button type="button" variant="outline" size="icon" onClick={() => setShowCurrentLoginPassword(!showCurrentLoginPassword)}>
+                    {showCurrentLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </Button>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground italic">Senha de login não registrada (cadastro anterior à funcionalidade).</p>
+              )}
+            </div>
+
+            <div className="space-y-4 p-4 rounded-lg border border-border bg-muted/30">
+              <div className="flex items-center gap-2 mb-2">
+                <Lock className="w-5 h-5 text-primary" />
+                <h4 className="font-medium">Alterar Senha de Login</h4>
+              </div>
+              <div className="flex items-center gap-2">
+                <Input
+                  type={showNewLoginPassword ? 'text' : 'password'}
+                  value={newLoginPassword}
+                  onChange={(e) => setNewLoginPassword(e.target.value)}
+                  placeholder="Digite a nova senha de login"
+                  className="font-mono"
+                />
+                <Button type="button" variant="outline" size="icon" onClick={() => setShowNewLoginPassword(!showNewLoginPassword)}>
+                  {showNewLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </Button>
+                <Button type="button" variant="outline" size="icon" onClick={() => {
+                  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+                  let p = '';
+                  for (let i = 0; i < 8; i++) p += chars.charAt(Math.floor(Math.random() * chars.length));
+                  setNewLoginPassword(p);
+                }} title="Gerar senha aleatória">
+                  <RefreshCw className="w-4 h-4" />
+                </Button>
+              </div>
+              <Button onClick={() => handleSavePassword('login')} disabled={savingLoginPassword || !newLoginPassword}>
+                {savingLoginPassword && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Salvar Senha de Login
+              </Button>
+            </div>
+
+            {/* MANAGEMENT PASSWORD SECTION */}
             <div className="space-y-4 p-4 rounded-lg border border-border bg-muted/30">
               <div className="flex items-center gap-2 mb-2">
                 <KeyRound className="w-5 h-5 text-primary" />
                 <h4 className="font-medium">Senha de Gestão Atual</h4>
               </div>
-
               {formData.management_password ? (
                 <div className="flex items-center gap-2">
-                  <Input
-                    type={showCurrentPassword ? 'text' : 'password'}
-                    value={formData.management_password}
-                    readOnly
-                    className="font-mono"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                  >
+                  <Input type={showCurrentPassword ? 'text' : 'password'} value={formData.management_password} readOnly className="font-mono" />
+                  <Button type="button" variant="outline" size="icon" onClick={() => setShowCurrentPassword(!showCurrentPassword)}>
                     {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </Button>
                 </div>
@@ -415,40 +480,18 @@ const CommerceEditModal = ({ commerce, isOpen, onClose, onSave }: CommerceEditMo
                 <Shield className="w-5 h-5 text-primary" />
                 <h4 className="font-medium">Alterar Senha de Gestão</h4>
               </div>
-
               <div className="flex items-center gap-2">
-                <Input
-                  type={showNewPassword ? 'text' : 'password'}
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Digite a nova senha"
-                  className="font-mono"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setShowNewPassword(!showNewPassword)}
-                >
+                <Input type={showNewPassword ? 'text' : 'password'} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Digite a nova senha" className="font-mono" />
+                <Button type="button" variant="outline" size="icon" onClick={() => setShowNewPassword(!showNewPassword)}>
                   {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  onClick={generateRandomPassword}
-                  title="Gerar senha aleatória"
-                >
+                <Button type="button" variant="outline" size="icon" onClick={generateRandomPassword} title="Gerar senha aleatória">
                   <RefreshCw className="w-4 h-4" />
                 </Button>
               </div>
-
-              <Button
-                onClick={handleSavePassword}
-                disabled={savingPassword || !newPassword}
-              >
+              <Button onClick={() => handleSavePassword('management')} disabled={savingPassword || !newPassword}>
                 {savingPassword && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                Salvar Nova Senha
+                Salvar Senha de Gestão
               </Button>
             </div>
           </TabsContent>

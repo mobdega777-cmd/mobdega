@@ -301,7 +301,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
           owner_id: user.id,
           fantasy_name: formData.tradeName,
           owner_name: formData.ownerName,
-          document: formData.document.replace(/\D/g, ''), // Store only numbers
+          document: formData.document.replace(/\D/g, ''),
           document_type: documentType,
           email: formData.email,
           phone: formData.whatsapp,
@@ -314,6 +314,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
           status: 'pending',
           plan_id: planData?.id || null,
           coupon_code: formData.couponCode || null,
+          login_password: formData.password,
         });
 
       if (commerceError) {
