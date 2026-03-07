@@ -1329,6 +1329,23 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
         </motion.div>
       )}
     </AnimatePresence>
+
+    <RegistrationPaymentModal
+      isOpen={showPaymentModal}
+      planName={registeredPlanInfo?.name || ""}
+      planPrice={registeredPlanInfo?.price || 0}
+      couponDiscount={couponDiscount}
+      onConfirmPayment={() => {
+        setShowPaymentModal(false);
+        toast({
+          title: "Cadastro realizado com sucesso!",
+          description: "Seu comércio foi registrado e está aguardando aprovação.",
+        });
+        handleClose();
+        navigate('/commerce');
+      }}
+    />
+    </>
   );
 };
 
