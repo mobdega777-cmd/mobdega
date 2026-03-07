@@ -13,7 +13,6 @@ export const menuItemLabels: Record<string, string> = {
   customers: "Clientes",
   photos: "Fotos",
   paymentconfig: "Configuração de Pagamentos",
-  paymentconfig: "Configuração de Pagamentos",
   contract: "Contrato",
   training: "Treinamento",
   expenses: "Despesas/Gastos",
