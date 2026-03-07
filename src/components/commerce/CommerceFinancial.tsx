@@ -204,8 +204,8 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
     const feeMap = new Map(paymentMethods.map(pm => [pm.type, { pct: pm.fee_percentage || 0, fixed: pm.fee_fixed || 0 }]));
 
     // Calcular faturamento usando apenas cash_movements
-    const monthlyRevenue = cashMovements?.reduce((sum, m) => sum + Number(m.amount), 0) || 0;
-    const totalOrders = cashMovements?.length || 0;
+    const monthlyRevenue = cashMovements.reduce((sum, m) => sum + Number(m.amount), 0);
+    const totalOrders = cashMovements.length;
     const avgTicket = totalOrders > 0 ? monthlyRevenue / totalOrders : 0;
 
     // Calculate operator fees usando apenas cash_movements
