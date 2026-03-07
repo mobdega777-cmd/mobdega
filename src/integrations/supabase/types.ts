@@ -2090,6 +2090,17 @@ export type Database = {
           table_id: string
         }[]
       }
+      get_billing_config_public: {
+        Args: never
+        Returns: {
+          account_holder: string
+          bank_name: string
+          cnpj: string
+          pix_key: string
+          pix_key_type: string
+          qr_code_url: string
+        }[]
+      }
       get_commerce_email_by_document: {
         Args: { p_document: string }
         Returns: string

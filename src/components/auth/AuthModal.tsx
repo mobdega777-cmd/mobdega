@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { fetchAddressByCep, formatCep } from "@/lib/viaCepService";
 import { formatCurrency, formatPercentage } from "@/lib/formatCurrency";
 import { getFeatureLabels } from "@/lib/planFeatures";
+import RegistrationPaymentModal from "./RegistrationPaymentModal";
 type AuthMode = "login" | "register";
 type UserType = "user" | "commerce";
 type DocumentType = "cpf" | "cnpj";
@@ -51,6 +52,8 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState("");
   const [sendingResetEmail, setSendingResetEmail] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [registeredPlanInfo, setRegisteredPlanInfo] = useState<{ name: string; price: number } | null>(null);
   // Form states
   const [formData, setFormData] = useState({
     name: "",
@@ -239,6 +242,8 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
     });
     setShowForgotPassword(false);
     setForgotPasswordEmail("");
+    setShowPaymentModal(false);
+    setRegisteredPlanInfo(null);
   };
 
   const handleClose = () => {
@@ -342,12 +347,13 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
         })
         .eq('user_id', user.id);
 
-      toast({
-        title: "Cadastro realizado com sucesso!",
-        description: "Seu comércio foi registrado e está aguardando aprovação.",
+      // Get selected plan info for payment modal
+      const selectedPlan = plans.find(p => p.type === formData.plan);
+      setRegisteredPlanInfo({
+        name: selectedPlan?.name || formData.plan,
+        price: selectedPlan?.price || 0,
       });
-
-      handleClose();
+      setShowPaymentModal(true);
     } catch (error) {
       console.error('Registration error:', error);
       toast({
@@ -531,6 +537,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
   };
 
   return (
+    <>
     <AnimatePresence>
       {isOpen && (
         <motion.div
@@ -1325,6 +1332,23 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
         </motion.div>
       )}
     </AnimatePresence>
+
+    <RegistrationPaymentModal
+      isOpen={showPaymentModal}
+      planName={registeredPlanInfo?.name || ""}
+      planPrice={registeredPlanInfo?.price || 0}
+      couponDiscount={couponDiscount}
+      onConfirmPayment={() => {
+        setShowPaymentModal(false);
+        toast({
+          title: "Cadastro realizado com sucesso!",
+          description: "Seu comércio foi registrado e está aguardando aprovação.",
+        });
+        handleClose();
+        navigate('/commerce');
+      }}
+    />
+    </>
   );
 };
 
