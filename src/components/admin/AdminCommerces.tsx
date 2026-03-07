@@ -41,6 +41,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Database } from "@/integrations/supabase/types";
+import { fetchAllRows } from "@/lib/supabaseHelper";
 import CommerceDetailsModal from "./CommerceDetailsModal";
 import CommercesAnalytics from "./CommercesAnalytics";
 import CommerceEditModal from "./CommerceEditModal";
