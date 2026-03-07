@@ -69,7 +69,7 @@ function App() {
                 />
                 {/* Public routes */}
                 <Route path="/loja/:commerceId" element={<Storefront />} />
-                <Route path="/ranking" element={<Ranking />} />
+                
                 <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/termos-de-uso" element={<TermosDeUso />} />
                 <Route path="/politica-de-privacidade" element={<PoliticaPrivacidade />} />

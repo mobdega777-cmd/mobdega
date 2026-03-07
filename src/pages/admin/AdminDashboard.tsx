@@ -17,7 +17,7 @@ import {
   ChevronRight,
   Crown,
   BookOpen,
-  Trophy,
+  
   Database,
   MessageSquare,
   History as HistoryIcon

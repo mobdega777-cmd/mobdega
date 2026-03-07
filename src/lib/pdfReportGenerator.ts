@@ -1060,17 +1060,6 @@ export const generateManagementReportPDF = async (data: ManagementReportData) =>
   });
   doc.setTextColor(0, 0, 0);
 
-  // ===== PAGE 11: RANKING =====
-  doc.addPage();
-  mgmtSectionHeader(doc, 'Ranking e Avaliações', [245, 158, 11]);
-  yPos = 45;
-
-  yPos = mgmtCards(doc, yPos, [
-    { label: 'Nota Média', value: `${data.avgRating.toFixed(1)} ⭐`, color: [245, 158, 11] },
-    { label: 'Total Avaliações', value: data.reviewCount.toString(), color: [59, 130, 246] },
-    { label: 'Favoritos', value: data.favoritesCount.toString(), color: [239, 68, 68] },
-  ], 3);
-
   // ===== FINAL PAGE: PROJECTIONS =====
   doc.addPage();
   mgmtSectionHeader(doc, 'Projeções e Valuation', [139, 92, 246]);

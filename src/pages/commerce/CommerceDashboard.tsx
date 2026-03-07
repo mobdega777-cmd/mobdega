@@ -25,7 +25,7 @@ import {
   Camera,
   FileText,
   BookOpen,
-  Trophy,
+  
   AlertTriangleIcon,
   ArrowUp,
   User,
