@@ -530,7 +530,7 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
       const productCategoryMap = new Map(productsWithCategories.map(p => [p.id, p.category_id]));
       
       const salesByCategory: Record<string, number> = {};
-      orderItems?.forEach(item => {
+      orderItems.forEach(item => {
         const categoryId = productCategoryMap.get(item.product_id || '');
         const categoryName = categoryId ? categoryMap.get(categoryId) : 'Sem categoria';
         const name = categoryName || 'Sem categoria';
