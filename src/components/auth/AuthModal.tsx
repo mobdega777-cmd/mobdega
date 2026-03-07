@@ -1201,7 +1201,17 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
                                   : "border-border hover:border-secondary/50"
                               }`}
                             >
-                              <div className="flex justify-between items-start">
+                            <div className="flex items-start gap-3">
+                              <div className={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
+                                formData.plan === plan.type
+                                  ? "bg-secondary border-secondary"
+                                  : "border-muted-foreground/40"
+                              }`}>
+                                {formData.plan === plan.type && (
+                                  <Check className="w-3.5 h-3.5 text-secondary-foreground" />
+                                )}
+                              </div>
+                              <div className="flex-1 flex justify-between items-start">
                                 <div>
                                   <div className={`font-semibold ${formData.plan === plan.type ? "text-secondary" : "text-foreground"}`}>
                                     {plan.name}
@@ -1217,6 +1227,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
                                   {formatCurrency(plan.price)}/mês
                                 </div>
                               </div>
+                            </div>
                             </button>
                           ))
                         ) : (
