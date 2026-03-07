@@ -60,7 +60,6 @@ type AdminSection =
   | "coupons"
   | "customization" 
   | "training"
-  | "ranking"
   | "database"
   | "forum"
   | "system-updates"
