@@ -51,18 +51,18 @@ const AdminOverview = () => {
         .select('*', { count: 'exact', head: true });
 
       // Fetch commerces stats
-      const { data: commercesData } = await supabase
-        .from('commerces')
-        .select('status');
+      const commercesData = await fetchAllRows(() =>
+        supabase.from('commerces').select('status')
+      );
 
-      const totalCommerces = commercesData?.length || 0;
-      const pendingCommerces = commercesData?.filter(c => c.status === 'pending').length || 0;
-      const approvedCommerces = commercesData?.filter(c => c.status === 'approved').length || 0;
+      const totalCommerces = commercesData.length;
+      const pendingCommerces = commercesData.filter(c => c.status === 'pending').length;
+      const approvedCommerces = commercesData.filter(c => c.status === 'approved').length;
 
       // Fetch invoices
-      const { data: invoicesData } = await supabase
-        .from('invoices')
-        .select('amount, status');
+      const invoicesData = await fetchAllRows(() =>
+        supabase.from('invoices').select('amount, status')
+      );
 
       const monthlyRevenue = invoicesData
         ?.filter(i => i.status === 'paid')
