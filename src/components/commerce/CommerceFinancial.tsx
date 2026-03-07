@@ -716,44 +716,33 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
 
       // Parallel fetch all data
       const [
-        cashMovementsRes,
-        paymentMethodsRes,
+        cashMovements,
+        paymentMethods,
         cashRegistersRes,
-        productsRes,
-        categoriesRes,
-        expensesRes,
-        ordersRes,
-        orderItemsRes,
-        couponsRes,
-        reviewsRes,
-        favoritesRes,
-        allOrdersRes,
+        products,
+        categories,
+        expenses,
+        orders,
+        orderItems,
+        coupons,
+        reviews,
+        favorites,
+        allOrders,
       ] = await Promise.all([
-        supabase.from('cash_movements').select('amount, payment_method, created_at').eq('commerce_id', commerceId).eq('type', 'sale').gte('created_at', startISO).lte('created_at', endISO),
-        supabase.from('payment_methods').select('type, name, fee_percentage, fee_fixed').eq('commerce_id', commerceId).eq('is_active', true),
+        fetchAllRows(() => supabase.from('cash_movements').select('amount, payment_method, created_at').eq('commerce_id', commerceId).eq('type', 'sale').gte('created_at', startISO).lte('created_at', endISO)),
+        fetchAllRows(() => supabase.from('payment_methods').select('type, name, fee_percentage, fee_fixed').eq('commerce_id', commerceId).eq('is_active', true)),
         supabase.from('cash_registers').select('*').eq('commerce_id', commerceId).order('opened_at', { ascending: false }).limit(20),
-        supabase.from('products').select('id, name, price, stock, category_id, is_active').eq('commerce_id', commerceId),
-        supabase.from('categories').select('id, name').eq('commerce_id', commerceId),
-        supabase.from('expenses').select('*').eq('commerce_id', commerceId).eq('is_active', true),
-        supabase.from('orders').select('id, total, status, order_type, user_id, created_at, payment_method').eq('commerce_id', commerceId).gte('created_at', startISO).lte('created_at', endISO),
-        supabase.from('order_items').select('total_price, product_id, quantity, product_name, orders!inner(commerce_id, status, created_at)').eq('orders.commerce_id', commerceId).eq('orders.status', 'delivered').gte('orders.created_at', startISO).lte('orders.created_at', endISO),
-        supabase.from('commerce_coupons').select('code, discount_type, discount_value, used_count, max_uses, valid_until, is_active').eq('commerce_id', commerceId).eq('is_active', true),
-        supabase.from('reviews').select('rating, comment, created_at').eq('commerce_id', commerceId),
-        supabase.from('favorites').select('id').eq('commerce_id', commerceId),
-        supabase.from('orders').select('user_id, total, created_at').eq('commerce_id', commerceId).eq('status', 'delivered'),
+        fetchAllRows(() => supabase.from('products').select('id, name, price, stock, category_id, is_active').eq('commerce_id', commerceId)),
+        fetchAllRows(() => supabase.from('categories').select('id, name').eq('commerce_id', commerceId)),
+        fetchAllRows(() => supabase.from('expenses').select('*').eq('commerce_id', commerceId).eq('is_active', true)),
+        fetchAllRows(() => supabase.from('orders').select('id, total, status, order_type, user_id, created_at, payment_method').eq('commerce_id', commerceId).gte('created_at', startISO).lte('created_at', endISO)),
+        fetchAllRows(() => supabase.from('order_items').select('total_price, product_id, quantity, product_name, orders!inner(commerce_id, status, created_at)').eq('orders.commerce_id', commerceId).eq('orders.status', 'delivered').gte('orders.created_at', startISO).lte('orders.created_at', endISO)),
+        fetchAllRows(() => supabase.from('commerce_coupons').select('code, discount_type, discount_value, used_count, max_uses, valid_until, is_active').eq('commerce_id', commerceId).eq('is_active', true)),
+        fetchAllRows(() => supabase.from('reviews').select('rating, comment, created_at').eq('commerce_id', commerceId)),
+        fetchAllRows(() => supabase.from('favorites').select('id').eq('commerce_id', commerceId)),
+        fetchAllRows(() => supabase.from('orders').select('user_id, total, created_at').eq('commerce_id', commerceId).eq('status', 'delivered')),
       ]);
 
-      const cashMovements = cashMovementsRes.data || [];
-      const paymentMethods = paymentMethodsRes.data || [];
-      const products = productsRes.data || [];
-      const categories = categoriesRes.data || [];
-      const expenses = expensesRes.data || [];
-      const orders = ordersRes.data || [];
-      const orderItems = orderItemsRes.data || [];
-      const coupons = couponsRes.data || [];
-      const reviews = reviewsRes.data || [];
-      const favorites = favoritesRes.data || [];
-      const allOrders = allOrdersRes.data || [];
       const cashRegisters = cashRegistersRes.data || [];
 
       // Revenue from cash_movements
