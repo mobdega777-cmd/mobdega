@@ -238,14 +238,13 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
       : 0;
 
     // Fetch products for cost/stock calculations with category info
-    const { data: products } = await supabase
-      .from('products')
-      .select('price, promotional_price, stock, category_id')
-      .eq('commerce_id', commerceId);
+    const products = await fetchAllRows(() =>
+      supabase.from('products').select('price, promotional_price, stock, category_id').eq('commerce_id', commerceId)
+    );
 
     let stockCostValue = 0;
     let stockSaleValue = 0;
-    products?.forEach(p => {
+    products.forEach(p => {
       const stock = p.stock || 0;
       stockCostValue += (p.price || 0) * stock;
       stockSaleValue += (p.promotional_price || p.price || 0) * stock;
