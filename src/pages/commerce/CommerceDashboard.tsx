@@ -59,7 +59,7 @@ import CommerceCustomers from "@/components/commerce/CommerceCustomers";
 import CommercePhotos from "@/components/commerce/CommercePhotos";
 import CommerceContract from "@/components/commerce/CommerceContract";
 import CommerceTraining from "@/components/commerce/CommerceTraining";
-import CommerceRanking from "@/components/commerce/CommerceRanking";
+
 import CommerceCoupons from "@/components/commerce/CommerceCoupons";
 import CommerceForum from "@/components/commerce/CommerceForum";
 import UpgradeModal from "@/components/commerce/UpgradeModal";
