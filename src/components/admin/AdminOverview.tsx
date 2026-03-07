@@ -15,6 +15,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency } from "@/lib/formatCurrency";
+import { fetchAllRows } from "@/lib/supabaseHelper";
 
 interface Stats {
   totalUsers: number;
