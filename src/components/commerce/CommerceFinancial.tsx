@@ -210,7 +210,7 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
 
     // Calculate operator fees usando apenas cash_movements
     let calculatedFees = 0;
-    cashMovements?.forEach(movement => {
+    cashMovements.forEach(movement => {
       const fee = feeMap.get(movement.payment_method || '');
       if (fee) {
         calculatedFees += Number(movement.amount) * (fee.pct / 100) + fee.fixed;
