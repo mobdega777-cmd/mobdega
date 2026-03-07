@@ -201,7 +201,7 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
     );
 
     // Use 'type' as key for matching with movement.payment_method
-    const feeMap = new Map(paymentMethods?.map(pm => [pm.type, { pct: pm.fee_percentage || 0, fixed: pm.fee_fixed || 0 }]) || []);
+    const feeMap = new Map(paymentMethods.map(pm => [pm.type, { pct: pm.fee_percentage || 0, fixed: pm.fee_fixed || 0 }]));
 
     // Calcular faturamento usando apenas cash_movements
     const monthlyRevenue = cashMovements?.reduce((sum, m) => sum + Number(m.amount), 0) || 0;
