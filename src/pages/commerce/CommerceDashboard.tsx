@@ -543,8 +543,6 @@ const CommerceDashboard = () => {
         return <CommerceContract commerceId={commerce.id} />;
       case "training":
         return <CommerceTraining />;
-      case "ranking":
-        return <CommerceRanking currentCommerceId={commerce.id} />;
       case "forum":
         return <CommerceForum commerceId={commerce.id} commerceName={commerce.fantasy_name} commerceLogo={commerce.logo_url} />;
       case "settings":
