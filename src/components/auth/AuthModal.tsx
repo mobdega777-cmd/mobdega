@@ -52,6 +52,8 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState("");
   const [sendingResetEmail, setSendingResetEmail] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [registeredPlanInfo, setRegisteredPlanInfo] = useState<{ name: string; price: number } | null>(null);
   // Form states
   const [formData, setFormData] = useState({
     name: "",
