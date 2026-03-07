@@ -571,8 +571,8 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
 
       // Calculate financial details from fetched data (não usar stats que pode estar com período diferente)
       // Calcular faturamento bruto diretamente dos cash_movements do período
-      const reportGrossRevenue = cashMovements?.reduce((sum, m) => sum + Number(m.amount), 0) || 0;
-      const reportTotalOrders = cashMovements?.length || 0;
+      const reportGrossRevenue = cashMovements.reduce((sum, m) => sum + Number(m.amount), 0);
+      const reportTotalOrders = cashMovements.length;
       const reportAvgTicket = reportTotalOrders > 0 ? reportGrossRevenue / reportTotalOrders : 0;
       
       // Fetch payment methods for fee calculation (para o período do relatório)
