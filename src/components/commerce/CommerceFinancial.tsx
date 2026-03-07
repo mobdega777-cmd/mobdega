@@ -621,15 +621,13 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
       previousEnd.setDate(previousEnd.getDate() - 1);
       
       const { startISO: prevStartISO, endISO: prevEndISO } = getSupabaseDateRange(previousStart, previousEnd);
-      const { data: previousCashMovements } = await supabase
-        .from('cash_movements')
-        .select('amount')
-        .eq('commerce_id', commerceId)
-        .eq('type', 'sale')
-        .gte('created_at', prevStartISO)
-        .lte('created_at', prevEndISO);
+      const previousCashMovements = await fetchAllRows(() =>
+        supabase.from('cash_movements').select('amount')
+          .eq('commerce_id', commerceId).eq('type', 'sale')
+          .gte('created_at', prevStartISO).lte('created_at', prevEndISO)
+      );
       
-      const previousRevenue = previousCashMovements?.reduce((sum, m) => sum + Number(m.amount), 0) || 0;
+      const previousRevenue = previousCashMovements.reduce((sum, m) => sum + Number(m.amount), 0);
       const reportGrowthRate = previousRevenue > 0 
         ? ((reportGrossRevenue - previousRevenue) / previousRevenue) * 100 
         : 0;
