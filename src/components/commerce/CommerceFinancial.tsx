@@ -476,20 +476,17 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
       // Fetch detailed data for the report with correct timezone
       // IMPORTANTE: Usar apenas cash_movements para faturamento real
       // Os cash_movements já contêm o valor final (com descontos aplicados)
-      const { data: cashMovements } = await supabase
-        .from('cash_movements')
-        .select('amount, payment_method, created_at')
-        .eq('commerce_id', commerceId)
-        .eq('type', 'sale')
-        .gte('created_at', startISO)
-        .lte('created_at', endISO);
+      const cashMovements = await fetchAllRows(() =>
+        supabase.from('cash_movements').select('amount, payment_method, created_at')
+          .eq('commerce_id', commerceId).eq('type', 'sale')
+          .gte('created_at', startISO).lte('created_at', endISO)
+      );
 
       // Fetch expenses for the report
-      const { data: expenses } = await supabase
-        .from('expenses')
-        .select('name, type, amount, created_at')
-        .eq('commerce_id', commerceId)
-        .eq('is_active', true);
+      const expenses = await fetchAllRows(() =>
+        supabase.from('expenses').select('name, type, amount, created_at')
+          .eq('commerce_id', commerceId).eq('is_active', true)
+      );
 
       // Separate fixed expenses from stock purchases
       const fixedExpenses = expenses?.filter(e => e.type !== 'stock_purchase') || [];
