@@ -991,7 +991,6 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
         })),
         deliveryStats,
         peakHour, peakDay, topProduct, retentionRate,
-        avgRating, reviewCount: reviews.length, favoritesCount: favorites.length,
       };
 
       await generateManagementReportPDF(reportData);

@@ -1040,8 +1040,6 @@ export const generateManagementReportPDF = async (data: ManagementReportData) =>
   if (data.peakDay) tips.push(`• ${data.peakDay} é seu dia mais forte. Considere promoções em dias fracos para equilibrar.`);
   if (data.retentionRate < 30) tips.push('• Retenção abaixo de 30%. Crie programas de fidelidade para trazer clientes de volta.');
   if (data.retentionRate >= 30) tips.push(`• Retenção de ${data.retentionRate.toFixed(0)}%! Continue investindo em experiência do cliente.`);
-  if (data.avgRating < 4) tips.push('• Nota abaixo de 4.0. Foque em qualidade do serviço e resolução de problemas.');
-  if (data.avgRating >= 4) tips.push(`• Nota ${data.avgRating.toFixed(1)}! Use avaliações positivas como prova social nas redes.`);
   if (data.topProduct) tips.push(`• "${data.topProduct}" é seu carro-chefe. Crie combos com ele para aumentar ticket médio.`);
   if (data.growthRate < 0) tips.push('• Vendas em queda. Revise precificação, invista em marketing e avalie novos canais.');
   if (data.growthRate > 10) tips.push(`• Crescimento de ${data.growthRate.toFixed(0)}%! Considere expandir equipe ou horário.`);
