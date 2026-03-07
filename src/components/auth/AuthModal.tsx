@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { fetchAddressByCep, formatCep } from "@/lib/viaCepService";
 import { formatCurrency, formatPercentage } from "@/lib/formatCurrency";
 import { getFeatureLabels } from "@/lib/planFeatures";
+import RegistrationPaymentModal from "./RegistrationPaymentModal";
 type AuthMode = "login" | "register";
 type UserType = "user" | "commerce";
 type DocumentType = "cpf" | "cnpj";
