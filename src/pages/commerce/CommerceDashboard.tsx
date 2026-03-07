@@ -86,7 +86,7 @@ type CommerceSection =
   | "settings";
 
 // Ordem atualizada com Cupons entre Financeiro e Clientes
-import { Ticket, MessageSquare } from "lucide-react";
+import { Ticket, MessageSquare, MessageCircle } from "lucide-react";
 
 const menuItems = [
   { id: "overview" as CommerceSection, label: "Visão Geral", icon: LayoutDashboard },
