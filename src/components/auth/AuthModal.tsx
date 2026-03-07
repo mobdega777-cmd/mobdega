@@ -242,7 +242,8 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
     });
     setShowForgotPassword(false);
     setForgotPasswordEmail("");
-  };
+    setShowPaymentModal(false);
+    setRegisteredPlanInfo(null);
 
   const handleClose = () => {
     resetForm();
