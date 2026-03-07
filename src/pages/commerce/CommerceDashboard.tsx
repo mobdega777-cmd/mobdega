@@ -82,7 +82,6 @@ type CommerceSection =
   | "paymentconfig"
   | "contract"
   | "training"
-  | "ranking"
   | "forum"
   | "settings";
 
