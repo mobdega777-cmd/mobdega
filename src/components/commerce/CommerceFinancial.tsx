@@ -815,8 +815,8 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
       const prevEnd = new Date(dateFilter.start);
       prevEnd.setDate(prevEnd.getDate() - 1);
       const { startISO: pStartISO, endISO: pEndISO } = getSupabaseDateRange(prevStart, prevEnd);
-      const { data: prevMoves } = await supabase.from('cash_movements').select('amount').eq('commerce_id', commerceId).eq('type', 'sale').gte('created_at', pStartISO).lte('created_at', pEndISO);
-      const prevRevenue = prevMoves?.reduce((s, m) => s + Number(m.amount), 0) || 0;
+      const prevMoves = await fetchAllRows(() => supabase.from('cash_movements').select('amount').eq('commerce_id', commerceId).eq('type', 'sale').gte('created_at', pStartISO).lte('created_at', pEndISO));
+      const prevRevenue = prevMoves.reduce((s, m) => s + Number(m.amount), 0);
       const growthRate = prevRevenue > 0 ? ((grossRevenue - prevRevenue) / prevRevenue) * 100 : 0;
 
       const projectedRevenue = periodDays > 0 ? (grossRevenue / periodDays) * 30 : 0;
