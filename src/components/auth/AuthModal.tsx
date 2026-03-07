@@ -244,6 +244,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
     setForgotPasswordEmail("");
     setShowPaymentModal(false);
     setRegisteredPlanInfo(null);
+  };
 
   const handleClose = () => {
     resetForm();
