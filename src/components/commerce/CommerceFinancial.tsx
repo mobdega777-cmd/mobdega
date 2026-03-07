@@ -512,26 +512,22 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
       });
 
       // Fetch categories with sales (use the same startISO/endISO)
-      const { data: orderItems } = await supabase
-        .from('order_items')
-        .select('total_price, product_id, orders!inner(commerce_id, status, created_at)')
-        .eq('orders.commerce_id', commerceId)
-        .eq('orders.status', 'delivered')
-        .gte('orders.created_at', startISO)
-        .lte('orders.created_at', endISO);
+      const orderItems = await fetchAllRows(() =>
+        supabase.from('order_items').select('total_price, product_id, orders!inner(commerce_id, status, created_at)')
+          .eq('orders.commerce_id', commerceId).eq('orders.status', 'delivered')
+          .gte('orders.created_at', startISO).lte('orders.created_at', endISO)
+      );
 
-      const { data: productsWithCategories } = await supabase
-        .from('products')
-        .select('id, category_id')
-        .eq('commerce_id', commerceId);
+      const productsWithCategories = await fetchAllRows(() =>
+        supabase.from('products').select('id, category_id').eq('commerce_id', commerceId)
+      );
 
-      const { data: categoriesData } = await supabase
-        .from('categories')
-        .select('id, name')
-        .eq('commerce_id', commerceId);
+      const categoriesData = await fetchAllRows(() =>
+        supabase.from('categories').select('id, name').eq('commerce_id', commerceId)
+      );
 
-      const categoryMap = new Map(categoriesData?.map(c => [c.id, c.name]) || []);
-      const productCategoryMap = new Map(productsWithCategories?.map(p => [p.id, p.category_id]) || []);
+      const categoryMap = new Map(categoriesData.map(c => [c.id, c.name]));
+      const productCategoryMap = new Map(productsWithCategories.map(p => [p.id, p.category_id]));
       
       const salesByCategory: Record<string, number> = {};
       orderItems?.forEach(item => {
