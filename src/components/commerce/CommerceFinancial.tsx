@@ -489,8 +489,8 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
       );
 
       // Separate fixed expenses from stock purchases
-      const fixedExpenses = expenses?.filter(e => e.type !== 'stock_purchase') || [];
-      const stockPurchases = expenses?.filter(e => e.type === 'stock_purchase') || [];
+      const fixedExpenses = expenses.filter(e => e.type !== 'stock_purchase');
+      const stockPurchases = expenses.filter(e => e.type === 'stock_purchase');
       
       const totalFixedExpenses = fixedExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
       const totalStockPurchases = stockPurchases.reduce((sum, e) => sum + Number(e.amount), 0);
