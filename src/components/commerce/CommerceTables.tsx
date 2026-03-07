@@ -23,6 +23,7 @@ import { Plus, Pencil, Trash2, Utensils, Users, DollarSign, CreditCard, QrCode, 
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { generateTableQRCodePDF, generateAllTablesQRCodePDF } from "@/lib/tableQRCodeGenerator";
+import { fetchAllRows } from "@/lib/supabaseHelper";
 
 interface CommerceTablesProps {
   commerceId: string;
