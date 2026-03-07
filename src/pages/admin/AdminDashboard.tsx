@@ -43,7 +43,7 @@ import AdminPlans from "@/components/admin/AdminPlans";
 import AdminCustomers from "@/components/admin/AdminCustomers";
 import AdminCoupons from "@/components/admin/AdminCoupons";
 import AdminTraining from "@/components/admin/AdminTraining";
-import AdminRanking from "@/components/admin/AdminRanking";
+
 import AdminDatabase from "@/components/admin/AdminDatabase";
 import AdminForum from "@/components/admin/AdminForum";
 import AdminSystemUpdates from "@/components/admin/AdminSystemUpdates";
