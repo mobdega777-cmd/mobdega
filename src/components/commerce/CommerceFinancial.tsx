@@ -599,10 +599,9 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
       
       // Calcular CPV (Custo dos Produtos Vendidos) para o período
       // Usar uma estimativa baseada em margem média ou preço de custo se disponível
-      const reportProductCostSold = orderItems?.reduce((sum, item) => {
-        // Estimativa: custo = 60% do preço de venda (pode ser ajustado)
+      const reportProductCostSold = orderItems.reduce((sum, item) => {
         return sum + Number(item.total_price) * 0.6;
-      }, 0) || 0;
+      }, 0);
       
       // Calcular imposto para o período do relatório
       let reportTaxAmount = 0;
