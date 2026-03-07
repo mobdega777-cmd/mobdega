@@ -1,22 +1,27 @@
 
 
-## Plano: Zerar faturas e dados financeiros
+## Mostrar e alterar senha de gestao diretamente no modal de edicao
 
-### O que será feito
+### O que muda
 
-Deletar todas as 34 faturas existentes na tabela `invoices` e resetar os dados financeiros relacionados para recomeçar do zero.
+A aba "Seguranca" do modal de edicao de comercio deixa de enviar email de reset e passa a:
+1. Mostrar a senha de gestao atual do comercio (com toggle para ver/ocultar)
+2. Permitir que o admin altere a senha diretamente, salvando no banco
 
-### Dados a serem removidos
+### Alteracoes
 
-| Tabela | Registros | Ação |
-|--------|-----------|------|
-| `invoices` | 34 | Deletar todos |
-| `financial_transactions` | 0 | Já vazia |
+**Arquivo 1: `src/components/admin/AdminCommerces.tsx`**
+- Adicionar `management_password: string | null` na interface `Commerce` (linha ~77)
 
-### Passos de implementação
+**Arquivo 2: `src/components/admin/CommerceEditModal.tsx`**
+- Adicionar `management_password` na interface `Commerce`
+- Substituir toda a `TabsContent value="seguranca"` por:
+  - Exibicao da senha atual com botao de ver/ocultar (se existir, senao mostra "Nenhuma senha configurada")
+  - Campo para digitar nova senha com botao de gerar senha aleatoria
+  - Botao "Salvar Nova Senha" que faz update direto na tabela `commerces`
+- Remover imports e estados relacionados ao reset por email (`resetPasswordForEmail`, `tempPassword`, etc.)
 
-1. **Deletar todas as faturas** — Executar `DELETE FROM invoices` via ferramenta de dados
-2. **Limpar notificações de faturas** — Remover notificações do tipo `new_invoice` e `payment_confirmation` das tabelas `commerce_notifications` e `admin_notifications`
+**Banco de dados**: Nenhuma alteracao necessaria, `management_password` ja existe como texto na tabela.
 
-Os cards de overview (AdminOverview, CommerceFinancial, etc.) já calculam valores dinamicamente a partir das tabelas, então ao deletar os dados, os valores zerarão automaticamente.
+**Registro no feed**: 1 insert em `system_updates` documentando a mudanca.
 
