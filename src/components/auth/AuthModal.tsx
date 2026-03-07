@@ -345,12 +345,13 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
         })
         .eq('user_id', user.id);
 
-      toast({
-        title: "Cadastro realizado com sucesso!",
-        description: "Seu comércio foi registrado e está aguardando aprovação.",
+      // Get selected plan info for payment modal
+      const selectedPlan = plans.find(p => p.type === formData.plan);
+      setRegisteredPlanInfo({
+        name: selectedPlan?.name || formData.plan,
+        price: selectedPlan?.price || 0,
       });
-
-      handleClose();
+      setShowPaymentModal(true);
     } catch (error) {
       console.error('Registration error:', error);
       toast({
