@@ -535,6 +535,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
   };
 
   return (
+    <>
     <AnimatePresence>
       {isOpen && (
         <motion.div
