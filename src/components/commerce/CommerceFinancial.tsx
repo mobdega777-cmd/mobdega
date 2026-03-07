@@ -308,13 +308,9 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
     setPendingInvoicesCount(pendingCount);
 
     // Fetch expenses with due dates for A Pagar/Vencidos calculation
-    const { data: expensesData } = await supabase
-      .from('expenses')
-      .select('*')
-      .eq('commerce_id', commerceId)
-      .eq('is_active', true);
-
-    const todayStr = new Date().toISOString().split('T')[0];
+    const expensesData = await fetchAllRows(() =>
+      supabase.from('expenses').select('*').eq('commerce_id', commerceId).eq('is_active', true)
+    );
     
     // Despesas pendentes (não pagas e não vencidas)
     const pendingExpenses = expensesData?.filter(e => 
