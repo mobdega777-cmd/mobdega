@@ -12,7 +12,6 @@ export const menuItemLabels: Record<string, string> = {
   coupons: "Cupons para Clientes",
   customers: "Clientes",
   photos: "Fotos",
-  ranking: "Ranking",
   paymentconfig: "Configuração de Pagamentos",
   contract: "Contrato",
   training: "Treinamento",

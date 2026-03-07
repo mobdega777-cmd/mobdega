@@ -1,28 +1,27 @@
 
 
-## Plano: Remover Ranking de todo o sistema
+## Mostrar e alterar senha de gestao diretamente no modal de edicao
 
-### Arquivos a deletar
-- `src/pages/Ranking.tsx` — página pública de ranking
-- `src/components/commerce/CommerceRanking.tsx` — componente ranking do comércio
-- `src/components/admin/AdminRanking.tsx` — componente ranking do admin
+### O que muda
 
-### Arquivos a editar
+A aba "Seguranca" do modal de edicao de comercio deixa de enviar email de reset e passa a:
+1. Mostrar a senha de gestao atual do comercio (com toggle para ver/ocultar)
+2. Permitir que o admin altere a senha diretamente, salvando no banco
 
-1. **`src/App.tsx`** — Remover import de `Ranking`, remover a rota `/ranking`
+### Alteracoes
 
-2. **`src/pages/admin/AdminDashboard.tsx`** — Remover import `AdminRanking`, remover `"ranking"` do type `AdminSection`, remover item do `menuItems`, remover case `"ranking"` do `renderContent`, remover import `Trophy`
+**Arquivo 1: `src/components/admin/AdminCommerces.tsx`**
+- Adicionar `management_password: string | null` na interface `Commerce` (linha ~77)
 
-3. **`src/pages/commerce/CommerceDashboard.tsx`** — Remover import `CommerceRanking`, remover `"ranking"` do type `CommerceSection`, remover item do `menuItems`, remover case `"ranking"` do `renderContent`
+**Arquivo 2: `src/components/admin/CommerceEditModal.tsx`**
+- Adicionar `management_password` na interface `Commerce`
+- Substituir toda a `TabsContent value="seguranca"` por:
+  - Exibicao da senha atual com botao de ver/ocultar (se existir, senao mostra "Nenhuma senha configurada")
+  - Campo para digitar nova senha com botao de gerar senha aleatoria
+  - Botao "Salvar Nova Senha" que faz update direto na tabela `commerces`
+- Remover imports e estados relacionados ao reset por email (`resetPasswordForEmail`, `tempPassword`, etc.)
 
-4. **`src/lib/planFeatures.ts`** — Remover entrada `ranking: "Ranking"` do `menuItemLabels`
+**Banco de dados**: Nenhuma alteracao necessaria, `management_password` ja existe como texto na tabela.
 
-5. **`src/lib/pdfReportGenerator.ts`** — Remover seção "Ranking e Avaliações" (página 11) e campos relacionados
-
-6. **`src/pages/SobreNos.tsx`** — Remover menção a "Rankings e visibilidade" da lista de features
-
-7. **`src/components/user/CommerceStorefront.tsx`** — A função `refreshPlanAccess` usa `get_ranking_commerces` RPC mas para buscar info de plano, não para ranking em si. Manter mas verificar se precisa renomear/ajustar.
-
-### Sem alterações no banco de dados
-Nenhuma migração necessária. A RPC `get_ranking_commerces` pode permanecer pois é usada para outros fins (storefront).
+**Registro no feed**: 1 insert em `system_updates` documentando a mudanca.
 

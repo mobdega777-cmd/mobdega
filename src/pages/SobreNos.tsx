@@ -123,7 +123,7 @@ const SobreNos = () => {
                 <li>Gestão financeira com relatórios detalhados</li>
                 <li>Cardápio digital personalizável</li>
                 <li>Sistema de delivery integrado</li>
-                <li>Rankings e visibilidade para atrair novos clientes</li>
+                
               </ul>
             </div>
           </div>

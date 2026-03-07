@@ -25,7 +25,7 @@ import {
   Camera,
   FileText,
   BookOpen,
-  Trophy,
+  
   AlertTriangleIcon,
   ArrowUp,
   User,
@@ -59,7 +59,7 @@ import CommerceCustomers from "@/components/commerce/CommerceCustomers";
 import CommercePhotos from "@/components/commerce/CommercePhotos";
 import CommerceContract from "@/components/commerce/CommerceContract";
 import CommerceTraining from "@/components/commerce/CommerceTraining";
-import CommerceRanking from "@/components/commerce/CommerceRanking";
+
 import CommerceCoupons from "@/components/commerce/CommerceCoupons";
 import CommerceForum from "@/components/commerce/CommerceForum";
 import UpgradeModal from "@/components/commerce/UpgradeModal";
@@ -82,7 +82,6 @@ type CommerceSection =
   | "paymentconfig"
   | "contract"
   | "training"
-  | "ranking"
   | "forum"
   | "settings";
 
@@ -106,7 +105,6 @@ const menuItems = [
   { id: "customers" as CommerceSection, label: "Clientes", icon: Store },
   { id: "contract" as CommerceSection, label: "Contrato", icon: FileText },
   { id: "training" as CommerceSection, label: "Treinamento", icon: BookOpen },
-  { id: "ranking" as CommerceSection, label: "Ranking", icon: Trophy },
   { id: "forum" as CommerceSection, label: "Fórum", icon: MessageSquare },
   { id: "settings" as CommerceSection, label: "Configurações", icon: Settings },
 ];
@@ -545,8 +543,6 @@ const CommerceDashboard = () => {
         return <CommerceContract commerceId={commerce.id} />;
       case "training":
         return <CommerceTraining />;
-      case "ranking":
-        return <CommerceRanking currentCommerceId={commerce.id} />;
       case "forum":
         return <CommerceForum commerceId={commerce.id} commerceName={commerce.fantasy_name} commerceLogo={commerce.logo_url} />;
       case "settings":

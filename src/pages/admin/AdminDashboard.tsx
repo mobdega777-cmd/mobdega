@@ -17,7 +17,7 @@ import {
   ChevronRight,
   Crown,
   BookOpen,
-  Trophy,
+  
   Database,
   MessageSquare,
   History as HistoryIcon
@@ -43,7 +43,7 @@ import AdminPlans from "@/components/admin/AdminPlans";
 import AdminCustomers from "@/components/admin/AdminCustomers";
 import AdminCoupons from "@/components/admin/AdminCoupons";
 import AdminTraining from "@/components/admin/AdminTraining";
-import AdminRanking from "@/components/admin/AdminRanking";
+
 import AdminDatabase from "@/components/admin/AdminDatabase";
 import AdminForum from "@/components/admin/AdminForum";
 import AdminSystemUpdates from "@/components/admin/AdminSystemUpdates";
@@ -60,7 +60,6 @@ type AdminSection =
   | "coupons"
   | "customization" 
   | "training"
-  | "ranking"
   | "database"
   | "forum"
   | "system-updates"
@@ -77,7 +76,6 @@ const menuItems = [
   { id: "plans" as AdminSection, label: "Planos", icon: Crown },
   { id: "coupons" as AdminSection, label: "Cupons", icon: Receipt },
   { id: "training" as AdminSection, label: "Treinamento", icon: BookOpen },
-  { id: "ranking" as AdminSection, label: "Ranking", icon: Trophy },
   { id: "database" as AdminSection, label: "Banco de Dados", icon: Database },
   { id: "forum" as AdminSection, label: "Fórum", icon: MessageSquare },
   { id: "system-updates" as AdminSection, label: "Atualizações", icon: HistoryIcon },
@@ -176,8 +174,6 @@ const AdminDashboard = () => {
         return <AdminCoupons />;
       case "training":
         return <AdminTraining />;
-      case "ranking":
-        return <AdminRanking />;
       case "database":
         return <AdminDatabase />;
       case "forum":
