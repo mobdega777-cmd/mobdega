@@ -150,36 +150,32 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
   const fetchOrders = async () => {
     setLoading(true);
     
-    // Fetch orders from orders table
-    let ordersQuery = supabase
-      .from('orders')
-      .select('*')
-      .eq('commerce_id', commerceId)
-      .gte('created_at', dateFilter.start.toISOString())
-      .lte('created_at', dateFilter.end.toISOString())
-      .order('created_at', { ascending: false });
+    try {
+      const ordersData = await fetchAllRows<Order>(() => {
+        let q = supabase
+          .from('orders')
+          .select('*')
+          .eq('commerce_id', commerceId)
+          .gte('created_at', dateFilter.start.toISOString())
+          .lte('created_at', dateFilter.end.toISOString())
+          .order('created_at', { ascending: false });
 
-    if (statusFilter !== 'all') {
-      ordersQuery = ordersQuery.eq('status', statusFilter as OrderStatus);
+        if (statusFilter !== 'all') {
+          q = q.eq('status', statusFilter as OrderStatus);
+        }
+        return q;
+      });
+
+      const combinedOrders: CombinedOrder[] = ordersData.map(order => order as Order);
+
+      combinedOrders.sort((a, b) => 
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+
+      setOrders(combinedOrders);
+    } catch (error) {
+      console.error('Error fetching orders:', error);
     }
-
-    // Fetch cash movements (PDV sales) - only if not filtering by order status
-    const { data: ordersData, error: ordersError } = await ordersQuery;
-    
-    if (ordersError) {
-      console.error('Error fetching orders:', ordersError);
-    }
-
-    // Convert orders to combined format - pedidos já aparecem com seus dados
-    // Não duplicar com cash_movements, apenas usar a tabela orders
-    const combinedOrders: CombinedOrder[] = (ordersData || []).map(order => order as Order);
-
-    // Sort by created_at descending
-    combinedOrders.sort((a, b) => 
-      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    );
-
-    setOrders(combinedOrders);
     setLoading(false);
   };
 
