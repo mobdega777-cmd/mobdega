@@ -497,7 +497,7 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
 
       // Payment method breakdown (usando apenas cash_movements)
       const paymentMap = new Map<string, { total: number; count: number }>();
-      cashMovements?.forEach(m => {
+      cashMovements.forEach(m => {
         const method = m.payment_method || 'Dinheiro';
         const existing = paymentMap.get(method) || { total: 0, count: 0 };
         paymentMap.set(method, { total: existing.total + Number(m.amount), count: existing.count + 1 });
@@ -505,7 +505,7 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
 
       // Daily sales (usando apenas cash_movements)
       const dailyMap = new Map<string, { revenue: number; orders: number }>();
-      cashMovements?.forEach(m => {
+      cashMovements.forEach(m => {
         const date = format(new Date(m.created_at), 'dd/MM/yyyy');
         const existing = dailyMap.get(date) || { revenue: 0, orders: 0 };
         dailyMap.set(date, { revenue: existing.revenue + Number(m.amount), orders: existing.orders + 1 });
