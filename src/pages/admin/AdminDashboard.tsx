@@ -76,7 +76,6 @@ const menuItems = [
   { id: "plans" as AdminSection, label: "Planos", icon: Crown },
   { id: "coupons" as AdminSection, label: "Cupons", icon: Receipt },
   { id: "training" as AdminSection, label: "Treinamento", icon: BookOpen },
-  { id: "ranking" as AdminSection, label: "Ranking", icon: Trophy },
   { id: "database" as AdminSection, label: "Banco de Dados", icon: Database },
   { id: "forum" as AdminSection, label: "Fórum", icon: MessageSquare },
   { id: "system-updates" as AdminSection, label: "Atualizações", icon: HistoryIcon },
