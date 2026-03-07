@@ -193,12 +193,12 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
         .lte('created_at', endISO)
     );
 
-    // Fetch payment methods for fee calculation
-    const { data: paymentMethods } = await supabase
-      .from('payment_methods')
-      .select('type, fee_percentage, fee_fixed')
-      .eq('commerce_id', commerceId)
-      .eq('is_active', true);
+    const paymentMethods = await fetchAllRows(() =>
+      supabase.from('payment_methods')
+        .select('type, fee_percentage, fee_fixed')
+        .eq('commerce_id', commerceId)
+        .eq('is_active', true)
+    );
 
     // Use 'type' as key for matching with movement.payment_method
     const feeMap = new Map(paymentMethods?.map(pm => [pm.type, { pct: pm.fee_percentage || 0, fixed: pm.fee_fixed || 0 }]) || []);
