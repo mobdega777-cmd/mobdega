@@ -333,13 +333,13 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
              paidDate.getFullYear() === now.getFullYear();
     };
 
-    const invoicePendingPayments = invoicesData?.filter(i => 
+    const invoicePendingPayments = invoicesData.filter(i => 
       i.status === 'pending'
-    ).reduce((sum, i) => sum + Number(i.amount), 0) || 0;
+    ).reduce((sum, i) => sum + Number(i.amount), 0);
 
-    const invoiceOverduePayments = invoicesData?.filter(i => 
+    const invoiceOverduePayments = invoicesData.filter(i => 
       i.status === 'overdue'
-    ).reduce((sum, i) => sum + Number(i.amount), 0) || 0;
+    ).reduce((sum, i) => sum + Number(i.amount), 0);
 
     // Calculate tax amount based on config
     let taxAmount = 0;
