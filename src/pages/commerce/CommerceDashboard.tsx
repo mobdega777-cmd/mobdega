@@ -105,7 +105,6 @@ const menuItems = [
   { id: "customers" as CommerceSection, label: "Clientes", icon: Store },
   { id: "contract" as CommerceSection, label: "Contrato", icon: FileText },
   { id: "training" as CommerceSection, label: "Treinamento", icon: BookOpen },
-  { id: "ranking" as CommerceSection, label: "Ranking", icon: Trophy },
   { id: "forum" as CommerceSection, label: "Fórum", icon: MessageSquare },
   { id: "settings" as CommerceSection, label: "Configurações", icon: Settings },
 ];
