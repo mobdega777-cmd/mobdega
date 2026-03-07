@@ -219,24 +219,20 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
     setOperatorFees(calculatedFees);
 
     // Fetch last month orders for comparison
-    const { data: lastMonthOrders } = await supabase
-      .from('orders')
-      .select('total, status')
-      .eq('commerce_id', commerceId)
-      .eq('status', 'delivered')
-      .gte('created_at', lastMonth)
-      .lte('created_at', lastMonthEnd);
+    const lastMonthOrders = await fetchAllRows(() =>
+      supabase.from('orders').select('total, status')
+        .eq('commerce_id', commerceId).eq('status', 'delivered')
+        .gte('created_at', lastMonth).lte('created_at', lastMonthEnd)
+    );
 
-    const { data: lastMonthMovements } = await supabase
-      .from('cash_movements')
-      .select('amount')
-      .eq('commerce_id', commerceId)
-      .eq('type', 'sale')
-      .gte('created_at', lastMonth)
-      .lte('created_at', lastMonthEnd);
+    const lastMonthMovements = await fetchAllRows(() =>
+      supabase.from('cash_movements').select('amount')
+        .eq('commerce_id', commerceId).eq('type', 'sale')
+        .gte('created_at', lastMonth).lte('created_at', lastMonthEnd)
+    );
 
-    const lastMonthRevenue = (lastMonthOrders?.reduce((sum, o) => sum + Number(o.total), 0) || 0) +
-      (lastMonthMovements?.reduce((sum, m) => sum + Number(m.amount), 0) || 0);
+    const lastMonthRevenue = lastMonthOrders.reduce((sum, o) => sum + Number(o.total), 0) +
+      lastMonthMovements.reduce((sum, m) => sum + Number(m.amount), 0);
     const growthRate = lastMonthRevenue > 0 
       ? ((monthlyRevenue - lastMonthRevenue) / lastMonthRevenue) * 100 
       : 0;
