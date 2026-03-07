@@ -576,17 +576,16 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
       const reportAvgTicket = reportTotalOrders > 0 ? reportGrossRevenue / reportTotalOrders : 0;
       
       // Fetch payment methods for fee calculation (para o período do relatório)
-      const { data: paymentMethods } = await supabase
-        .from('payment_methods')
-        .select('type, fee_percentage, fee_fixed')
-        .eq('commerce_id', commerceId)
-        .eq('is_active', true);
+      const reportPaymentMethods = await fetchAllRows(() =>
+        supabase.from('payment_methods').select('type, fee_percentage, fee_fixed')
+          .eq('commerce_id', commerceId).eq('is_active', true)
+      );
 
-      const feeMap = new Map(paymentMethods?.map(pm => [pm.type, { percentage: pm.fee_percentage || 0, fixed: pm.fee_fixed || 0 }]) || []);
+      const feeMap = new Map(reportPaymentMethods.map(pm => [pm.type, { percentage: pm.fee_percentage || 0, fixed: pm.fee_fixed || 0 }]));
       
       // Calcular taxas de operadoras para o período do relatório
       let reportOperatorFees = 0;
-      cashMovements?.forEach(m => {
+      cashMovements.forEach(m => {
         const fee = feeMap.get(m.payment_method);
         if (fee) {
           reportOperatorFees += (Number(m.amount) * fee.percentage / 100) + fee.fixed;
@@ -594,10 +593,9 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
       });
       
       // Fetch products for cost calculation
-      const { data: allProducts } = await supabase
-        .from('products')
-        .select('id, price, stock')
-        .eq('commerce_id', commerceId);
+      const allProducts = await fetchAllRows(() =>
+        supabase.from('products').select('id, price, stock').eq('commerce_id', commerceId)
+      );
       
       // Calcular CPV (Custo dos Produtos Vendidos) para o período
       // Usar uma estimativa baseada em margem média ou preço de custo se disponível
