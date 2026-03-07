@@ -11,7 +11,7 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import CommerceDashboard from "./pages/commerce/CommerceDashboard";
 import UserDashboard from "./pages/user/UserDashboard";
 import Storefront from "./pages/Storefront";
-import Ranking from "./pages/Ranking";
+
 import ResetPassword from "./pages/ResetPassword";
 import TermosDeUso from "./pages/TermosDeUso";
 import PoliticaPrivacidade from "./pages/PoliticaPrivacidade";
