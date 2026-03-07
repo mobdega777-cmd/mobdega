@@ -825,8 +825,8 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
       // Cash closings with movements
       const cashClosingsData = await Promise.all(
         cashRegisters.filter(cr => cr.status === 'closed').slice(0, 10).map(async (cr) => {
-          const { data: crMoves } = await supabase.from('cash_movements').select('amount, payment_method').eq('cash_register_id', cr.id).eq('type', 'sale');
-          const moves = crMoves || [];
+          const crMoves = await fetchAllRows(() => supabase.from('cash_movements').select('amount, payment_method').eq('cash_register_id', cr.id).eq('type', 'sale'));
+          const moves = crMoves;
           const totalSales = moves.reduce((s, m) => s + Number(m.amount), 0);
           const salesCount = moves.length;
           const ticketMedio = salesCount > 0 ? totalSales / salesCount : 0;
