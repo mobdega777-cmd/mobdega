@@ -300,13 +300,11 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
     const projectedRevenue = dayOfMonth > 0 ? (monthlyRevenue / dayOfMonth) * daysInMonth : 0;
 
     // Fetch invoices (A Pagar for merchant)
-    const { data: invoicesData } = await supabase
-      .from('invoices')
-      .select('*')
-      .eq('commerce_id', commerceId)
-      .order('due_date', { ascending: false });
+    const invoicesData = await fetchAllRows(() =>
+      supabase.from('invoices').select('*').eq('commerce_id', commerceId).order('due_date', { ascending: false })
+    );
 
-    const pendingCount = invoicesData?.filter(i => i.status === 'pending').length || 0;
+    const pendingCount = invoicesData.filter(i => i.status === 'pending').length;
     setPendingInvoicesCount(pendingCount);
 
     // Fetch expenses with due dates for A Pagar/Vencidos calculation
