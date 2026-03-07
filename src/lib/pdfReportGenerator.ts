@@ -1025,10 +1025,7 @@ export const generateManagementReportPDF = async (data: ManagementReportData) =>
   yPos += 5;
   yPos = mgmtCards(doc, yPos, [
     { label: 'Retenção Clientes', value: `${data.retentionRate.toFixed(1)}%`, color: [16, 185, 129] },
-    { label: 'Avaliação Média', value: `${data.avgRating.toFixed(1)} ⭐`, color: [245, 158, 11] },
-    { label: 'Avaliações', value: data.reviewCount.toString(), color: [59, 130, 246] },
-    { label: 'Favoritos', value: data.favoritesCount.toString(), color: [239, 68, 68] },
-  ]);
+  ], 1);
 
   // BI Tips
   yPos += 10;
