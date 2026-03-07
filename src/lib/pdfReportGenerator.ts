@@ -632,10 +632,6 @@ export interface ManagementReportData {
   peakDay: string;
   topProduct: string;
   retentionRate: number;
-  // Ranking
-  avgRating: number;
-  reviewCount: number;
-  favoritesCount: number;
 }
 
 const mgmtSectionHeader = (doc: jsPDF, title: string, color: number[]) => {
