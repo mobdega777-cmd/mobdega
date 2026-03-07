@@ -46,6 +46,7 @@ import { useToast } from "@/hooks/use-toast";
 import DateFilter from "./DateFilter";
 import { startOfDay, endOfDay, subDays } from "date-fns";
 import { formatCurrency } from "@/lib/formatCurrency";
+import { fetchAllRows } from "@/lib/supabaseHelper";
 
 interface CommerceOrdersProps {
   commerceId: string;
