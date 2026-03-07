@@ -1,25 +1,24 @@
-import { supabase } from "@/integrations/supabase/client";
-
 const PAGE_SIZE = 1000;
 
 /**
  * Fetches all rows from a Supabase query, paginating automatically
  * to bypass the default 1000-row limit.
  *
+ * Pass a function that builds a fresh query builder each call.
+ *
  * Usage:
- *   const data = await fetchAllRows(
+ *   const data = await fetchAllRows(() =>
  *     supabase.from('invoices').select('*, commerces(fantasy_name)').order('created_at', { ascending: false })
  *   );
  */
 export async function fetchAllRows<T = any>(
-  queryBuilder: any
+  buildQuery: () => any
 ): Promise<T[]> {
   let allData: T[] = [];
   let offset = 0;
-  let hasMore = true;
 
-  while (hasMore) {
-    const { data, error } = await queryBuilder.range(offset, offset + PAGE_SIZE - 1);
+  while (true) {
+    const { data, error } = await buildQuery().range(offset, offset + PAGE_SIZE - 1);
 
     if (error) {
       console.error('fetchAllRows error:', error);
@@ -30,10 +29,9 @@ export async function fetchAllRows<T = any>(
     allData = allData.concat(rows);
 
     if (rows.length < PAGE_SIZE) {
-      hasMore = false;
-    } else {
-      offset += PAGE_SIZE;
+      break;
     }
+    offset += PAGE_SIZE;
   }
 
   return allData;
