@@ -108,22 +108,19 @@ const AdminCommerces = () => {
 
   const fetchCommerces = async () => {
     setIsLoading(true);
-    const { data, error } = await supabase
-      .from('commerces')
-      .select('*, plans!commerces_plan_id_fkey(name, price)')
-      .order('created_at', { ascending: false });
-
-    if (error) {
+    try {
+      const data = await fetchAllRows<Commerce>(() =>
+        supabase.from('commerces').select('*, plans!commerces_plan_id_fkey(name, price)').order('created_at', { ascending: false })
+      );
+      setCommerces(data);
+      fetchAllCommerceStats(data);
+    } catch (error: any) {
       console.error('Error fetching commerces:', error);
       toast({
         variant: 'destructive',
         title: 'Erro ao carregar comércios',
         description: error.message,
       });
-    } else {
-      setCommerces(data || []);
-      // Fetch stats for each commerce
-      fetchAllCommerceStats(data || []);
     }
     setIsLoading(false);
   };

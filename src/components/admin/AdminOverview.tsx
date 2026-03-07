@@ -65,10 +65,10 @@ const AdminOverview = () => {
       );
 
       const monthlyRevenue = invoicesData
-        ?.filter(i => i.status === 'paid')
-        .reduce((sum, i) => sum + Number(i.amount), 0) || 0;
+        .filter(i => i.status === 'paid')
+        .reduce((sum, i) => sum + Number(i.amount), 0);
 
-      const pendingInvoices = invoicesData?.filter(i => i.status === 'pending').length || 0;
+      const pendingInvoices = invoicesData.filter(i => i.status === 'pending').length;
 
       setStats({
         totalUsers: usersCount || 0,

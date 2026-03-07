@@ -66,20 +66,18 @@ const AdminUsers = () => {
 
   const fetchUsers = async () => {
     setIsLoading(true);
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) {
+    try {
+      const data = await fetchAllRows<Profile>(() =>
+        supabase.from('profiles').select('*').order('created_at', { ascending: false })
+      );
+      setUsers(data);
+    } catch (error: any) {
       console.error('Error fetching users:', error);
       toast({
         variant: 'destructive',
         title: 'Erro ao carregar usuários',
         description: error.message,
       });
-    } else {
-      setUsers(data || []);
     }
     setIsLoading(false);
   };
