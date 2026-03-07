@@ -36,6 +36,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Database } from "@/integrations/supabase/types";
+import { fetchAllRows } from "@/lib/supabaseHelper";
 import {
   Pagination,
   PaginationContent,
@@ -102,27 +103,27 @@ const AdminInvoices = () => {
 
   const fetchInvoices = async () => {
     setIsLoading(true);
-    const { data, error } = await supabase
-      .from('invoices')
-      .select('*, commerces(fantasy_name)')
-      .order('created_at', { ascending: false });
-
-    if (error) {
+    try {
+      const data = await fetchAllRows<Invoice>(() =>
+        supabase.from('invoices').select('*, commerces(fantasy_name)').order('created_at', { ascending: false })
+      );
+      setInvoices(data);
+    } catch (error: any) {
       console.error('Error fetching invoices:', error);
-    } else {
-      setInvoices(data || []);
     }
     setIsLoading(false);
   };
 
   const fetchCommerces = async () => {
-    const { data } = await supabase
-      .from('commerces')
-      .select('id, fantasy_name, neighborhood, city, owner_name, created_at, payment_due_day, auto_invoice_enabled, auto_invoice_day, coupon_code, plans!commerces_plan_id_fkey(price)')
-      .eq('status', 'approved')
-      .order('created_at', { ascending: false });
-    
-    setCommerces((data as Commerce[]) || []);
+    try {
+      const data = await fetchAllRows<Commerce>(() =>
+        supabase.from('commerces')
+          .select('id, fantasy_name, neighborhood, city, owner_name, created_at, payment_due_day, auto_invoice_enabled, auto_invoice_day, coupon_code, plans!commerces_plan_id_fkey(price)')
+          .eq('status', 'approved')
+          .order('created_at', { ascending: false })
+      );
+      setCommerces(data);
+    } catch {}
   };
 
   const handleCreateInvoice = async () => {

@@ -23,6 +23,7 @@ import { Plus, Pencil, Trash2, Utensils, Users, DollarSign, CreditCard, QrCode, 
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { generateTableQRCodePDF, generateAllTablesQRCodePDF } from "@/lib/tableQRCodeGenerator";
+import { fetchAllRows } from "@/lib/supabaseHelper";
 
 interface CommerceTablesProps {
   commerceId: string;
@@ -64,16 +65,13 @@ const CommerceTables = ({ commerceId }: CommerceTablesProps) => {
   });
 
   const fetchTables = async () => {
-    const { data, error } = await supabase
-      .from('tables')
-      .select('*')
-      .eq('commerce_id', commerceId)
-      .order('number');
-
-    if (error) {
+    try {
+      const data = await fetchAllRows<Table>(() =>
+        supabase.from('tables').select('*').eq('commerce_id', commerceId).order('number')
+      );
+      setTables(data);
+    } catch (error) {
       console.error('Error fetching tables:', error);
-    } else {
-      setTables(data || []);
     }
     setLoading(false);
   };

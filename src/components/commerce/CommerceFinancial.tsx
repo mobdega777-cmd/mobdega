@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { fetchAllRows } from "@/lib/supabaseHelper";
 import DateFilter from "./DateFilter";
 import InvoicePaymentModal from "./InvoicePaymentModal";
 import CommerceExpenses from "./CommerceExpenses";
@@ -183,32 +184,33 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
     // Fetch cash movements (POS sales) with correct timezone
     // IMPORTANTE: Usar apenas cash_movements como fonte única de faturamento
     // Os cash_movements contêm o valor final (com descontos aplicados) e evita duplicação
-    const { data: cashMovements } = await supabase
-      .from('cash_movements')
-      .select('amount, type, created_at, payment_method')
-      .eq('commerce_id', commerceId)
-      .eq('type', 'sale')
-      .gte('created_at', startISO)
-      .lte('created_at', endISO);
+    const cashMovements = await fetchAllRows(() =>
+      supabase.from('cash_movements')
+        .select('amount, type, created_at, payment_method')
+        .eq('commerce_id', commerceId)
+        .eq('type', 'sale')
+        .gte('created_at', startISO)
+        .lte('created_at', endISO)
+    );
 
-    // Fetch payment methods for fee calculation
-    const { data: paymentMethods } = await supabase
-      .from('payment_methods')
-      .select('type, fee_percentage, fee_fixed')
-      .eq('commerce_id', commerceId)
-      .eq('is_active', true);
+    const paymentMethods = await fetchAllRows(() =>
+      supabase.from('payment_methods')
+        .select('type, fee_percentage, fee_fixed')
+        .eq('commerce_id', commerceId)
+        .eq('is_active', true)
+    );
 
     // Use 'type' as key for matching with movement.payment_method
-    const feeMap = new Map(paymentMethods?.map(pm => [pm.type, { pct: pm.fee_percentage || 0, fixed: pm.fee_fixed || 0 }]) || []);
+    const feeMap = new Map(paymentMethods.map(pm => [pm.type, { pct: pm.fee_percentage || 0, fixed: pm.fee_fixed || 0 }]));
 
     // Calcular faturamento usando apenas cash_movements
-    const monthlyRevenue = cashMovements?.reduce((sum, m) => sum + Number(m.amount), 0) || 0;
-    const totalOrders = cashMovements?.length || 0;
+    const monthlyRevenue = cashMovements.reduce((sum, m) => sum + Number(m.amount), 0);
+    const totalOrders = cashMovements.length;
     const avgTicket = totalOrders > 0 ? monthlyRevenue / totalOrders : 0;
 
     // Calculate operator fees usando apenas cash_movements
     let calculatedFees = 0;
-    cashMovements?.forEach(movement => {
+    cashMovements.forEach(movement => {
       const fee = feeMap.get(movement.payment_method || '');
       if (fee) {
         calculatedFees += Number(movement.amount) * (fee.pct / 100) + fee.fixed;
@@ -217,75 +219,61 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
     setOperatorFees(calculatedFees);
 
     // Fetch last month orders for comparison
-    const { data: lastMonthOrders } = await supabase
-      .from('orders')
-      .select('total, status')
-      .eq('commerce_id', commerceId)
-      .eq('status', 'delivered')
-      .gte('created_at', lastMonth)
-      .lte('created_at', lastMonthEnd);
+    const lastMonthOrders = await fetchAllRows(() =>
+      supabase.from('orders').select('total, status')
+        .eq('commerce_id', commerceId).eq('status', 'delivered')
+        .gte('created_at', lastMonth).lte('created_at', lastMonthEnd)
+    );
 
-    const { data: lastMonthMovements } = await supabase
-      .from('cash_movements')
-      .select('amount')
-      .eq('commerce_id', commerceId)
-      .eq('type', 'sale')
-      .gte('created_at', lastMonth)
-      .lte('created_at', lastMonthEnd);
+    const lastMonthMovements = await fetchAllRows(() =>
+      supabase.from('cash_movements').select('amount')
+        .eq('commerce_id', commerceId).eq('type', 'sale')
+        .gte('created_at', lastMonth).lte('created_at', lastMonthEnd)
+    );
 
-    const lastMonthRevenue = (lastMonthOrders?.reduce((sum, o) => sum + Number(o.total), 0) || 0) +
-      (lastMonthMovements?.reduce((sum, m) => sum + Number(m.amount), 0) || 0);
+    const lastMonthRevenue = lastMonthOrders.reduce((sum, o) => sum + Number(o.total), 0) +
+      lastMonthMovements.reduce((sum, m) => sum + Number(m.amount), 0);
     const growthRate = lastMonthRevenue > 0 
       ? ((monthlyRevenue - lastMonthRevenue) / lastMonthRevenue) * 100 
       : 0;
 
     // Fetch products for cost/stock calculations with category info
-    const { data: products } = await supabase
-      .from('products')
-      .select('price, promotional_price, stock, category_id')
-      .eq('commerce_id', commerceId);
+    const products = await fetchAllRows(() =>
+      supabase.from('products').select('price, promotional_price, stock, category_id').eq('commerce_id', commerceId)
+    );
 
     let stockCostValue = 0;
     let stockSaleValue = 0;
-    products?.forEach(p => {
+    products.forEach(p => {
       const stock = p.stock || 0;
       stockCostValue += (p.price || 0) * stock;
       stockSaleValue += (p.promotional_price || p.price || 0) * stock;
     });
 
     // Calcular categorias com base em vendas reais - FILTERED BY DATE with correct timezone
-    const { data: orderItems } = await supabase
-      .from('order_items')
-      .select(`
-        quantity,
-        total_price,
-        product_id,
-        orders!inner(commerce_id, status, created_at)
-      `)
-      .eq('orders.commerce_id', commerceId)
-      .eq('orders.status', 'delivered')
-      .gte('orders.created_at', startISO)
-      .lte('orders.created_at', endISO);
+    const orderItems = await fetchAllRows(() =>
+      supabase.from('order_items').select(`quantity, total_price, product_id, orders!inner(commerce_id, status, created_at)`)
+        .eq('orders.commerce_id', commerceId).eq('orders.status', 'delivered')
+        .gte('orders.created_at', startISO).lte('orders.created_at', endISO)
+    );
 
     // Buscar produtos com suas categorias
-    const { data: productsWithCategories } = await supabase
-      .from('products')
-      .select('id, category_id')
-      .eq('commerce_id', commerceId);
+    const productsWithCategories = await fetchAllRows(() =>
+      supabase.from('products').select('id, category_id').eq('commerce_id', commerceId)
+    );
 
-    const { data: categoriesData } = await supabase
-      .from('categories')
-      .select('id, name')
-      .eq('commerce_id', commerceId);
+    const categoriesData = await fetchAllRows(() =>
+      supabase.from('categories').select('id, name').eq('commerce_id', commerceId)
+    );
 
     // Mapear vendas por categoria
-    const categoryMap = new Map(categoriesData?.map(c => [c.id, c.name]) || []);
-    const productCategoryMap = new Map(productsWithCategories?.map(p => [p.id, p.category_id]) || []);
+    const categoryMap = new Map(categoriesData.map(c => [c.id, c.name]));
+    const productCategoryMap = new Map(productsWithCategories.map(p => [p.id, p.category_id]));
     
     const salesByCategory: Record<string, number> = {};
     let productCostSold = 0;
     
-    orderItems?.forEach(item => {
+    orderItems.forEach(item => {
       const categoryId = productCategoryMap.get(item.product_id || '');
       const categoryName = categoryId ? categoryMap.get(categoryId) : 'Sem categoria';
       const name = categoryName || 'Sem categoria';
@@ -312,33 +300,29 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
     const projectedRevenue = dayOfMonth > 0 ? (monthlyRevenue / dayOfMonth) * daysInMonth : 0;
 
     // Fetch invoices (A Pagar for merchant)
-    const { data: invoicesData } = await supabase
-      .from('invoices')
-      .select('*')
-      .eq('commerce_id', commerceId)
-      .order('due_date', { ascending: false });
+    const invoicesData = await fetchAllRows(() =>
+      supabase.from('invoices').select('*').eq('commerce_id', commerceId).order('due_date', { ascending: false })
+    );
 
-    const pendingCount = invoicesData?.filter(i => i.status === 'pending').length || 0;
+    const pendingCount = invoicesData.filter(i => i.status === 'pending').length;
     setPendingInvoicesCount(pendingCount);
 
     // Fetch expenses with due dates for A Pagar/Vencidos calculation
-    const { data: expensesData } = await supabase
-      .from('expenses')
-      .select('*')
-      .eq('commerce_id', commerceId)
-      .eq('is_active', true);
-
+    const expensesData = await fetchAllRows(() =>
+      supabase.from('expenses').select('*').eq('commerce_id', commerceId).eq('is_active', true)
+    );
+    
     const todayStr = new Date().toISOString().split('T')[0];
     
     // Despesas pendentes (não pagas e não vencidas)
-    const pendingExpenses = expensesData?.filter(e => 
+    const pendingExpenses = expensesData.filter(e => 
       !e.is_paid && e.due_date && e.due_date >= todayStr
-    ).reduce((sum, e) => sum + Number(e.amount), 0) || 0;
+    ).reduce((sum, e) => sum + Number(e.amount), 0);
 
     // Despesas vencidas (não pagas e já vencidas)
-    const overdueExpenses = expensesData?.filter(e => 
+    const overdueExpenses = expensesData.filter(e => 
       !e.is_paid && e.due_date && e.due_date < todayStr
-    ).reduce((sum, e) => sum + Number(e.amount), 0) || 0;
+    ).reduce((sum, e) => sum + Number(e.amount), 0);
 
     // Verificar se imposto está pago neste mês
     const isTaxPaidThisMonth = () => {
@@ -349,13 +333,13 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
              paidDate.getFullYear() === now.getFullYear();
     };
 
-    const invoicePendingPayments = invoicesData?.filter(i => 
+    const invoicePendingPayments = invoicesData.filter(i => 
       i.status === 'pending'
-    ).reduce((sum, i) => sum + Number(i.amount), 0) || 0;
+    ).reduce((sum, i) => sum + Number(i.amount), 0);
 
-    const invoiceOverduePayments = invoicesData?.filter(i => 
+    const invoiceOverduePayments = invoicesData.filter(i => 
       i.status === 'overdue'
-    ).reduce((sum, i) => sum + Number(i.amount), 0) || 0;
+    ).reduce((sum, i) => sum + Number(i.amount), 0);
 
     // Calculate tax amount based on config
     let taxAmount = 0;
@@ -492,31 +476,28 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
       // Fetch detailed data for the report with correct timezone
       // IMPORTANTE: Usar apenas cash_movements para faturamento real
       // Os cash_movements já contêm o valor final (com descontos aplicados)
-      const { data: cashMovements } = await supabase
-        .from('cash_movements')
-        .select('amount, payment_method, created_at')
-        .eq('commerce_id', commerceId)
-        .eq('type', 'sale')
-        .gte('created_at', startISO)
-        .lte('created_at', endISO);
+      const cashMovements = await fetchAllRows(() =>
+        supabase.from('cash_movements').select('amount, payment_method, created_at')
+          .eq('commerce_id', commerceId).eq('type', 'sale')
+          .gte('created_at', startISO).lte('created_at', endISO)
+      );
 
       // Fetch expenses for the report
-      const { data: expenses } = await supabase
-        .from('expenses')
-        .select('name, type, amount, created_at')
-        .eq('commerce_id', commerceId)
-        .eq('is_active', true);
+      const expenses = await fetchAllRows(() =>
+        supabase.from('expenses').select('name, type, amount, created_at')
+          .eq('commerce_id', commerceId).eq('is_active', true)
+      );
 
       // Separate fixed expenses from stock purchases
-      const fixedExpenses = expenses?.filter(e => e.type !== 'stock_purchase') || [];
-      const stockPurchases = expenses?.filter(e => e.type === 'stock_purchase') || [];
+      const fixedExpenses = expenses.filter(e => e.type !== 'stock_purchase');
+      const stockPurchases = expenses.filter(e => e.type === 'stock_purchase');
       
       const totalFixedExpenses = fixedExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
       const totalStockPurchases = stockPurchases.reduce((sum, e) => sum + Number(e.amount), 0);
 
       // Payment method breakdown (usando apenas cash_movements)
       const paymentMap = new Map<string, { total: number; count: number }>();
-      cashMovements?.forEach(m => {
+      cashMovements.forEach(m => {
         const method = m.payment_method || 'Dinheiro';
         const existing = paymentMap.get(method) || { total: 0, count: 0 };
         paymentMap.set(method, { total: existing.total + Number(m.amount), count: existing.count + 1 });
@@ -524,36 +505,32 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
 
       // Daily sales (usando apenas cash_movements)
       const dailyMap = new Map<string, { revenue: number; orders: number }>();
-      cashMovements?.forEach(m => {
+      cashMovements.forEach(m => {
         const date = format(new Date(m.created_at), 'dd/MM/yyyy');
         const existing = dailyMap.get(date) || { revenue: 0, orders: 0 };
         dailyMap.set(date, { revenue: existing.revenue + Number(m.amount), orders: existing.orders + 1 });
       });
 
       // Fetch categories with sales (use the same startISO/endISO)
-      const { data: orderItems } = await supabase
-        .from('order_items')
-        .select('total_price, product_id, orders!inner(commerce_id, status, created_at)')
-        .eq('orders.commerce_id', commerceId)
-        .eq('orders.status', 'delivered')
-        .gte('orders.created_at', startISO)
-        .lte('orders.created_at', endISO);
+      const orderItems = await fetchAllRows(() =>
+        supabase.from('order_items').select('total_price, product_id, orders!inner(commerce_id, status, created_at)')
+          .eq('orders.commerce_id', commerceId).eq('orders.status', 'delivered')
+          .gte('orders.created_at', startISO).lte('orders.created_at', endISO)
+      );
 
-      const { data: productsWithCategories } = await supabase
-        .from('products')
-        .select('id, category_id')
-        .eq('commerce_id', commerceId);
+      const productsWithCategories = await fetchAllRows(() =>
+        supabase.from('products').select('id, category_id').eq('commerce_id', commerceId)
+      );
 
-      const { data: categoriesData } = await supabase
-        .from('categories')
-        .select('id, name')
-        .eq('commerce_id', commerceId);
+      const categoriesData = await fetchAllRows(() =>
+        supabase.from('categories').select('id, name').eq('commerce_id', commerceId)
+      );
 
-      const categoryMap = new Map(categoriesData?.map(c => [c.id, c.name]) || []);
-      const productCategoryMap = new Map(productsWithCategories?.map(p => [p.id, p.category_id]) || []);
+      const categoryMap = new Map(categoriesData.map(c => [c.id, c.name]));
+      const productCategoryMap = new Map(productsWithCategories.map(p => [p.id, p.category_id]));
       
       const salesByCategory: Record<string, number> = {};
-      orderItems?.forEach(item => {
+      orderItems.forEach(item => {
         const categoryId = productCategoryMap.get(item.product_id || '');
         const categoryName = categoryId ? categoryMap.get(categoryId) : 'Sem categoria';
         const name = categoryName || 'Sem categoria';
@@ -594,22 +571,21 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
 
       // Calculate financial details from fetched data (não usar stats que pode estar com período diferente)
       // Calcular faturamento bruto diretamente dos cash_movements do período
-      const reportGrossRevenue = cashMovements?.reduce((sum, m) => sum + Number(m.amount), 0) || 0;
-      const reportTotalOrders = cashMovements?.length || 0;
+      const reportGrossRevenue = cashMovements.reduce((sum, m) => sum + Number(m.amount), 0);
+      const reportTotalOrders = cashMovements.length;
       const reportAvgTicket = reportTotalOrders > 0 ? reportGrossRevenue / reportTotalOrders : 0;
       
       // Fetch payment methods for fee calculation (para o período do relatório)
-      const { data: paymentMethods } = await supabase
-        .from('payment_methods')
-        .select('type, fee_percentage, fee_fixed')
-        .eq('commerce_id', commerceId)
-        .eq('is_active', true);
+      const reportPaymentMethods = await fetchAllRows(() =>
+        supabase.from('payment_methods').select('type, fee_percentage, fee_fixed')
+          .eq('commerce_id', commerceId).eq('is_active', true)
+      );
 
-      const feeMap = new Map(paymentMethods?.map(pm => [pm.type, { percentage: pm.fee_percentage || 0, fixed: pm.fee_fixed || 0 }]) || []);
+      const feeMap = new Map(reportPaymentMethods.map(pm => [pm.type, { percentage: pm.fee_percentage || 0, fixed: pm.fee_fixed || 0 }]));
       
       // Calcular taxas de operadoras para o período do relatório
       let reportOperatorFees = 0;
-      cashMovements?.forEach(m => {
+      cashMovements.forEach(m => {
         const fee = feeMap.get(m.payment_method);
         if (fee) {
           reportOperatorFees += (Number(m.amount) * fee.percentage / 100) + fee.fixed;
@@ -617,17 +593,15 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
       });
       
       // Fetch products for cost calculation
-      const { data: allProducts } = await supabase
-        .from('products')
-        .select('id, price, stock')
-        .eq('commerce_id', commerceId);
+      const allProducts = await fetchAllRows(() =>
+        supabase.from('products').select('id, price, stock').eq('commerce_id', commerceId)
+      );
       
       // Calcular CPV (Custo dos Produtos Vendidos) para o período
       // Usar uma estimativa baseada em margem média ou preço de custo se disponível
-      const reportProductCostSold = orderItems?.reduce((sum, item) => {
-        // Estimativa: custo = 60% do preço de venda (pode ser ajustado)
+      const reportProductCostSold = orderItems.reduce((sum, item) => {
         return sum + Number(item.total_price) * 0.6;
-      }, 0) || 0;
+      }, 0);
       
       // Calcular imposto para o período do relatório
       let reportTaxAmount = 0;
@@ -647,15 +621,13 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
       previousEnd.setDate(previousEnd.getDate() - 1);
       
       const { startISO: prevStartISO, endISO: prevEndISO } = getSupabaseDateRange(previousStart, previousEnd);
-      const { data: previousCashMovements } = await supabase
-        .from('cash_movements')
-        .select('amount')
-        .eq('commerce_id', commerceId)
-        .eq('type', 'sale')
-        .gte('created_at', prevStartISO)
-        .lte('created_at', prevEndISO);
+      const previousCashMovements = await fetchAllRows(() =>
+        supabase.from('cash_movements').select('amount')
+          .eq('commerce_id', commerceId).eq('type', 'sale')
+          .gte('created_at', prevStartISO).lte('created_at', prevEndISO)
+      );
       
-      const previousRevenue = previousCashMovements?.reduce((sum, m) => sum + Number(m.amount), 0) || 0;
+      const previousRevenue = previousCashMovements.reduce((sum, m) => sum + Number(m.amount), 0);
       const reportGrowthRate = previousRevenue > 0 
         ? ((reportGrossRevenue - previousRevenue) / previousRevenue) * 100 
         : 0;
@@ -744,44 +716,33 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
 
       // Parallel fetch all data
       const [
-        cashMovementsRes,
-        paymentMethodsRes,
+        cashMovements,
+        paymentMethods,
         cashRegistersRes,
-        productsRes,
-        categoriesRes,
-        expensesRes,
-        ordersRes,
-        orderItemsRes,
-        couponsRes,
-        reviewsRes,
-        favoritesRes,
-        allOrdersRes,
+        products,
+        categories,
+        expenses,
+        orders,
+        orderItems,
+        coupons,
+        reviews,
+        favorites,
+        allOrders,
       ] = await Promise.all([
-        supabase.from('cash_movements').select('amount, payment_method, created_at').eq('commerce_id', commerceId).eq('type', 'sale').gte('created_at', startISO).lte('created_at', endISO),
-        supabase.from('payment_methods').select('type, name, fee_percentage, fee_fixed').eq('commerce_id', commerceId).eq('is_active', true),
+        fetchAllRows(() => supabase.from('cash_movements').select('amount, payment_method, created_at').eq('commerce_id', commerceId).eq('type', 'sale').gte('created_at', startISO).lte('created_at', endISO)),
+        fetchAllRows(() => supabase.from('payment_methods').select('type, name, fee_percentage, fee_fixed').eq('commerce_id', commerceId).eq('is_active', true)),
         supabase.from('cash_registers').select('*').eq('commerce_id', commerceId).order('opened_at', { ascending: false }).limit(20),
-        supabase.from('products').select('id, name, price, stock, category_id, is_active').eq('commerce_id', commerceId),
-        supabase.from('categories').select('id, name').eq('commerce_id', commerceId),
-        supabase.from('expenses').select('*').eq('commerce_id', commerceId).eq('is_active', true),
-        supabase.from('orders').select('id, total, status, order_type, user_id, created_at, payment_method').eq('commerce_id', commerceId).gte('created_at', startISO).lte('created_at', endISO),
-        supabase.from('order_items').select('total_price, product_id, quantity, product_name, orders!inner(commerce_id, status, created_at)').eq('orders.commerce_id', commerceId).eq('orders.status', 'delivered').gte('orders.created_at', startISO).lte('orders.created_at', endISO),
-        supabase.from('commerce_coupons').select('code, discount_type, discount_value, used_count, max_uses, valid_until, is_active').eq('commerce_id', commerceId).eq('is_active', true),
-        supabase.from('reviews').select('rating, comment, created_at').eq('commerce_id', commerceId),
-        supabase.from('favorites').select('id').eq('commerce_id', commerceId),
-        supabase.from('orders').select('user_id, total, created_at').eq('commerce_id', commerceId).eq('status', 'delivered'),
+        fetchAllRows(() => supabase.from('products').select('id, name, price, stock, category_id, is_active').eq('commerce_id', commerceId)),
+        fetchAllRows(() => supabase.from('categories').select('id, name').eq('commerce_id', commerceId)),
+        fetchAllRows(() => supabase.from('expenses').select('*').eq('commerce_id', commerceId).eq('is_active', true)),
+        fetchAllRows(() => supabase.from('orders').select('id, total, status, order_type, user_id, created_at, payment_method').eq('commerce_id', commerceId).gte('created_at', startISO).lte('created_at', endISO)),
+        fetchAllRows(() => supabase.from('order_items').select('total_price, product_id, quantity, product_name, orders!inner(commerce_id, status, created_at)').eq('orders.commerce_id', commerceId).eq('orders.status', 'delivered').gte('orders.created_at', startISO).lte('orders.created_at', endISO)),
+        fetchAllRows(() => supabase.from('commerce_coupons').select('code, discount_type, discount_value, used_count, max_uses, valid_until, is_active').eq('commerce_id', commerceId).eq('is_active', true)),
+        fetchAllRows(() => supabase.from('reviews').select('rating, comment, created_at').eq('commerce_id', commerceId)),
+        fetchAllRows(() => supabase.from('favorites').select('id').eq('commerce_id', commerceId)),
+        fetchAllRows(() => supabase.from('orders').select('user_id, total, created_at').eq('commerce_id', commerceId).eq('status', 'delivered')),
       ]);
 
-      const cashMovements = cashMovementsRes.data || [];
-      const paymentMethods = paymentMethodsRes.data || [];
-      const products = productsRes.data || [];
-      const categories = categoriesRes.data || [];
-      const expenses = expensesRes.data || [];
-      const orders = ordersRes.data || [];
-      const orderItems = orderItemsRes.data || [];
-      const coupons = couponsRes.data || [];
-      const reviews = reviewsRes.data || [];
-      const favorites = favoritesRes.data || [];
-      const allOrders = allOrdersRes.data || [];
       const cashRegisters = cashRegistersRes.data || [];
 
       // Revenue from cash_movements
@@ -854,8 +815,8 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
       const prevEnd = new Date(dateFilter.start);
       prevEnd.setDate(prevEnd.getDate() - 1);
       const { startISO: pStartISO, endISO: pEndISO } = getSupabaseDateRange(prevStart, prevEnd);
-      const { data: prevMoves } = await supabase.from('cash_movements').select('amount').eq('commerce_id', commerceId).eq('type', 'sale').gte('created_at', pStartISO).lte('created_at', pEndISO);
-      const prevRevenue = prevMoves?.reduce((s, m) => s + Number(m.amount), 0) || 0;
+      const prevMoves = await fetchAllRows(() => supabase.from('cash_movements').select('amount').eq('commerce_id', commerceId).eq('type', 'sale').gte('created_at', pStartISO).lte('created_at', pEndISO));
+      const prevRevenue = prevMoves.reduce((s, m) => s + Number(m.amount), 0);
       const growthRate = prevRevenue > 0 ? ((grossRevenue - prevRevenue) / prevRevenue) * 100 : 0;
 
       const projectedRevenue = periodDays > 0 ? (grossRevenue / periodDays) * 30 : 0;
@@ -864,8 +825,8 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
       // Cash closings with movements
       const cashClosingsData = await Promise.all(
         cashRegisters.filter(cr => cr.status === 'closed').slice(0, 10).map(async (cr) => {
-          const { data: crMoves } = await supabase.from('cash_movements').select('amount, payment_method').eq('cash_register_id', cr.id).eq('type', 'sale');
-          const moves = crMoves || [];
+          const crMoves = await fetchAllRows(() => supabase.from('cash_movements').select('amount, payment_method').eq('cash_register_id', cr.id).eq('type', 'sale'));
+          const moves = crMoves;
           const totalSales = moves.reduce((s, m) => s + Number(m.amount), 0);
           const salesCount = moves.length;
           const ticketMedio = salesCount > 0 ? totalSales / salesCount : 0;

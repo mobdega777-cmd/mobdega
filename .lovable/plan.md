@@ -1,40 +1,27 @@
 
 
-## Plano: Remover limitação de 1000 linhas em todas as consultas
+## Mostrar e alterar senha de gestao diretamente no modal de edicao
 
-### Problema
-O Supabase tem um limite padrão de 1000 linhas por consulta. Queries que não usam `.limit()` ou `.range()` retornam no máximo 1000 registros silenciosamente, o que pode causar dados incompletos em relatórios, listas e cálculos financeiros.
+### O que muda
 
-### Solução
-Criar uma função utilitária `fetchAllRows` que pagina automaticamente qualquer consulta, buscando todos os registros em lotes de 1000. Substituir todas as consultas que podem ultrapassar 1000 linhas.
+A aba "Seguranca" do modal de edicao de comercio deixa de enviar email de reset e passa a:
+1. Mostrar a senha de gestao atual do comercio (com toggle para ver/ocultar)
+2. Permitir que o admin altere a senha diretamente, salvando no banco
 
-### 1. Criar utilitário `src/lib/supabaseHelper.ts`
-Função genérica que recebe um query builder e faz paginação automática em lotes de 1000, retornando todos os registros.
+### Alteracoes
 
-### 2. Arquivos a modificar (consultas sem limite que podem crescer)
+**Arquivo 1: `src/components/admin/AdminCommerces.tsx`**
+- Adicionar `management_password: string | null` na interface `Commerce` (linha ~77)
 
-**Admin:**
-- `AdminOverview.tsx` — `invoices.select('amount, status')` e `commerces.select('status')` sem limite
-- `AdminInvoices.tsx` — `invoices.select('*')` sem limite
-- `AdminCommerces.tsx` — `commerces.select('*')` sem limite
-- `AdminUsers.tsx` — `profiles.select('*')` sem limite
-- `AdminFinancial.tsx` — `financial_transactions`, `invoices`, `commerces` sem limite
+**Arquivo 2: `src/components/admin/CommerceEditModal.tsx`**
+- Adicionar `management_password` na interface `Commerce`
+- Substituir toda a `TabsContent value="seguranca"` por:
+  - Exibicao da senha atual com botao de ver/ocultar (se existir, senao mostra "Nenhuma senha configurada")
+  - Campo para digitar nova senha com botao de gerar senha aleatoria
+  - Botao "Salvar Nova Senha" que faz update direto na tabela `commerces`
+- Remover imports e estados relacionados ao reset por email (`resetPasswordForEmail`, `tempPassword`, etc.)
 
-**Commerce:**
-- `CommerceOrders.tsx` — `orders.select('*')` filtrado por data mas sem limite
-- `CommerceFinancial.tsx` — `cash_movements`, `orders`, `order_items`, `expenses`, `reviews`, `favorites` sem limite (relatório PDF incluso)
-- `CommerceProducts.tsx` — `products.select('*')` sem limite
-- `CommerceTables.tsx` — `tables.select('*')` sem limite (baixo risco mas prevenir)
+**Banco de dados**: Nenhuma alteracao necessaria, `management_password` ja existe como texto na tabela.
 
-**Nota:** `CommerceCustomers.tsx` já implementa paginação manual — está OK.
-
-### 3. Implementação
-Em cada arquivo, substituir chamadas simples `.select()` sem `.limit()` pela função `fetchAllRows`, que internamente faz:
-```
-loop: .range(offset, offset+999) até retornar menos de 1000
-```
-
-Consultas com `.limit()` explícito (notificações, últimos registros, etc.) permanecem inalteradas pois são intencionais.
-
-### Sem alterações no banco de dados
+**Registro no feed**: 1 insert em `system_updates` documentando a mudanca.
 

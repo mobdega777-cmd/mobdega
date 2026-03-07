@@ -41,6 +41,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Database } from "@/integrations/supabase/types";
+import { fetchAllRows } from "@/lib/supabaseHelper";
 import CommerceDetailsModal from "./CommerceDetailsModal";
 import CommercesAnalytics from "./CommercesAnalytics";
 import CommerceEditModal from "./CommerceEditModal";
@@ -107,22 +108,19 @@ const AdminCommerces = () => {
 
   const fetchCommerces = async () => {
     setIsLoading(true);
-    const { data, error } = await supabase
-      .from('commerces')
-      .select('*, plans!commerces_plan_id_fkey(name, price)')
-      .order('created_at', { ascending: false });
-
-    if (error) {
+    try {
+      const data = await fetchAllRows<Commerce>(() =>
+        supabase.from('commerces').select('*, plans!commerces_plan_id_fkey(name, price)').order('created_at', { ascending: false })
+      );
+      setCommerces(data);
+      fetchAllCommerceStats(data);
+    } catch (error: any) {
       console.error('Error fetching commerces:', error);
       toast({
         variant: 'destructive',
         title: 'Erro ao carregar comércios',
         description: error.message,
       });
-    } else {
-      setCommerces(data || []);
-      // Fetch stats for each commerce
-      fetchAllCommerceStats(data || []);
     }
     setIsLoading(false);
   };

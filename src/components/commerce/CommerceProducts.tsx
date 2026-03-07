@@ -52,6 +52,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency, formatPercentage } from "@/lib/formatCurrency";
+import { fetchAllRows } from "@/lib/supabaseHelper";
 
 interface CommerceProductsProps {
   commerceId: string;
@@ -141,16 +142,13 @@ const CommerceProducts = ({ commerceId }: CommerceProductsProps) => {
   });
 
   const fetchProducts = async () => {
-    const { data, error } = await supabase
-      .from('products')
-      .select('*, category:categories(name)')
-      .eq('commerce_id', commerceId)
-      .order('name');
-
-    if (error) {
+    try {
+      const data = await fetchAllRows<Product>(() =>
+        supabase.from('products').select('*, category:categories(name)').eq('commerce_id', commerceId).order('name')
+      );
+      setProducts(data);
+    } catch (error) {
       console.error('Error fetching products:', error);
-    } else {
-      setProducts(data || []);
     }
     setLoading(false);
   };

@@ -34,6 +34,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import DateFilter from "@/components/commerce/DateFilter";
 import { formatCurrency } from "@/lib/formatCurrency";
+import { fetchAllRows } from "@/lib/supabaseHelper";
 
 interface FinancialStats {
   totalIncome: number;
@@ -111,46 +112,36 @@ const AdminFinancial = () => {
     const startISO = dateFilter.start;
     const endISO = dateFilter.end;
 
-    const [transactionsRes, invoicesRes, commercesRes] = await Promise.all([
-      supabase
-        .from('financial_transactions')
-        .select('*')
-        .gte('transaction_date', startISO)
-        .lte('transaction_date', endISO)
-        .order('transaction_date', { ascending: false }),
-      supabase
-        .from('invoices')
-        .select('amount, status, type, created_at')
-        .gte('created_at', `${startISO}T00:00:00.000Z`)
-        .lte('created_at', `${endISO}T23:59:59.999Z`),
-      // Fetch all active commerces with their plan prices for projected revenue
-      supabase
-        .from('commerces')
-        .select('id, plan_id, plans!commerces_plan_id_fkey(price)')
-        .eq('status', 'approved'),
-    ]);
+    let transactionsData: Transaction[] = [];
+    let invoicesData: any[] = [];
+    let commercesData: any[] = [];
 
-    if (transactionsRes.error) {
-      console.error('Error fetching financial_transactions:', transactionsRes.error);
+    try {
+      [transactionsData, invoicesData, commercesData] = await Promise.all([
+        fetchAllRows<Transaction>(() =>
+          supabase.from('financial_transactions').select('*')
+            .gte('transaction_date', startISO)
+            .lte('transaction_date', endISO)
+            .order('transaction_date', { ascending: false })
+        ),
+        fetchAllRows(() =>
+          supabase.from('invoices').select('amount, status, type, created_at')
+            .gte('created_at', `${startISO}T00:00:00.000Z`)
+            .lte('created_at', `${endISO}T23:59:59.999Z`)
+        ),
+        fetchAllRows(() =>
+          supabase.from('commerces').select('id, plan_id, plans!commerces_plan_id_fkey(price)')
+            .eq('status', 'approved')
+        ),
+      ]);
+    } catch (error: any) {
+      console.error('Error fetching financial data:', error);
       toast({
         variant: 'destructive',
-        title: 'Erro ao carregar transações',
-        description: transactionsRes.error.message,
+        title: 'Erro ao carregar dados financeiros',
+        description: error.message,
       });
     }
-
-    if (invoicesRes.error) {
-      console.error('Error fetching invoices:', invoicesRes.error);
-      toast({
-        variant: 'destructive',
-        title: 'Erro ao carregar faturas',
-        description: invoicesRes.error.message,
-      });
-    }
-
-    const transactionsData = transactionsRes.data || [];
-    const invoicesData = invoicesRes.data || [];
-    const commercesData = commercesRes.data || [];
 
     setTransactions(transactionsData);
 
