@@ -184,13 +184,14 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
     // Fetch cash movements (POS sales) with correct timezone
     // IMPORTANTE: Usar apenas cash_movements como fonte única de faturamento
     // Os cash_movements contêm o valor final (com descontos aplicados) e evita duplicação
-    const { data: cashMovements } = await supabase
-      .from('cash_movements')
-      .select('amount, type, created_at, payment_method')
-      .eq('commerce_id', commerceId)
-      .eq('type', 'sale')
-      .gte('created_at', startISO)
-      .lte('created_at', endISO);
+    const cashMovements = await fetchAllRows(() =>
+      supabase.from('cash_movements')
+        .select('amount, type, created_at, payment_method')
+        .eq('commerce_id', commerceId)
+        .eq('type', 'sale')
+        .gte('created_at', startISO)
+        .lte('created_at', endISO)
+    );
 
     // Fetch payment methods for fee calculation
     const { data: paymentMethods } = await supabase
