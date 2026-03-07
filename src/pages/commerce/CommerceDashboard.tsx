@@ -86,7 +86,7 @@ type CommerceSection =
   | "settings";
 
 // Ordem atualizada com Cupons entre Financeiro e Clientes
-import { Ticket, MessageSquare } from "lucide-react";
+import { Ticket, MessageSquare, MessageCircle } from "lucide-react";
 
 const menuItems = [
   { id: "overview" as CommerceSection, label: "Visão Geral", icon: LayoutDashboard },
@@ -695,6 +695,17 @@ const CommerceDashboard = () => {
             >
               <X className="w-5 h-5" />
             </Button>
+          </div>
+
+          {/* Suporte Button - always visible */}
+          <div className="px-3 pt-3">
+            <button
+              onClick={() => window.open('https://wa.me/5511949830010?text=Olá! Preciso de suporte com meu comércio na Mobdega.', '_blank')}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-green-400 hover:bg-green-500/10 border border-green-500/30 hover:border-green-500/50"
+            >
+              <MessageCircle className="w-5 h-5 flex-shrink-0" />
+              <span className="flex-1 text-left font-medium text-sm">Suporte</span>
+            </button>
           </div>
 
           {/* Navigation */}
