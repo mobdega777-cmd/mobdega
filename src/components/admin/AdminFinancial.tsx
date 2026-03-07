@@ -34,6 +34,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import DateFilter from "@/components/commerce/DateFilter";
 import { formatCurrency } from "@/lib/formatCurrency";
+import { fetchAllRows } from "@/lib/supabaseHelper";
 
 interface FinancialStats {
   totalIncome: number;
