@@ -38,6 +38,13 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
   const { signUp, signIn } = useAuth();
   const { toast } = useToast();
   const [mode, setMode] = useState<AuthMode>(initialMode);
+
+  // Sync mode with initialMode when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setMode(initialMode);
+    }
+  }, [isOpen, initialMode]);
   const [userType, setUserType] = useState<UserType>("user");
   const [documentType, setDocumentType] = useState<DocumentType>("cpf");
   const [showPassword, setShowPassword] = useState(false);
