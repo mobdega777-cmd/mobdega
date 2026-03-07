@@ -312,15 +312,17 @@ const CommerceFinancial = ({ commerceId }: CommerceFinancialProps) => {
       supabase.from('expenses').select('*').eq('commerce_id', commerceId).eq('is_active', true)
     );
     
+    const todayStr = new Date().toISOString().split('T')[0];
+    
     // Despesas pendentes (não pagas e não vencidas)
-    const pendingExpenses = expensesData?.filter(e => 
+    const pendingExpenses = expensesData.filter(e => 
       !e.is_paid && e.due_date && e.due_date >= todayStr
-    ).reduce((sum, e) => sum + Number(e.amount), 0) || 0;
+    ).reduce((sum, e) => sum + Number(e.amount), 0);
 
     // Despesas vencidas (não pagas e já vencidas)
-    const overdueExpenses = expensesData?.filter(e => 
+    const overdueExpenses = expensesData.filter(e => 
       !e.is_paid && e.due_date && e.due_date < todayStr
-    ).reduce((sum, e) => sum + Number(e.amount), 0) || 0;
+    ).reduce((sum, e) => sum + Number(e.amount), 0);
 
     // Verificar se imposto está pago neste mês
     const isTaxPaidThisMonth = () => {
