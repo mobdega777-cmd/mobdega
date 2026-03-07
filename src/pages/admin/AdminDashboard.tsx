@@ -174,8 +174,6 @@ const AdminDashboard = () => {
         return <AdminCoupons />;
       case "training":
         return <AdminTraining />;
-      case "ranking":
-        return <AdminRanking />;
       case "database":
         return <AdminDatabase />;
       case "forum":
