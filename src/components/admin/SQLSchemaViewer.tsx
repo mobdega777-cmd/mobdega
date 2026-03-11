@@ -8,8 +8,48 @@ import { useToast } from "@/hooks/use-toast";
 
 const tableSchemas: { name: string; sql: string }[] = [
   {
+    name: "enums",
+    sql: `-- =============================================
+-- ENUMS (criar primeiro)
+-- =============================================
+DO $$ BEGIN
+  CREATE TYPE public.app_role AS ENUM ('admin', 'moderator', 'user', 'commerce', 'master_admin');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE TYPE public.plan_type AS ENUM ('basic', 'intermediate', 'premium', 'custom');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE TYPE public.commerce_status AS ENUM ('pending', 'approved', 'rejected', 'suspended');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE TYPE public.order_status AS ENUM ('pending', 'confirmed', 'preparing', 'ready', 'delivered', 'cancelled');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE TYPE public.invoice_status AS ENUM ('pending', 'paid', 'overdue', 'cancelled');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE TYPE public.invoice_type AS ENUM ('receivable', 'payable');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE TYPE public.table_status AS ENUM ('available', 'occupied', 'reserved', 'maintenance');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;`
+  },
+  {
     name: "profiles",
-    sql: `CREATE TABLE public.profiles (
+    sql: `CREATE TABLE IF NOT EXISTS public.profiles (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL,
   full_name text NOT NULL,
@@ -31,9 +71,7 @@ const tableSchemas: { name: string; sql: string }[] = [
   },
   {
     name: "user_roles",
-    sql: `CREATE TYPE public.app_role AS ENUM ('admin', 'moderator', 'user', 'commerce', 'master_admin');
-
-CREATE TABLE public.user_roles (
+    sql: `CREATE TABLE IF NOT EXISTS public.user_roles (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL,
   role app_role NOT NULL DEFAULT 'user',
@@ -43,9 +81,7 @@ CREATE TABLE public.user_roles (
   },
   {
     name: "plans",
-    sql: `CREATE TYPE public.plan_type AS ENUM ('basic', 'intermediate', 'premium', 'custom');
-
-CREATE TABLE public.plans (
+    sql: `CREATE TABLE IF NOT EXISTS public.plans (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name text NOT NULL,
   description text,
@@ -61,9 +97,7 @@ CREATE TABLE public.plans (
   },
   {
     name: "commerces",
-    sql: `CREATE TYPE public.commerce_status AS ENUM ('pending', 'approved', 'rejected', 'suspended');
-
-CREATE TABLE public.commerces (
+    sql: `CREATE TABLE IF NOT EXISTS public.commerces (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   owner_id uuid NOT NULL,
   fantasy_name text NOT NULL,
@@ -114,8 +148,22 @@ CREATE TABLE public.commerces (
 );`
   },
   {
+    name: "categories",
+    sql: `CREATE TABLE IF NOT EXISTS public.categories (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  commerce_id uuid NOT NULL REFERENCES public.commerces(id),
+  name text NOT NULL,
+  description text,
+  image_url text,
+  sort_order integer DEFAULT 0,
+  is_active boolean DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);`
+  },
+  {
     name: "products",
-    sql: `CREATE TABLE public.products (
+    sql: `CREATE TABLE IF NOT EXISTS public.products (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   commerce_id uuid NOT NULL REFERENCES public.commerces(id),
   category_id uuid REFERENCES public.categories(id),
@@ -139,22 +187,8 @@ CREATE TABLE public.commerces (
 );`
   },
   {
-    name: "categories",
-    sql: `CREATE TABLE public.categories (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  commerce_id uuid NOT NULL REFERENCES public.commerces(id),
-  name text NOT NULL,
-  description text,
-  image_url text,
-  sort_order integer DEFAULT 0,
-  is_active boolean DEFAULT true,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
-);`
-  },
-  {
     name: "composite_product_items",
-    sql: `CREATE TABLE public.composite_product_items (
+    sql: `CREATE TABLE IF NOT EXISTS public.composite_product_items (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   composite_product_id uuid NOT NULL REFERENCES public.products(id),
   component_product_id uuid NOT NULL REFERENCES public.products(id),
@@ -163,10 +197,72 @@ CREATE TABLE public.commerces (
 );`
   },
   {
+    name: "tables",
+    sql: `CREATE TABLE IF NOT EXISTS public.tables (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  commerce_id uuid NOT NULL REFERENCES public.commerces(id),
+  number integer NOT NULL,
+  name text,
+  capacity integer DEFAULT 4,
+  status table_status DEFAULT 'available',
+  current_order_id uuid,
+  session_id uuid,
+  opened_at timestamptz,
+  closed_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);`
+  },
+  {
+    name: "table_sessions",
+    sql: `CREATE TABLE IF NOT EXISTS public.table_sessions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  table_id uuid NOT NULL REFERENCES public.tables(id),
+  commerce_id uuid NOT NULL REFERENCES public.commerces(id),
+  opened_by_user_id uuid,
+  bill_mode text NOT NULL DEFAULT 'single',
+  status text NOT NULL DEFAULT 'active',
+  opened_at timestamptz NOT NULL DEFAULT now(),
+  closed_at timestamptz
+);`
+  },
+  {
+    name: "table_participants",
+    sql: `CREATE TABLE IF NOT EXISTS public.table_participants (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  session_id uuid NOT NULL REFERENCES public.table_sessions(id),
+  user_id uuid NOT NULL,
+  customer_name text,
+  is_host boolean NOT NULL DEFAULT false,
+  bill_requested boolean DEFAULT false,
+  bill_requested_at timestamptz,
+  selected_payment_method text,
+  change_for numeric DEFAULT NULL,
+  joined_at timestamptz NOT NULL DEFAULT now()
+);`
+  },
+  {
+    name: "invoices",
+    sql: `CREATE TABLE IF NOT EXISTS public.invoices (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  commerce_id uuid REFERENCES public.commerces(id),
+  type invoice_type NOT NULL,
+  amount numeric NOT NULL,
+  due_date date NOT NULL,
+  reference_month text NOT NULL,
+  status invoice_status NOT NULL DEFAULT 'pending',
+  payment_method text,
+  payment_confirmed_by_commerce boolean DEFAULT false,
+  payment_confirmed_at timestamptz,
+  paid_at timestamptz,
+  notes text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);`
+  },
+  {
     name: "orders",
-    sql: `CREATE TYPE public.order_status AS ENUM ('pending', 'confirmed', 'preparing', 'ready', 'delivered', 'cancelled');
-
-CREATE TABLE public.orders (
+    sql: `CREATE TABLE IF NOT EXISTS public.orders (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   commerce_id uuid NOT NULL REFERENCES public.commerces(id),
   user_id uuid NOT NULL,
@@ -194,7 +290,7 @@ CREATE TABLE public.orders (
   },
   {
     name: "order_items",
-    sql: `CREATE TABLE public.order_items (
+    sql: `CREATE TABLE IF NOT EXISTS public.order_items (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   order_id uuid NOT NULL REFERENCES public.orders(id),
   product_id uuid REFERENCES public.products(id),
@@ -207,77 +303,8 @@ CREATE TABLE public.orders (
 );`
   },
   {
-    name: "invoices",
-    sql: `CREATE TYPE public.invoice_status AS ENUM ('pending', 'paid', 'overdue', 'cancelled');
-CREATE TYPE public.invoice_type AS ENUM ('receivable', 'payable');
-
-CREATE TABLE public.invoices (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  commerce_id uuid REFERENCES public.commerces(id),
-  type invoice_type NOT NULL,
-  amount numeric NOT NULL,
-  due_date date NOT NULL,
-  reference_month text NOT NULL,
-  status invoice_status NOT NULL DEFAULT 'pending',
-  payment_method text,
-  payment_confirmed_by_commerce boolean DEFAULT false,
-  payment_confirmed_at timestamptz,
-  paid_at timestamptz,
-  notes text,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
-);`
-  },
-  {
-    name: "tables",
-    sql: `CREATE TYPE public.table_status AS ENUM ('available', 'occupied', 'reserved', 'maintenance');
-
-CREATE TABLE public.tables (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  commerce_id uuid NOT NULL REFERENCES public.commerces(id),
-  number integer NOT NULL,
-  name text,
-  capacity integer DEFAULT 4,
-  status table_status DEFAULT 'available',
-  current_order_id uuid,
-  session_id uuid,
-  opened_at timestamptz,
-  closed_at timestamptz,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
-);`
-  },
-  {
-    name: "table_sessions",
-    sql: `CREATE TABLE public.table_sessions (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  table_id uuid NOT NULL REFERENCES public.tables(id),
-  commerce_id uuid NOT NULL REFERENCES public.commerces(id),
-  opened_by_user_id uuid,
-  bill_mode text NOT NULL DEFAULT 'single',
-  status text NOT NULL DEFAULT 'active',
-  opened_at timestamptz NOT NULL DEFAULT now(),
-  closed_at timestamptz
-);`
-  },
-  {
-    name: "table_participants",
-    sql: `CREATE TABLE public.table_participants (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  session_id uuid NOT NULL REFERENCES public.table_sessions(id),
-  user_id uuid NOT NULL,
-  customer_name text,
-  is_host boolean NOT NULL DEFAULT false,
-  bill_requested boolean DEFAULT false,
-  bill_requested_at timestamptz,
-  selected_payment_method text,
-  change_for numeric DEFAULT NULL,
-  joined_at timestamptz NOT NULL DEFAULT now()
-);`
-  },
-  {
     name: "reviews",
-    sql: `CREATE TABLE public.reviews (
+    sql: `CREATE TABLE IF NOT EXISTS public.reviews (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL,
   commerce_id uuid NOT NULL REFERENCES public.commerces(id),
@@ -291,7 +318,7 @@ CREATE TABLE public.tables (
   },
   {
     name: "favorites",
-    sql: `CREATE TABLE public.favorites (
+    sql: `CREATE TABLE IF NOT EXISTS public.favorites (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL,
   commerce_id uuid NOT NULL REFERENCES public.commerces(id),
@@ -300,7 +327,7 @@ CREATE TABLE public.tables (
   },
   {
     name: "cash_registers",
-    sql: `CREATE TABLE public.cash_registers (
+    sql: `CREATE TABLE IF NOT EXISTS public.cash_registers (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   commerce_id uuid NOT NULL REFERENCES public.commerces(id),
   opened_by uuid NOT NULL,
@@ -318,7 +345,7 @@ CREATE TABLE public.tables (
   },
   {
     name: "cash_movements",
-    sql: `CREATE TABLE public.cash_movements (
+    sql: `CREATE TABLE IF NOT EXISTS public.cash_movements (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   cash_register_id uuid NOT NULL REFERENCES public.cash_registers(id),
   commerce_id uuid NOT NULL REFERENCES public.commerces(id),
@@ -333,7 +360,7 @@ CREATE TABLE public.tables (
   },
   {
     name: "expenses",
-    sql: `CREATE TABLE public.expenses (
+    sql: `CREATE TABLE IF NOT EXISTS public.expenses (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   commerce_id uuid NOT NULL REFERENCES public.commerces(id),
   name text NOT NULL,
@@ -350,7 +377,7 @@ CREATE TABLE public.tables (
   },
   {
     name: "financial_transactions",
-    sql: `CREATE TABLE public.financial_transactions (
+    sql: `CREATE TABLE IF NOT EXISTS public.financial_transactions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   type text NOT NULL,
   category text NOT NULL,
@@ -364,7 +391,7 @@ CREATE TABLE public.tables (
   },
   {
     name: "payment_methods",
-    sql: `CREATE TABLE public.payment_methods (
+    sql: `CREATE TABLE IF NOT EXISTS public.payment_methods (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   commerce_id uuid NOT NULL REFERENCES public.commerces(id),
   name text NOT NULL,
@@ -381,7 +408,7 @@ CREATE TABLE public.tables (
   },
   {
     name: "delivery_zones",
-    sql: `CREATE TABLE public.delivery_zones (
+    sql: `CREATE TABLE IF NOT EXISTS public.delivery_zones (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   commerce_id uuid NOT NULL REFERENCES public.commerces(id),
   name text NOT NULL,
@@ -396,7 +423,7 @@ CREATE TABLE public.tables (
   },
   {
     name: "commerce_coupons",
-    sql: `CREATE TABLE public.commerce_coupons (
+    sql: `CREATE TABLE IF NOT EXISTS public.commerce_coupons (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   commerce_id uuid NOT NULL REFERENCES public.commerces(id),
   code varchar NOT NULL,
@@ -417,7 +444,7 @@ CREATE TABLE public.tables (
   },
   {
     name: "discount_coupons",
-    sql: `CREATE TABLE public.discount_coupons (
+    sql: `CREATE TABLE IF NOT EXISTS public.discount_coupons (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   code varchar NOT NULL,
   description text,
@@ -436,7 +463,7 @@ CREATE TABLE public.tables (
   },
   {
     name: "billing_config",
-    sql: `CREATE TABLE public.billing_config (
+    sql: `CREATE TABLE IF NOT EXISTS public.billing_config (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   pix_key text NOT NULL,
   pix_key_type text NOT NULL DEFAULT 'cnpj',
@@ -450,7 +477,7 @@ CREATE TABLE public.tables (
   },
   {
     name: "admin_notifications",
-    sql: `CREATE TABLE public.admin_notifications (
+    sql: `CREATE TABLE IF NOT EXISTS public.admin_notifications (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   type text NOT NULL,
   title text NOT NULL,
@@ -463,7 +490,7 @@ CREATE TABLE public.tables (
   },
   {
     name: "commerce_notifications",
-    sql: `CREATE TABLE public.commerce_notifications (
+    sql: `CREATE TABLE IF NOT EXISTS public.commerce_notifications (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   commerce_id uuid NOT NULL REFERENCES public.commerces(id),
   type text NOT NULL,
@@ -476,7 +503,7 @@ CREATE TABLE public.tables (
   },
   {
     name: "commerce_photos",
-    sql: `CREATE TABLE public.commerce_photos (
+    sql: `CREATE TABLE IF NOT EXISTS public.commerce_photos (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   commerce_id uuid NOT NULL REFERENCES public.commerces(id),
   image_url text NOT NULL,
@@ -488,7 +515,7 @@ CREATE TABLE public.tables (
   },
   {
     name: "site_customizations",
-    sql: `CREATE TABLE public.site_customizations (
+    sql: `CREATE TABLE IF NOT EXISTS public.site_customizations (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   section text NOT NULL,
   title text,
@@ -505,7 +532,7 @@ CREATE TABLE public.tables (
   },
   {
     name: "training_videos",
-    sql: `CREATE TABLE public.training_videos (
+    sql: `CREATE TABLE IF NOT EXISTS public.training_videos (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   title text NOT NULL,
   description text,
@@ -520,7 +547,7 @@ CREATE TABLE public.tables (
   },
   {
     name: "training_video_progress",
-    sql: `CREATE TABLE public.training_video_progress (
+    sql: `CREATE TABLE IF NOT EXISTS public.training_video_progress (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL,
   video_id uuid NOT NULL REFERENCES public.training_videos(id),
@@ -531,7 +558,7 @@ CREATE TABLE public.tables (
   },
   {
     name: "forum_topics",
-    sql: `CREATE TABLE public.forum_topics (
+    sql: `CREATE TABLE IF NOT EXISTS public.forum_topics (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   author_id uuid NOT NULL,
   author_name text NOT NULL,
@@ -555,7 +582,7 @@ CREATE TABLE public.tables (
   },
   {
     name: "forum_replies",
-    sql: `CREATE TABLE public.forum_replies (
+    sql: `CREATE TABLE IF NOT EXISTS public.forum_replies (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   topic_id uuid NOT NULL REFERENCES public.forum_topics(id),
   author_id uuid NOT NULL,
@@ -571,7 +598,7 @@ CREATE TABLE public.tables (
   },
   {
     name: "forum_topic_votes",
-    sql: `CREATE TABLE public.forum_topic_votes (
+    sql: `CREATE TABLE IF NOT EXISTS public.forum_topic_votes (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   topic_id uuid NOT NULL REFERENCES public.forum_topics(id),
   user_id uuid NOT NULL,
@@ -581,7 +608,7 @@ CREATE TABLE public.tables (
   },
   {
     name: "system_updates",
-    sql: `CREATE TABLE public.system_updates (
+    sql: `CREATE TABLE IF NOT EXISTS public.system_updates (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   type text NOT NULL DEFAULT 'update',
   module text NOT NULL,
