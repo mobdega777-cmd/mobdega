@@ -231,7 +231,94 @@ const AdminDatabase = () => {
     }
   };
 
-  const totalRecords = tableStats.reduce((sum, t) => sum + t.row_count, 0);
+  const downloadCSV = (filename: string, data: any[]) => {
+    if (!data.length) return;
+    const headers = Object.keys(data[0]);
+    const csvContent = [
+      headers.join(','),
+      ...data.map(row => headers.map(h => {
+        const val = row[h];
+        const str = val === null || val === undefined ? '' : String(val);
+        return `"${str.replace(/"/g, '""')}"`;
+      }).join(','))
+    ].join('\n');
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  };
+
+  const exportAllData = async () => {
+    setExporting(true);
+    toast({ title: 'Exportando...', description: 'Buscando todos os dados do sistema.' });
+
+    try {
+      const tableConfigs = [
+        { name: 'profiles', query: () => supabase.from('profiles').select('*') },
+        { name: 'commerces', query: () => supabase.from('commerces').select('*') },
+        { name: 'orders', query: () => supabase.from('orders').select('*') },
+        { name: 'order_items', query: () => supabase.from('order_items').select('*') },
+        { name: 'products', query: () => supabase.from('products').select('*') },
+        { name: 'categories', query: () => supabase.from('categories').select('*') },
+        { name: 'invoices', query: () => supabase.from('invoices').select('*') },
+        { name: 'reviews', query: () => supabase.from('reviews').select('*') },
+        { name: 'tables', query: () => supabase.from('tables').select('*') },
+        { name: 'table_sessions', query: () => supabase.from('table_sessions').select('*') },
+        { name: 'table_participants', query: () => supabase.from('table_participants').select('*') },
+        { name: 'favorites', query: () => supabase.from('favorites').select('*') },
+        { name: 'training_videos', query: () => supabase.from('training_videos').select('*') },
+        { name: 'plans', query: () => supabase.from('plans').select('*') },
+        { name: 'discount_coupons', query: () => supabase.from('discount_coupons').select('*') },
+        { name: 'delivery_zones', query: () => supabase.from('delivery_zones').select('*') },
+        { name: 'payment_methods', query: () => supabase.from('payment_methods').select('*') },
+        { name: 'expenses', query: () => supabase.from('expenses').select('*') },
+        { name: 'cash_registers', query: () => supabase.from('cash_registers').select('*') },
+        { name: 'cash_movements', query: () => supabase.from('cash_movements').select('*') },
+        { name: 'financial_transactions', query: () => supabase.from('financial_transactions').select('*') },
+        { name: 'admin_notifications', query: () => supabase.from('admin_notifications').select('*') },
+        { name: 'commerce_notifications', query: () => supabase.from('commerce_notifications').select('*') },
+        { name: 'site_customizations', query: () => supabase.from('site_customizations').select('*') },
+        { name: 'commerce_photos', query: () => supabase.from('commerce_photos').select('*') },
+        { name: 'user_roles', query: () => supabase.from('user_roles').select('*') },
+        { name: 'billing_config', query: () => supabase.from('billing_config').select('*') },
+        { name: 'system_updates', query: () => supabase.from('system_updates').select('*') },
+        { name: 'forum_topics', query: () => supabase.from('forum_topics').select('*') },
+        { name: 'forum_replies', query: () => supabase.from('forum_replies').select('*') },
+        { name: 'commerce_coupons', query: () => supabase.from('commerce_coupons').select('*') },
+        { name: 'composite_product_items', query: () => supabase.from('composite_product_items').select('*') },
+        { name: 'training_video_progress', query: () => supabase.from('training_video_progress').select('*') },
+      ];
+
+      const dateStr = format(new Date(), 'yyyy-MM-dd_HH-mm');
+      let exportedCount = 0;
+
+      for (const config of tableConfigs) {
+        try {
+          const data = await fetchAllRows(() => config.query());
+          if (data.length > 0) {
+            downloadCSV(`${config.name}_${dateStr}.csv`, data);
+            exportedCount++;
+          }
+        } catch (err) {
+          console.warn(`Erro ao exportar ${config.name}:`, err);
+        }
+      }
+
+      toast({ 
+        title: 'Exportação concluída!', 
+        description: `${exportedCount} tabela(s) exportada(s) com sucesso.` 
+      });
+    } catch (error) {
+      console.error('Export error:', error);
+      toast({ variant: 'destructive', title: 'Erro na exportação', description: 'Ocorreu um erro ao exportar os dados.' });
+    } finally {
+      setExporting(false);
+    }
+  };
+
+
 
   if (loading) {
     return (
