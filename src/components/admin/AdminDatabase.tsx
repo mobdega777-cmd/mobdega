@@ -724,6 +724,11 @@ const AdminDatabase = () => {
             </Card>
           </div>
         </TabsContent>
+
+        {/* SQL Schema Tab */}
+        <TabsContent value="sql" className="mt-4">
+          <SQLSchemaViewer />
+        </TabsContent>
       </Tabs>
     </div>
   );
