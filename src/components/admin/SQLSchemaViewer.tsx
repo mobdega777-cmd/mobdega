@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Copy, Check, ChevronDown, ChevronRight } from "lucide-react";
+import { Copy, Check, ChevronDown, ChevronRight, Database } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
