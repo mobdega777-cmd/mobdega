@@ -28,6 +28,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
+import SQLSchemaViewer from "./SQLSchemaViewer";
 import { ptBR } from "date-fns/locale";
 
 interface TableStats {
