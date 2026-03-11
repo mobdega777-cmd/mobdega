@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,7 @@ interface HeaderProps {
 const Header = ({ onLoginClick, onRegisterClick, onLogoClick }: HeaderProps) => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const navigate = useNavigate();
 
   // Handle scroll effect
   useEffect(() => {
@@ -25,9 +27,15 @@ const Header = ({ onLoginClick, onRegisterClick, onLogoClick }: HeaderProps) => 
 
   const handleMobileNavClick = (href: string) => {
     setIsMobileMenuOpen(false);
-    const element = document.querySelector(href);
-    if (element) {
-      element.scrollIntoView({ behavior: "smooth" });
+    if (href.startsWith("#")) {
+      const element = document.querySelector(href);
+      if (element) {
+        element.scrollIntoView({ behavior: "smooth" });
+      } else {
+        navigate("/" + href);
+      }
+    } else {
+      navigate(href);
     }
   };
 
@@ -78,6 +86,12 @@ const Header = ({ onLoginClick, onRegisterClick, onLogoClick }: HeaderProps) => 
             >
               Contato
             </a>
+            <Link
+              to="/sobre-nos"
+              className="text-foreground/80 hover:text-primary transition-colors font-medium"
+            >
+              Sobre Nós
+            </Link>
           </nav>
 
           {/* Auth Buttons & Mobile Menu Toggle */}
@@ -136,6 +150,12 @@ const Header = ({ onLoginClick, onRegisterClick, onLogoClick }: HeaderProps) => 
                 className="text-left py-3 px-4 rounded-lg text-foreground/80 hover:text-primary hover:bg-muted transition-colors font-medium"
               >
                 Contato
+              </button>
+              <button
+                onClick={() => handleMobileNavClick("/sobre-nos")}
+                className="text-left py-3 px-4 rounded-lg text-foreground/80 hover:text-primary hover:bg-muted transition-colors font-medium"
+              >
+                Sobre Nós
               </button>
               <Button
                 variant="ghost"
