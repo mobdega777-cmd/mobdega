@@ -68,6 +68,8 @@ interface SystemStats {
 
 const AdminDatabase = () => {
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [stats, setStats] = useState<SystemStats | null>(null);
   const [exporting, setExporting] = useState(false);
   const { toast } = useToast();
   const [tableStats, setTableStats] = useState<TableStats[]>([]);
