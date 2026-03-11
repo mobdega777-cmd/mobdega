@@ -360,6 +360,19 @@ const AdminDatabase = () => {
             )}
             <span className="ml-2 hidden sm:inline">Atualizar</span>
           </Button>
+          <Button 
+            variant="default" 
+            size="sm" 
+            onClick={exportAllData}
+            disabled={exporting}
+          >
+            {exporting ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Download className="w-4 h-4" />
+            )}
+            <span className="ml-2 hidden sm:inline">Exportar CSV</span>
+          </Button>
         </div>
       </div>
 
