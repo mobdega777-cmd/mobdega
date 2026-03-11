@@ -15,7 +15,9 @@ import {
   Layers,
   TrendingUp,
   Calendar,
-  Download
+  Download,
+  Copy,
+  Code
 } from "lucide-react";
 import { fetchAllRows } from "@/lib/supabaseHelper";
 import { useToast } from "@/hooks/use-toast";
