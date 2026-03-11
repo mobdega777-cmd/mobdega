@@ -318,6 +318,7 @@ const AdminDatabase = () => {
     }
   };
 
+  const totalRecords = tableStats.reduce((sum, t) => sum + t.row_count, 0);
 
 
   if (loading) {
