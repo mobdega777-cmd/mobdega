@@ -485,18 +485,22 @@ const AdminDatabase = () => {
 
       {/* Tabs for detailed info */}
       <Tabs defaultValue="tables" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="tables" className="gap-2">
             <Table2 className="w-4 h-4" />
-            Tabelas
+            <span className="hidden sm:inline">Tabelas</span>
           </TabsTrigger>
           <TabsTrigger value="operations" className="gap-2">
             <Activity className="w-4 h-4" />
-            Operações
+            <span className="hidden sm:inline">Operações</span>
           </TabsTrigger>
           <TabsTrigger value="metrics" className="gap-2">
             <TrendingUp className="w-4 h-4" />
-            Métricas
+            <span className="hidden sm:inline">Métricas</span>
+          </TabsTrigger>
+          <TabsTrigger value="sql" className="gap-2">
+            <Code className="w-4 h-4" />
+            <span className="hidden sm:inline">SQL Schema</span>
           </TabsTrigger>
         </TabsList>
 
