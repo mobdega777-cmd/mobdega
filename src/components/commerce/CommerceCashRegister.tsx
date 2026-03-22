@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+// @ts-ignore - fetchAllRows used below
+import { fetchAllRows } from "@/lib/supabaseHelper";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
