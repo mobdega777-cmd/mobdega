@@ -35,6 +35,7 @@ import { useToast } from "@/hooks/use-toast";
 import { format, formatDistanceToNow } from "date-fns";
 import { parseDateOnly } from "@/lib/dateUtils";
 import { ptBR } from "date-fns/locale";
+import { fetchAllRows } from "@/lib/supabaseHelper";
 
 interface Customer {
   id: string;

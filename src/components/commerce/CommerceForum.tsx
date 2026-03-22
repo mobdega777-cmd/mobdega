@@ -47,6 +47,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { fetchAllRows } from "@/lib/supabaseHelper";
 
 interface ForumTopic {
   id: string;
