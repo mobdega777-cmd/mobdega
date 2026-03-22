@@ -254,22 +254,16 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
 
     if (register) {
       // Fetch movements for this register
-      const { data: movementsData } = await supabase
-        .from('cash_movements')
-        .select('*')
-        .eq('cash_register_id', register.id)
-        .order('created_at', { ascending: false });
-
-      setMovements(movementsData || []);
+      const movementsData = await fetchAllRows(() =>
+        supabase.from('cash_movements').select('*').eq('cash_register_id', register.id).order('created_at', { ascending: false })
+      );
+      setMovements(movementsData);
     } else {
       // Fetch all movements for filtering when register is closed
-      const { data: allMovements } = await supabase
-        .from('cash_movements')
-        .select('*')
-        .eq('commerce_id', commerceId)
-        .order('created_at', { ascending: false });
-
-      setMovements(allMovements || []);
+      const allMovements = await fetchAllRows(() =>
+        supabase.from('cash_movements').select('*').eq('commerce_id', commerceId).order('created_at', { ascending: false })
+      );
+      setMovements(allMovements);
     }
 
     // Fetch products
