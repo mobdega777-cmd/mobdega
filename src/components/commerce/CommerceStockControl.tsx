@@ -135,16 +135,13 @@ const CommerceStockControl = ({ commerceId }: CommerceStockControlProps) => {
   const { toast } = useToast();
 
   const fetchProducts = async () => {
-    const { data, error } = await supabase
-      .from('products')
-      .select('*, category:categories(name)')
-      .eq('commerce_id', commerceId)
-      .order('stock', { ascending: true });
-
-    if (error) {
+    try {
+      const data = await fetchAllRows(() =>
+        supabase.from('products').select('*, category:categories(name)').eq('commerce_id', commerceId).order('stock', { ascending: true })
+      );
+      setProducts(data);
+    } catch (error) {
       console.error('Error fetching products:', error);
-    } else {
-      setProducts(data || []);
     }
     setLoading(false);
   };
