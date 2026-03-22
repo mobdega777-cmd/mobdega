@@ -138,13 +138,11 @@ const CommerceForum = ({ commerceId, commerceName, commerceLogo }: CommerceForum
 
   const fetchUserVotes = async () => {
     if (!user) return;
-    const { data } = await supabase
-      .from('forum_topic_votes')
-      .select('topic_id, vote_type')
-      .eq('user_id', user.id);
-    
+    const data = await fetchAllRows(() =>
+      supabase.from('forum_topic_votes').select('topic_id, vote_type').eq('user_id', user.id)
+    );
     const votesMap: Record<string, 'like' | 'dislike' | null> = {};
-    data?.forEach(vote => {
+    data.forEach(vote => {
       votesMap[vote.topic_id] = vote.vote_type as 'like' | 'dislike';
     });
     setUserVotes(votesMap);
