@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { fetchAllRows } from "@/lib/supabaseHelper";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -252,33 +253,23 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
 
     if (register) {
       // Fetch movements for this register
-      const { data: movementsData } = await supabase
-        .from('cash_movements')
-        .select('*')
-        .eq('cash_register_id', register.id)
-        .order('created_at', { ascending: false });
-
-      setMovements(movementsData || []);
+      const movementsData = await fetchAllRows(() =>
+        supabase.from('cash_movements').select('*').eq('cash_register_id', register.id).order('created_at', { ascending: false })
+      );
+      setMovements(movementsData);
     } else {
       // Fetch all movements for filtering when register is closed
-      const { data: allMovements } = await supabase
-        .from('cash_movements')
-        .select('*')
-        .eq('commerce_id', commerceId)
-        .order('created_at', { ascending: false });
-
-      setMovements(allMovements || []);
+      const allMovements = await fetchAllRows(() =>
+        supabase.from('cash_movements').select('*').eq('commerce_id', commerceId).order('created_at', { ascending: false })
+      );
+      setMovements(allMovements);
     }
 
     // Fetch products
-    const { data: productsData } = await supabase
-      .from('products')
-      .select('id, name, price, promotional_price, stock')
-      .eq('commerce_id', commerceId)
-      .eq('is_active', true)
-      .order('name');
-
-    setProducts(productsData || []);
+    const productsData = await fetchAllRows(() =>
+      supabase.from('products').select('id, name, price, promotional_price, stock').eq('commerce_id', commerceId).eq('is_active', true).order('name')
+    );
+    setProducts(productsData);
 
   // Fetch table orders with pending payment (status = delivered, payment_method = pending, order_type = table)
     const { data: tableOrdersData } = await supabase

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { fetchAllRows } from "@/lib/supabaseHelper";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -133,27 +134,22 @@ const CommerceStockControl = ({ commerceId }: CommerceStockControlProps) => {
   const { toast } = useToast();
 
   const fetchProducts = async () => {
-    const { data, error } = await supabase
-      .from('products')
-      .select('*, category:categories(name)')
-      .eq('commerce_id', commerceId)
-      .order('stock', { ascending: true });
-
-    if (error) {
+    try {
+      const data = await fetchAllRows(() =>
+        supabase.from('products').select('*, category:categories(name)').eq('commerce_id', commerceId).order('stock', { ascending: true })
+      );
+      setProducts(data);
+    } catch (error) {
       console.error('Error fetching products:', error);
-    } else {
-      setProducts(data || []);
     }
     setLoading(false);
   };
 
   const fetchCategories = async () => {
-    const { data } = await supabase
-      .from('categories')
-      .select('id, name')
-      .eq('commerce_id', commerceId)
-      .order('name');
-    setCategories(data || []);
+    const data = await fetchAllRows(() =>
+      supabase.from('categories').select('id, name').eq('commerce_id', commerceId).order('name')
+    );
+    setCategories(data);
   };
 
   const fetchRecentSales = async () => {

@@ -56,6 +56,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { fetchAllRows } from "@/lib/supabaseHelper";
 
 interface ForumTopic {
   id: string;
@@ -128,30 +129,24 @@ const AdminForum = () => {
 
   const fetchTopics = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('forum_topics')
-      .select('*')
-      .order('is_pinned', { ascending: false })
-      .order('last_reply_at', { ascending: false, nullsFirst: false })
-      .order('created_at', { ascending: false });
-
-    if (error) {
+    try {
+      const data = await fetchAllRows(() =>
+        supabase.from('forum_topics').select('*').order('is_pinned', { ascending: false }).order('last_reply_at', { ascending: false, nullsFirst: false }).order('created_at', { ascending: false })
+      );
+      setTopics(data);
+    } catch (error) {
       console.error('Error fetching topics:', error);
-    } else {
-      setTopics(data || []);
     }
     setLoading(false);
   };
 
   const fetchUserVotes = async () => {
     if (!user) return;
-    const { data } = await supabase
-      .from('forum_topic_votes')
-      .select('topic_id, vote_type')
-      .eq('user_id', user.id);
-    
+    const data = await fetchAllRows(() =>
+      supabase.from('forum_topic_votes').select('topic_id, vote_type').eq('user_id', user.id)
+    );
     const votesMap: Record<string, 'like' | 'dislike' | null> = {};
-    data?.forEach(vote => {
+    data.forEach(vote => {
       votesMap[vote.topic_id] = vote.vote_type as 'like' | 'dislike';
     });
     setUserVotes(votesMap);
@@ -159,16 +154,13 @@ const AdminForum = () => {
 
   const fetchReplies = async (topicId: string) => {
     setLoadingReplies(true);
-    const { data, error } = await supabase
-      .from('forum_replies')
-      .select('*')
-      .eq('topic_id', topicId)
-      .order('created_at', { ascending: true });
-
-    if (error) {
+    try {
+      const data = await fetchAllRows(() =>
+        supabase.from('forum_replies').select('*').eq('topic_id', topicId).order('created_at', { ascending: true })
+      );
+      setReplies(data);
+    } catch (error) {
       console.error('Error fetching replies:', error);
-    } else {
-      setReplies(data || []);
     }
     setLoadingReplies(false);
   };
