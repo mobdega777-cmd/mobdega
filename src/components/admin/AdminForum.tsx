@@ -128,17 +128,13 @@ const AdminForum = () => {
 
   const fetchTopics = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('forum_topics')
-      .select('*')
-      .order('is_pinned', { ascending: false })
-      .order('last_reply_at', { ascending: false, nullsFirst: false })
-      .order('created_at', { ascending: false });
-
-    if (error) {
+    try {
+      const data = await fetchAllRows(() =>
+        supabase.from('forum_topics').select('*').order('is_pinned', { ascending: false }).order('last_reply_at', { ascending: false, nullsFirst: false }).order('created_at', { ascending: false })
+      );
+      setTopics(data);
+    } catch (error) {
       console.error('Error fetching topics:', error);
-    } else {
-      setTopics(data || []);
     }
     setLoading(false);
   };
