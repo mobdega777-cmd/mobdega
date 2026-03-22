@@ -267,14 +267,10 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
     }
 
     // Fetch products
-    const { data: productsData } = await supabase
-      .from('products')
-      .select('id, name, price, promotional_price, stock')
-      .eq('commerce_id', commerceId)
-      .eq('is_active', true)
-      .order('name');
-
-    setProducts(productsData || []);
+    const productsData = await fetchAllRows(() =>
+      supabase.from('products').select('id, name, price, promotional_price, stock').eq('commerce_id', commerceId).eq('is_active', true).order('name')
+    );
+    setProducts(productsData);
 
   // Fetch table orders with pending payment (status = delivered, payment_method = pending, order_type = table)
     const { data: tableOrdersData } = await supabase

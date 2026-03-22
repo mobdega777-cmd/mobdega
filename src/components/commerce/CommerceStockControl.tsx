@@ -147,12 +147,10 @@ const CommerceStockControl = ({ commerceId }: CommerceStockControlProps) => {
   };
 
   const fetchCategories = async () => {
-    const { data } = await supabase
-      .from('categories')
-      .select('id, name')
-      .eq('commerce_id', commerceId)
-      .order('name');
-    setCategories(data || []);
+    const data = await fetchAllRows(() =>
+      supabase.from('categories').select('id, name').eq('commerce_id', commerceId).order('name')
+    );
+    setCategories(data);
   };
 
   const fetchRecentSales = async () => {

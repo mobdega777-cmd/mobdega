@@ -153,16 +153,13 @@ const AdminForum = () => {
 
   const fetchReplies = async (topicId: string) => {
     setLoadingReplies(true);
-    const { data, error } = await supabase
-      .from('forum_replies')
-      .select('*')
-      .eq('topic_id', topicId)
-      .order('created_at', { ascending: true });
-
-    if (error) {
+    try {
+      const data = await fetchAllRows(() =>
+        supabase.from('forum_replies').select('*').eq('topic_id', topicId).order('created_at', { ascending: true })
+      );
+      setReplies(data);
+    } catch (error) {
       console.error('Error fetching replies:', error);
-    } else {
-      setReplies(data || []);
     }
     setLoadingReplies(false);
   };

@@ -88,37 +88,33 @@ const AdminCustomers = () => {
   const fetchCustomers = async () => {
     setLoading(true);
     
-    // Get profiles that are not commerce owners or admins
-    const { data: profiles, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .order('created_at', { ascending: false });
-    
-    if (error) {
+    try {
+      // Get profiles that are not commerce owners or admins
+      const profiles = await fetchAllRows(() =>
+        supabase.from('profiles').select('*').order('created_at', { ascending: false })
+      );
+
+      // Filter out users who have commerce or admin roles
+      const commerceOwners = await fetchAllRows(() =>
+        supabase.from('commerces').select('owner_id')
+      );
+      
+      const adminRoles = await fetchAllRows(() =>
+        supabase.from('user_roles').select('user_id').eq('role', 'master_admin')
+      );
+
+      const ownerIds = new Set(commerceOwners.map(c => c.owner_id));
+      const adminIds = new Set(adminRoles.map(r => r.user_id));
+
+      const filteredCustomers = profiles.filter(
+        p => !ownerIds.has(p.user_id) && !adminIds.has(p.user_id)
+      );
+
+      setCustomers(filteredCustomers);
+    } catch (error) {
       console.error('Error fetching customers:', error);
       toast({ variant: "destructive", title: "Erro ao carregar clientes" });
-      setLoading(false);
-      return;
     }
-
-    // Filter out users who have commerce or admin roles
-    const { data: commerceOwners } = await supabase
-      .from('commerces')
-      .select('owner_id');
-    
-    const { data: adminRoles } = await supabase
-      .from('user_roles')
-      .select('user_id')
-      .eq('role', 'master_admin');
-
-    const ownerIds = new Set(commerceOwners?.map(c => c.owner_id) || []);
-    const adminIds = new Set(adminRoles?.map(r => r.user_id) || []);
-
-    const filteredCustomers = (profiles || []).filter(
-      p => !ownerIds.has(p.user_id) && !adminIds.has(p.user_id)
-    );
-
-    setCustomers(filteredCustomers);
     setLoading(false);
   };
 
