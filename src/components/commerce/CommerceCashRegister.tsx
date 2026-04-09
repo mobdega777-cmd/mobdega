@@ -101,6 +101,13 @@ interface Product {
   stock: number | null;
 }
 
+interface CartItem {
+  product: Product;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+}
+
 interface TableParticipant {
   id: string;
   user_id: string;
