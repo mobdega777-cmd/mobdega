@@ -621,14 +621,8 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
     }
   };
 
-  const addSale = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user || !currentRegister || !selectedProduct) return;
 
-    const saleAmount = parseFloat(saleForm.amount);
-    const quantity = parseInt(saleForm.quantity) || 1;
 
-  const addToCart = () => {
     if (!selectedProduct) return;
     const qty = parseInt(saleForm.quantity) || 1;
     const unitPrice = selectedProduct.promotional_price || selectedProduct.price;
