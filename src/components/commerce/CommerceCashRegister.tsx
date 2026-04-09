@@ -628,10 +628,52 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
     const saleAmount = parseFloat(saleForm.amount);
     const quantity = parseInt(saleForm.quantity) || 1;
 
-    // Stock deduction is now handled by the database trigger when order status becomes 'delivered'
-    // No need for manual stock deduction here
+  const addToCart = () => {
+    if (!selectedProduct) return;
+    const qty = parseInt(saleForm.quantity) || 1;
+    const unitPrice = selectedProduct.promotional_price || selectedProduct.price;
+    const totalPrice = unitPrice * qty;
 
-    // Create order for this sale (status=delivered triggers stock deduction automatically)
+    setCartItems(prev => {
+      const existing = prev.findIndex(item => item.product.id === selectedProduct.id);
+      if (existing >= 0) {
+        const updated = [...prev];
+        updated[existing].quantity += qty;
+        updated[existing].total_price = updated[existing].quantity * updated[existing].unit_price;
+        return updated;
+      }
+      return [...prev, { product: selectedProduct, quantity: qty, unit_price: unitPrice, total_price: totalPrice }];
+    });
+
+    // Reset product selection but keep payment method
+    setSelectedProduct(null);
+    setProductSearch("");
+    setSaleForm(prev => ({ ...prev, product_id: "", amount: "", quantity: "1" }));
+  };
+
+  const removeFromCart = (index: number) => {
+    setCartItems(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const updateCartItemQuantity = (index: number, newQty: number) => {
+    if (newQty < 1) return;
+    setCartItems(prev => {
+      const updated = [...prev];
+      updated[index].quantity = newQty;
+      updated[index].total_price = newQty * updated[index].unit_price;
+      return updated;
+    });
+  };
+
+  const cartTotal = cartItems.reduce((sum, item) => sum + item.total_price, 0);
+
+  const addSale = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !currentRegister || cartItems.length === 0) return;
+
+    const paymentMethod = saleForm.payment_method;
+
+    // Create order
     const { data: orderData, error: orderError } = await supabase
       .from('orders')
       .insert({
@@ -639,9 +681,9 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
         user_id: user.id,
         order_type: 'pos',
         status: 'delivered',
-        subtotal: saleAmount,
-        total: saleAmount,
-        payment_method: saleForm.payment_method,
+        subtotal: cartTotal,
+        total: cartTotal,
+        payment_method: paymentMethod,
         customer_name: 'Venda PDV',
         delivered_at: new Date().toISOString(),
       })
@@ -650,31 +692,35 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
 
     if (orderError) {
       console.error('Error creating order:', orderError);
-    } else {
-      // Create order item (the trigger will deduct stock based on this)
-      await supabase
-        .from('order_items')
-        .insert({
-          order_id: orderData.id,
-          product_id: selectedProduct.id,
-          product_name: selectedProduct.name,
-          quantity: quantity,
-          unit_price: selectedProduct.promotional_price || selectedProduct.price,
-          total_price: saleAmount,
-        });
+      toast({ variant: "destructive", title: "Erro ao criar pedido", description: orderError.message });
+      return;
     }
 
+    // Create order items
+    const orderItems = cartItems.map(item => ({
+      order_id: orderData.id,
+      product_id: item.product.id,
+      product_name: item.product.name,
+      quantity: item.quantity,
+      unit_price: item.unit_price,
+      total_price: item.total_price,
+    }));
+
+    await supabase.from('order_items').insert(orderItems);
+
+    // Create cash movement
+    const description = cartItems.map(item => `${item.product.name} (x${item.quantity})`).join(', ');
     const { error } = await supabase
       .from('cash_movements')
       .insert({
         cash_register_id: currentRegister.id,
         commerce_id: commerceId,
         type: 'sale',
-        amount: saleAmount,
-        payment_method: saleForm.payment_method,
-        description: `Venda: ${selectedProduct.name} (x${quantity})`,
+        amount: cartTotal,
+        payment_method: paymentMethod,
+        description: `Venda: ${description}`,
         created_by: user.id,
-        order_id: orderData?.id || null,
+        order_id: orderData.id,
       });
 
     if (error) {
@@ -697,6 +743,7 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
     setSelectedProduct(null);
     setProductSearch("");
     setAmountPaid("");
+    setCartItems([]);
   };
 
   const handleSelectProduct = (product: Product) => {
@@ -727,8 +774,7 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
   // Cálculo de troco
   const calculateChange = (): number => {
     const paid = parseFloat(amountPaid) || 0;
-    const total = parseFloat(saleForm.amount) || 0;
-    return paid - total;
+    return paid - cartTotal;
   };
 
   const change = calculateChange();
