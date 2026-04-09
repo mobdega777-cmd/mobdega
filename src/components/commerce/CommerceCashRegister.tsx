@@ -620,9 +620,7 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
       fetchData();
     }
   };
-
-
-
+  const addToCart = () => {
     if (!selectedProduct) return;
     const qty = parseInt(saleForm.quantity) || 1;
     const unitPrice = selectedProduct.promotional_price || selectedProduct.price;
