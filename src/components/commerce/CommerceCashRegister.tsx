@@ -1246,11 +1246,12 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
                     <span className="hidden xs:inline">Lançar</span> Venda
                   </Button>
                 </DialogTrigger>
-                <DialogContent>
+                <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle>Lançar Venda</DialogTitle>
                   </DialogHeader>
-                  <form onSubmit={addSale} className="space-y-4">
+                  <div className="space-y-4">
+                    {/* Busca e adição de produto */}
                     <div>
                       <Label>Produto</Label>
                       <div className="relative">
@@ -1291,14 +1292,14 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
                       )}
                       {selectedProduct && (
                         <p className="text-sm text-green-600 mt-1">
-                          ✓ Produto selecionado: R$ {(selectedProduct.promotional_price || selectedProduct.price).toFixed(2)} / un
+                          ✓ {selectedProduct.name}: R$ {(selectedProduct.promotional_price || selectedProduct.price).toFixed(2)} / un
                         </p>
                       )}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label>Quantidade</Label>
+                    <div className="flex gap-2 items-end">
+                      <div className="flex-1">
+                        <Label>Qtd</Label>
                         <Input
                           type="number"
                           min="1"
@@ -1306,80 +1307,160 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
                           onChange={(e) => updateSaleAmount(e.target.value)}
                         />
                       </div>
-                      <div>
-                        <Label>Valor Total (R$)</Label>
+                      <div className="flex-1">
+                        <Label>Subtotal</Label>
                         <Input
                           type="number"
                           step="0.01"
                           value={saleForm.amount}
-                          onChange={(e) => setSaleForm({ ...saleForm, amount: e.target.value })}
                           readOnly={!!selectedProduct}
                           className={selectedProduct ? "bg-muted" : ""}
+                          onChange={(e) => setSaleForm({ ...saleForm, amount: e.target.value })}
                         />
                       </div>
-                    </div>
-
-                    <div>
-                      <Label>Forma de Pagamento</Label>
-                      <Select
-                        value={saleForm.payment_method}
-                        onValueChange={(value) => setSaleForm({ ...saleForm, payment_method: value })}
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="gap-1"
+                        disabled={!selectedProduct}
+                        onClick={addToCart}
                       >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {paymentMethods.map((method) => (
-                            <SelectItem key={method.value} value={method.value}>
-                              {method.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        <Plus className="w-4 h-4" />
+                        Adicionar
+                      </Button>
                     </div>
 
-                    {/* Sistema de Troco - apenas para Dinheiro */}
-                    {saleForm.payment_method === 'cash' && saleForm.amount && (
-                      <div className="space-y-3 p-4 rounded-lg border bg-muted/30">
-                        <div>
-                          <Label>Valor Pago (R$)</Label>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={amountPaid}
-                            onChange={(e) => setAmountPaid(e.target.value)}
-                            placeholder="Valor recebido do cliente"
-                          />
+                    {/* Carrinho */}
+                    {cartItems.length > 0 && (
+                      <div className="border rounded-lg">
+                        <div className="p-3 border-b bg-muted/30 flex justify-between items-center">
+                          <span className="font-medium text-sm flex items-center gap-2">
+                            <ShoppingCart className="w-4 h-4" />
+                            Itens ({cartItems.length})
+                          </span>
+                          <span className="font-bold text-primary">
+                            Total: R$ {cartTotal.toFixed(2)}
+                          </span>
                         </div>
-                        {amountPaid && (
-                          <div className={`p-3 rounded-lg ${change >= 0 ? 'bg-green-500/10 border border-green-500/30' : 'bg-red-500/10 border border-red-500/30'}`}>
-                            <p className="text-sm text-muted-foreground">Troco a devolver</p>
-                            <p className={`text-2xl font-bold ${change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                              R$ {change.toFixed(2)}
-                            </p>
-                            {change < 0 && (
-                              <p className="text-xs text-red-500 mt-1">Valor insuficiente!</p>
-                            )}
-                          </div>
-                        )}
+                        <div className="max-h-40 overflow-y-auto divide-y">
+                          {cartItems.map((item, index) => (
+                            <div key={index} className="p-2 flex items-center justify-between gap-2 text-sm">
+                              <div className="flex-1 min-w-0">
+                                <p className="truncate font-medium">{item.product.name}</p>
+                                <p className="text-muted-foreground text-xs">
+                                  R$ {item.unit_price.toFixed(2)} / un
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6"
+                                  onClick={() => updateCartItemQuantity(index, item.quantity - 1)}
+                                >
+                                  <Minus className="w-3 h-3" />
+                                </Button>
+                                <span className="w-6 text-center">{item.quantity}</span>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6"
+                                  onClick={() => updateCartItemQuantity(index, item.quantity + 1)}
+                                >
+                                  <Plus className="w-3 h-3" />
+                                </Button>
+                              </div>
+                              <span className="font-medium w-20 text-right">
+                                R$ {item.total_price.toFixed(2)}
+                              </span>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 text-destructive"
+                                onClick={() => removeFromCart(index)}
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
 
-                    <div className="flex justify-end gap-2">
-                      <Button type="button" variant="outline" onClick={() => {
-                        setIsSaleDialogOpen(false);
-                        resetSaleForm();
-                      }}>
-                        Cancelar
-                      </Button>
-                      <Button 
-                        type="submit" 
-                        disabled={!selectedProduct || !saleForm.amount || (saleForm.payment_method === 'cash' && amountPaid && change < 0)}
-                      >
-                        Registrar Venda
-                      </Button>
-                    </div>
-                  </form>
+                    {/* Pagamento */}
+                    {cartItems.length > 0 && (
+                      <form onSubmit={addSale} className="space-y-4 border-t pt-4">
+                        <div>
+                          <Label>Forma de Pagamento</Label>
+                          <Select
+                            value={saleForm.payment_method}
+                            onValueChange={(value) => setSaleForm({ ...saleForm, payment_method: value })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {paymentMethods.map((method) => (
+                                <SelectItem key={method.value} value={method.value}>
+                                  {method.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {saleForm.payment_method === 'cash' && (
+                          <div className="space-y-3 p-4 rounded-lg border bg-muted/30">
+                            <div>
+                              <Label>Valor Pago (R$)</Label>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={amountPaid}
+                                onChange={(e) => setAmountPaid(e.target.value)}
+                                placeholder="Valor recebido do cliente"
+                              />
+                            </div>
+                            {amountPaid && (
+                              <div className={`p-3 rounded-lg ${change >= 0 ? 'bg-green-500/10 border border-green-500/30' : 'bg-red-500/10 border border-red-500/30'}`}>
+                                <p className="text-sm text-muted-foreground">Troco a devolver</p>
+                                <p className={`text-2xl font-bold ${change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                  R$ {change.toFixed(2)}
+                                </p>
+                                {change < 0 && (
+                                  <p className="text-xs text-red-500 mt-1">Valor insuficiente!</p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        <div className="flex justify-end gap-2">
+                          <Button type="button" variant="outline" onClick={() => {
+                            setIsSaleDialogOpen(false);
+                            resetSaleForm();
+                          }}>
+                            Cancelar
+                          </Button>
+                          <Button 
+                            type="submit" 
+                            disabled={cartItems.length === 0 || (saleForm.payment_method === 'cash' && amountPaid !== '' && change < 0)}
+                          >
+                            Registrar Venda (R$ {cartTotal.toFixed(2)})
+                          </Button>
+                        </div>
+                      </form>
+                    )}
+
+                    {cartItems.length === 0 && (
+                      <p className="text-center text-muted-foreground text-sm py-4">
+                        Adicione produtos ao carrinho para registrar a venda
+                      </p>
+                    )}
+                  </div>
                 </DialogContent>
               </Dialog>
 
