@@ -230,6 +230,7 @@ const CommerceCashRegister = ({ commerceId }: CommerceCashRegisterProps) => {
   const [productSearch, setProductSearch] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [amountPaid, setAmountPaid] = useState("");
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
   
   const [saleForm, setSaleForm] = useState({
     product_id: "",
