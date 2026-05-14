@@ -481,12 +481,12 @@ const AdminInvoices = () => {
               <Label>Comércio</Label>
               <Select
                 value={newInvoice.commerce_id}
-                onValueChange={(v) => {
-                  const commerce = commerces.find(c => c.id === v);
-                  setNewInvoice({ 
-                    ...newInvoice, 
+                onValueChange={async (v) => {
+                  const info = await fetchPendingForCommerce(v);
+                  setNewInvoice({
+                    ...newInvoice,
                     commerce_id: v,
-                    amount: commerce?.plans?.price?.toString() || ''
+                    amount: info ? info.calculated_amount.toFixed(2) : '0.00',
                   });
                 }}
               >
@@ -502,6 +502,17 @@ const AdminInvoices = () => {
                 </SelectContent>
               </Select>
             </div>
+            {pendingInfo && newInvoice.commerce_id && (
+              <div className="rounded-lg bg-muted/40 border p-3 text-sm space-y-1">
+                <p className="font-medium">Cobrança por transação acumulada</p>
+                <p className="text-muted-foreground">
+                  {pendingInfo.orders_count} venda(s) — total vendido R$ {pendingInfo.total_sales.toFixed(2)}
+                </p>
+                <p className="text-primary font-semibold">
+                  Valor da fatura: R$ {pendingInfo.calculated_amount.toFixed(2)}
+                </p>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Mês de Referência</Label>
