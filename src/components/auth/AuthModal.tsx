@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { fetchAddressByCep, formatCep } from "@/lib/viaCepService";
 import { formatCurrency, formatPercentage } from "@/lib/formatCurrency";
 import { getFeatureLabels } from "@/lib/planFeatures";
-import RegistrationPaymentModal from "./RegistrationPaymentModal";
+
 type AuthMode = "login" | "register";
 type UserType = "user" | "commerce";
 type DocumentType = "cpf" | "cnpj";
@@ -1358,21 +1358,6 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
       )}
     </AnimatePresence>
 
-    <RegistrationPaymentModal
-      isOpen={showPaymentModal}
-      planName={registeredPlanInfo?.name || ""}
-      planPrice={registeredPlanInfo?.price || 0}
-      couponDiscount={couponDiscount}
-      onConfirmPayment={() => {
-        setShowPaymentModal(false);
-        toast({
-          title: "Cadastro realizado com sucesso!",
-          description: "Seu comércio foi registrado e está aguardando aprovação.",
-        });
-        handleClose();
-        navigate('/commerce');
-      }}
-    />
     </>
   );
 };
