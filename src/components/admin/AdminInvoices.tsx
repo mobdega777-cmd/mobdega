@@ -573,6 +573,51 @@ const AdminInvoices = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Invoices list / Approve payment dialog */}
+      <Dialog open={!!invoicesDialogCommerce} onOpenChange={(o) => !o && setInvoicesDialogCommerce(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              Faturas — {invoicesDialogCommerce?.fantasy_name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+            {invoices
+              .filter(i => i.commerce_id === invoicesDialogCommerce?.id && i.status === 'pending')
+              .map(inv => (
+                <div key={inv.id} className="flex items-center justify-between gap-3 rounded-lg border p-3">
+                  <div className="text-sm">
+                    <p className="font-medium">
+                      {inv.reference_month} — R$ {Number(inv.amount).toFixed(2)}
+                    </p>
+                    <p className="text-muted-foreground text-xs">
+                      Vence em {formatDate(inv.due_date)}
+                    </p>
+                    {inv.payment_confirmed_by_commerce && (
+                      <Badge variant="warning" className="mt-1">
+                        Comércio informou pagamento
+                      </Badge>
+                    )}
+                  </div>
+                  <Button
+                    size="sm"
+                    className="gap-1"
+                    onClick={() => handleApprovePayment(inv.id)}
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    Aprovar pagamento
+                  </Button>
+                </div>
+              ))}
+            {invoices.filter(i => i.commerce_id === invoicesDialogCommerce?.id && i.status === 'pending').length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-6">
+                Nenhuma fatura pendente.
+              </p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
