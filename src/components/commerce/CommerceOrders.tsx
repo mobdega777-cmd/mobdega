@@ -797,19 +797,37 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
                     <span>-{formatCurrency(calculateFee(selectedOrder.payment_method, Number(selectedOrder.total)))}</span>
                   </div>
                 )}
+                {/* Mobdega platform transaction fee */}
+                {billingConfig && (() => {
+                  const platformFee = billingConfig.charge_type === 'percent'
+                    ? (Number(selectedOrder.total) * billingConfig.charge_value) / 100
+                    : billingConfig.charge_value;
+                  if (platformFee <= 0) return null;
+                  return (
+                    <div className="flex justify-between text-sm text-destructive">
+                      <span>
+                        Taxa Mobdega (transação)
+                        {billingConfig.charge_type === 'percent' && ` (${billingConfig.charge_value}%)`}
+                      </span>
+                      <span>-{formatCurrency(platformFee)}</span>
+                    </div>
+                  );
+                })()}
                 <div className="flex justify-between font-bold text-lg pt-2 border-t">
                   <span>Total Recebido</span>
                   <span>{formatCurrency(Number(selectedOrder.total))}</span>
                 </div>
                 {/* Lucro Líquido - using configured rates */}
-                {selectedOrder.payment_method && (
-                  <div className="flex justify-between font-bold text-lg text-primary">
-                    <span>Lucro Líquido (após taxas)</span>
-                    <span>{formatCurrency(
-                      Number(selectedOrder.total) - calculateFee(selectedOrder.payment_method, Number(selectedOrder.total))
-                    )}</span>
-                  </div>
-                )}
+                <div className="flex justify-between font-bold text-lg text-primary">
+                  <span>Lucro Líquido (após taxas)</span>
+                  <span>{formatCurrency(
+                    Number(selectedOrder.total)
+                      - (selectedOrder.payment_method ? calculateFee(selectedOrder.payment_method, Number(selectedOrder.total)) : 0)
+                      - (billingConfig ? (billingConfig.charge_type === 'percent'
+                          ? (Number(selectedOrder.total) * billingConfig.charge_value) / 100
+                          : billingConfig.charge_value) : 0)
+                  )}</span>
+                </div>
               </div>
 
               {selectedOrder.notes && (
