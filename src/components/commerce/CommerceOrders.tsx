@@ -127,6 +127,7 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [paymentMethodsConfig, setPaymentMethodsConfig] = useState<PaymentMethodConfig[]>([]);
+  const [billingConfig, setBillingConfig] = useState<{ charge_type: 'fixed' | 'percent'; charge_value: number } | null>(null);
   // Usa função centralizada para evitar problemas de fuso horário UTC
   const getLocalToday = () => {
     const now = new Date();
