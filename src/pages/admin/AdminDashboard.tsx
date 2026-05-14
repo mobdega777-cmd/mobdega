@@ -39,7 +39,6 @@ import AdminInvoices from "@/components/admin/AdminInvoices";
 import AdminCustomization from "@/components/admin/AdminCustomization";
 import AdminSettings from "@/components/admin/AdminSettings";
 import AdminBillingConfig from "@/components/admin/AdminBillingConfig";
-import AdminPlans from "@/components/admin/AdminPlans";
 import AdminBilling from "@/components/admin/AdminBilling";
 import AdminCustomers from "@/components/admin/AdminCustomers";
 import AdminCoupons from "@/components/admin/AdminCoupons";
