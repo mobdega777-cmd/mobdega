@@ -96,7 +96,21 @@ const AdminInvoices = () => {
     due_date: '',
   });
   const [disabledRows, setDisabledRows] = useState<Set<string>>(new Set());
+  const [invoicesDialogCommerce, setInvoicesDialogCommerce] = useState<Commerce | null>(null);
   const { toast } = useToast();
+
+  const handleApprovePayment = async (invoiceId: string) => {
+    const { error } = await supabase
+      .from('invoices')
+      .update({ status: 'paid' as InvoiceStatus, paid_at: new Date().toISOString() })
+      .eq('id', invoiceId);
+    if (error) {
+      toast({ variant: 'destructive', title: 'Erro ao aprovar', description: error.message });
+      return;
+    }
+    toast({ title: 'Pagamento aprovado!' });
+    fetchInvoices();
+  };
 
   useEffect(() => {
     fetchInvoices();
