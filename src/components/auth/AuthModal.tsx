@@ -59,8 +59,8 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState("");
   const [sendingResetEmail, setSendingResetEmail] = useState(false);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [registeredPlanInfo, setRegisteredPlanInfo] = useState<{ name: string; price: number } | null>(null);
+  const [billingConfig, setBillingConfig] = useState<{ charge_type: string; charge_value: number; description: string | null } | null>(null);
+  const [agreedToBilling, setAgreedToBilling] = useState(false);
   // Form states
   const [formData, setFormData] = useState({
     name: "",
@@ -108,6 +108,15 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
     
     if (isOpen && mode === 'register' && userType === 'commerce') {
       fetchPlans();
+      supabase
+        .from('transaction_billing_config' as any)
+        .select('charge_type, charge_value, description')
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data) setBillingConfig(data as any);
+        });
     }
   }, [isOpen, mode, userType]);
 
