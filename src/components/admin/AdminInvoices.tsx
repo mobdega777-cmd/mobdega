@@ -86,6 +86,7 @@ const AdminInvoices = () => {
   const [isLoading, setIsLoading] = useState(true);
   const ITEMS_PER_PAGE = 10;
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [pendingInfo, setPendingInfo] = useState<{ orders_count: number; total_sales: number; calculated_amount: number } | null>(null);
   const [newInvoice, setNewInvoice] = useState({
     commerce_id: '',
     type: 'receivable' as InvoiceType,
@@ -126,6 +127,22 @@ const AdminInvoices = () => {
     } catch {}
   };
 
+  const fetchPendingForCommerce = async (commerceId: string) => {
+    const { data, error } = await supabase.rpc('get_pending_transaction_billing' as any, { p_commerce_id: commerceId });
+    if (error) {
+      setPendingInfo(null);
+      return null;
+    }
+    const row = Array.isArray(data) ? data[0] : data;
+    const info = row ? {
+      orders_count: Number(row.orders_count) || 0,
+      total_sales: Number(row.total_sales) || 0,
+      calculated_amount: Number(row.calculated_amount) || 0,
+    } : { orders_count: 0, total_sales: 0, calculated_amount: 0 };
+    setPendingInfo(info);
+    return info;
+  };
+
   const handleCreateInvoice = async () => {
     if (!newInvoice.commerce_id || !newInvoice.amount || !newInvoice.due_date) {
       toast({
@@ -135,7 +152,7 @@ const AdminInvoices = () => {
       return;
     }
 
-    const { error } = await supabase
+    const { data: invoiceData, error } = await supabase
       .from('invoices')
       .insert({
         commerce_id: newInvoice.commerce_id,
@@ -144,26 +161,36 @@ const AdminInvoices = () => {
         amount: parseFloat(newInvoice.amount),
         due_date: newInvoice.due_date,
         status: 'pending',
-      });
+      })
+      .select()
+      .single();
 
-    if (error) {
+    if (error || !invoiceData) {
       toast({
         variant: 'destructive',
         title: 'Erro ao criar fatura',
-        description: error.message,
+        description: error?.message,
       });
-    } else {
-      toast({ title: 'Fatura criada com sucesso!' });
-      setCreateDialogOpen(false);
-      setNewInvoice({
-        commerce_id: '',
-        type: 'receivable',
-        reference_month: new Date().toISOString().slice(0, 7),
-        amount: '',
-        due_date: '',
-      });
-      fetchInvoices();
+      return;
     }
+
+    // Marca pedidos como faturados (zera contador)
+    await supabase.rpc('mark_orders_as_billed' as any, {
+      p_commerce_id: newInvoice.commerce_id,
+      p_invoice_id: invoiceData.id,
+    });
+
+    toast({ title: 'Fatura criada com sucesso!' });
+    setCreateDialogOpen(false);
+    setPendingInfo(null);
+    setNewInvoice({
+      commerce_id: '',
+      type: 'receivable',
+      reference_month: new Date().toISOString().slice(0, 7),
+      amount: '',
+      due_date: '',
+    });
+    fetchInvoices();
   };
 
   const handleUpdateCommerceField = async (commerceId: string, field: string, value: number) => {
@@ -186,12 +213,13 @@ const AdminInvoices = () => {
     }
   };
 
-  const handleSendInvoice = (commerce: Commerce) => {
+  const handleSendInvoice = async (commerce: Commerce) => {
+    const info = await fetchPendingForCommerce(commerce.id);
     setNewInvoice({
       commerce_id: commerce.id,
       type: 'receivable',
       reference_month: new Date().toISOString().slice(0, 7),
-      amount: commerce.plans?.price?.toString() || '',
+      amount: info ? info.calculated_amount.toFixed(2) : '0.00',
       due_date: '',
     });
     setCreateDialogOpen(true);
@@ -453,12 +481,12 @@ const AdminInvoices = () => {
               <Label>Comércio</Label>
               <Select
                 value={newInvoice.commerce_id}
-                onValueChange={(v) => {
-                  const commerce = commerces.find(c => c.id === v);
-                  setNewInvoice({ 
-                    ...newInvoice, 
+                onValueChange={async (v) => {
+                  const info = await fetchPendingForCommerce(v);
+                  setNewInvoice({
+                    ...newInvoice,
                     commerce_id: v,
-                    amount: commerce?.plans?.price?.toString() || ''
+                    amount: info ? info.calculated_amount.toFixed(2) : '0.00',
                   });
                 }}
               >
@@ -474,6 +502,17 @@ const AdminInvoices = () => {
                 </SelectContent>
               </Select>
             </div>
+            {pendingInfo && newInvoice.commerce_id && (
+              <div className="rounded-lg bg-muted/40 border p-3 text-sm space-y-1">
+                <p className="font-medium">Cobrança por transação acumulada</p>
+                <p className="text-muted-foreground">
+                  {pendingInfo.orders_count} venda(s) — total vendido R$ {pendingInfo.total_sales.toFixed(2)}
+                </p>
+                <p className="text-primary font-semibold">
+                  Valor da fatura: R$ {pendingInfo.calculated_amount.toFixed(2)}
+                </p>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Mês de Referência</Label>

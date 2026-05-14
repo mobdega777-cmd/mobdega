@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { fetchAddressByCep, formatCep } from "@/lib/viaCepService";
 import { formatCurrency, formatPercentage } from "@/lib/formatCurrency";
 import { getFeatureLabels } from "@/lib/planFeatures";
-import RegistrationPaymentModal from "./RegistrationPaymentModal";
+
 type AuthMode = "login" | "register";
 type UserType = "user" | "commerce";
 type DocumentType = "cpf" | "cnpj";
@@ -59,8 +59,8 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState("");
   const [sendingResetEmail, setSendingResetEmail] = useState(false);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [registeredPlanInfo, setRegisteredPlanInfo] = useState<{ name: string; price: number } | null>(null);
+  const [billingConfig, setBillingConfig] = useState<{ charge_type: string; charge_value: number; description: string | null } | null>(null);
+  const [agreedToBilling, setAgreedToBilling] = useState(false);
   // Form states
   const [formData, setFormData] = useState({
     name: "",
@@ -108,6 +108,15 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
     
     if (isOpen && mode === 'register' && userType === 'commerce') {
       fetchPlans();
+      supabase
+        .from('transaction_billing_config' as any)
+        .select('charge_type, charge_value, description')
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data) setBillingConfig(data as any);
+        });
     }
   }, [isOpen, mode, userType]);
 
@@ -249,8 +258,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
     });
     setShowForgotPassword(false);
     setForgotPasswordEmail("");
-    setShowPaymentModal(false);
-    setRegisteredPlanInfo(null);
+    setAgreedToBilling(false);
   };
 
   const handleClose = () => {
@@ -354,13 +362,12 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
         })
         .eq('user_id', user.id);
 
-      // Get selected plan info for payment modal
-      const selectedPlan = plans.find(p => p.type === formData.plan);
-      setRegisteredPlanInfo({
-        name: selectedPlan?.name || formData.plan,
-        price: selectedPlan?.price || 0,
+      toast({
+        title: "Cadastro realizado com sucesso!",
+        description: "Seu comércio foi registrado e está aguardando aprovação.",
       });
-      setShowPaymentModal(true);
+      handleClose();
+      navigate('/commerce');
     } catch (error) {
       console.error('Registration error:', error);
       toast({
@@ -1181,150 +1188,50 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
                       </div>
                     </div>
 
-                    {/* Plans */}
+                    {/* Modelo de Cobrança por Transação */}
                     <div className="space-y-3 pt-2">
-                      <Label>Escolha seu plano</Label>
-                      <div className="grid grid-cols-1 gap-3">
-                        {loadingPlans ? (
-                          <div className="flex justify-center py-4">
-                            <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-                          </div>
-                        ) : plans.length > 0 ? (
-                          plans.map((plan) => (
-                            <button
-                              key={plan.id}
-                              type="button"
-                              onClick={() => setFormData({ ...formData, plan: plan.type })}
-                              className={`p-4 rounded-xl border-2 text-left transition-all ${
-                                formData.plan === plan.type
-                                  ? "border-secondary bg-secondary/5"
-                                  : "border-border hover:border-secondary/50"
-                              }`}
-                            >
-                            <div className="flex items-start gap-3">
-                              <div className={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
-                                formData.plan === plan.type
-                                  ? "bg-secondary border-secondary"
-                                  : "border-muted-foreground/40"
-                              }`}>
-                                {formData.plan === plan.type && (
-                                  <Check className="w-3.5 h-3.5 text-secondary-foreground" />
-                                )}
-                              </div>
-                              <div className="flex-1 flex justify-between items-start">
-                                <div>
-                                  <div className={`font-semibold ${formData.plan === plan.type ? "text-secondary" : "text-foreground"}`}>
-                                    {plan.name}
-                                  </div>
-                                  <div className="text-xs text-muted-foreground mt-1">
-                                    {plan.allowed_menu_items.length > 0 
-                                      ? getFeatureLabels(plan.allowed_menu_items).slice(0, 4).join(" • ")
-                                      : plan.description || ''}
-                                    {getFeatureLabels(plan.allowed_menu_items).length > 4 && ' ...'}
-                                  </div>
-                                </div>
-                                <div className={`font-bold ${formData.plan === plan.type ? "text-secondary" : "text-foreground"}`}>
-                                  {formatCurrency(plan.price)}/mês
-                                </div>
-                              </div>
+                      <Label>Modelo de Cobrança</Label>
+                      <div className="p-4 rounded-xl border-2 border-secondary/30 bg-secondary/5 space-y-2">
+                        {billingConfig ? (
+                          <>
+                            <div className="flex items-baseline justify-between gap-2">
+                              <span className="text-sm text-muted-foreground">Você pagará</span>
+                              <span className="text-2xl font-bold text-secondary">
+                                {billingConfig.charge_type === 'percent'
+                                  ? `${Number(billingConfig.charge_value).toFixed(2)}%`
+                                  : formatCurrency(Number(billingConfig.charge_value))}
+                              </span>
                             </div>
-                            </button>
-                          ))
+                            <p className="text-xs text-muted-foreground">
+                              {billingConfig.charge_type === 'percent'
+                                ? 'sobre o valor de cada venda realizada na plataforma'
+                                : 'por cada venda realizada na plataforma'}
+                            </p>
+                            {billingConfig.description && (
+                              <p className="text-xs text-muted-foreground italic border-t pt-2">
+                                {billingConfig.description}
+                              </p>
+                            )}
+                            <p className="text-xs text-foreground/80 pt-1">
+                              Sem mensalidade fixa. Você só paga quando vender.
+                            </p>
+                          </>
                         ) : (
-                          [
-                            { type: "basic", name: "Básico", price: 90, features: ["PDV básico", "Até 50 produtos"] },
-                            { type: "startup", name: "Startup", price: 180, features: ["PDV completo", "Delivery", "Aparecer na home"] },
-                            { type: "business", name: "Business", price: 250, features: ["Tudo do Startup", "Relatórios avançados", "Prioridade no suporte"] },
-                          ].map((plan) => (
-                            <button
-                              key={plan.type}
-                              type="button"
-                              onClick={() => setFormData({ ...formData, plan: plan.type })}
-                              className={`p-4 rounded-xl border-2 text-left transition-all ${
-                                formData.plan === plan.type
-                                  ? "border-secondary bg-secondary/5"
-                                  : "border-border hover:border-secondary/50"
-                              }`}
-                            >
-                              <div className="flex justify-between items-start">
-                                <div>
-                                  <div className={`font-semibold ${formData.plan === plan.type ? "text-secondary" : "text-foreground"}`}>
-                                    {plan.name}
-                                  </div>
-                                  <div className="text-xs text-muted-foreground mt-1">
-                                    {plan.features.join(" • ")}
-                                  </div>
-                                </div>
-                                <div className={`font-bold ${formData.plan === plan.type ? "text-secondary" : "text-foreground"}`}>
-                                  {formatCurrency(plan.price)}/mês
-                                </div>
-                              </div>
-                            </button>
-                          ))
+                          <p className="text-sm text-muted-foreground">Carregando modelo de cobrança...</p>
                         )}
                       </div>
-                    </div>
 
-                    {/* Coupon Code Field */}
-                    <div className="space-y-2">
-                      <Label htmlFor="couponCode">Cupom de desconto (opcional)</Label>
-                      <div className="relative">
-                        <Input
-                          id="couponCode"
-                          name="couponCode"
-                          value={formData.couponCode}
-                          onChange={handleInputChange}
-                          placeholder="CUPOM10"
-                          className={`h-11 uppercase pr-12 ${
-                            couponValid === true ? 'border-green-500 focus-visible:ring-green-500' : 
-                            couponValid === false ? 'border-red-500 focus-visible:ring-red-500' : ''
-                          }`}
+                      <label className="flex items-start gap-3 p-3 rounded-lg border cursor-pointer hover:border-secondary/50">
+                        <input
+                          type="checkbox"
+                          checked={agreedToBilling}
+                          onChange={(e) => setAgreedToBilling(e.target.checked)}
+                          className="mt-1 w-4 h-4 accent-secondary"
                         />
-                        <div className="absolute right-4 top-1/2 -translate-y-1/2">
-                          {validatingCoupon && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
-                          {!validatingCoupon && couponValid === true && <Check className="w-5 h-5 text-green-500" />}
-                          {!validatingCoupon && couponValid === false && <AlertCircle className="w-5 h-5 text-red-500" />}
-                        </div>
-                      </div>
-                      {couponValid === true && couponDiscount && (() => {
-                        const selectedPlan = plans.find(p => p.type === formData.plan);
-                        const originalPrice = selectedPlan?.price || 0;
-                        const discountedPrice = couponDiscount.type === 'percentage'
-                          ? originalPrice * (1 - couponDiscount.value / 100)
-                          : Math.max(0, originalPrice - couponDiscount.value);
-                        
-                        return (
-                          <div className="space-y-1">
-                            <p className="text-xs text-green-600 font-medium">
-                              ✓ Cupom válido! {couponDiscount.message 
-                                ? couponDiscount.message 
-                                : `Desconto de ${couponDiscount.type === 'percentage' 
-                                  ? `${couponDiscount.value}%` 
-                                  : formatCurrency(couponDiscount.value)}`}
-                            </p>
-                            <div className="bg-green-50 border border-green-200 rounded-lg p-3 mt-2">
-                              <div className="flex justify-between items-center">
-                                <span className="text-sm text-muted-foreground">Valor original:</span>
-                                <span className="text-sm text-muted-foreground line-through">{formatCurrency(originalPrice)}/mês</span>
-                              </div>
-                              <div className="flex justify-between items-center mt-1">
-                                <span className="text-sm font-semibold text-green-700">Você pagará:</span>
-                                <span className="text-lg font-bold text-green-700">{formatCurrency(discountedPrice)}/mês</span>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })()}
-                      {couponValid === false && formData.couponCode.length >= 3 && (
-                        <p className="text-xs text-red-500">
-                          Cupom inválido ou expirado
-                        </p>
-                      )}
-                      {couponValid === null && (
-                        <p className="text-xs text-muted-foreground">
-                          Se você possui um cupom de desconto, insira aqui
-                        </p>
-                      )}
+                        <span className="text-sm text-foreground">
+                          Li e concordo com o modelo de cobrança por transação acima.
+                        </span>
+                      </label>
                     </div>
                   </div>
 
@@ -1333,7 +1240,7 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
                     className="w-full" 
                     size="lg"
                     onClick={handleCommerceRegister}
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || !agreedToBilling}
                   >
                     {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Finalizar cadastro"}
                   </Button>
@@ -1351,21 +1258,6 @@ const AuthModal = ({ isOpen, onClose, initialMode = "login" }: AuthModalProps) =
       )}
     </AnimatePresence>
 
-    <RegistrationPaymentModal
-      isOpen={showPaymentModal}
-      planName={registeredPlanInfo?.name || ""}
-      planPrice={registeredPlanInfo?.price || 0}
-      couponDiscount={couponDiscount}
-      onConfirmPayment={() => {
-        setShowPaymentModal(false);
-        toast({
-          title: "Cadastro realizado com sucesso!",
-          description: "Seu comércio foi registrado e está aguardando aprovação.",
-        });
-        handleClose();
-        navigate('/commerce');
-      }}
-    />
     </>
   );
 };

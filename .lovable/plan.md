@@ -1,86 +1,83 @@
+## Mudança para Cobrança por Transação
 
+### Visão geral
+Substituir o modelo de planos mensais por uma **taxa por transação** definida pelo master admin. As faturas passam a ser geradas automaticamente com o acumulado de vendas do período.
 
-## Relatório de Valuation e Pitch Comercial — Mobdega
+---
 
-### Objetivo
+### 1. Master Admin — substituir "Planos" por "Cobrança"
 
-Gerar um **relatório executivo em PDF** que apresente o Mobdega como produto pronto para venda/licenciamento, com:
-- Estimativa de valor de mercado do sistema
-- Comparativo com concorrentes (iFood, Goomer, Cardápio Web, Anota AI, Consumer, Linx, etc.)
-- "Dor" do mercado (problemas que o sistema resolve)
-- Diferenciais técnicos e funcionais
-- Cenários de monetização e ROI para o comprador
+- **Renomear item de menu** em `AdminDashboard.tsx`: "Planos" → "Cobrança" (ícone Receipt/Percent).
+- **Novo componente** `AdminBilling.tsx` (substitui o uso de `AdminPlans`):
+  - Campos configuráveis (salvos em nova tabela `transaction_billing_config`, registro único):
+    - **Tipo de cobrança**: `fixed` (R$ por venda) ou `percent` (% sobre o valor da venda)
+    - **Valor**: ex.: R$ 0,50 por venda, ou 2% por venda
+    - **Valor mínimo de fatura** (opcional)
+    - **Descrição** que aparecerá na fatura
+  - Preview de cálculo
+- `AdminPlans.tsx` deixa de ser usado no menu (mantido no código por enquanto, sem rota).
 
-### O que será entregue
+### 2. Novo cálculo automático em "Enviar Fatura"
 
-Um arquivo **PDF profissional** (`/mnt/documents/Mobdega_Valuation_Report.pdf`) com as seguintes seções:
+- Em `AdminInvoices.tsx`, ao abrir o modal **Nova Fatura** e escolher o comércio:
+  - Buscar todas as vendas do comércio com `transaction_billed = false`
+  - Calcular: `valor = soma_aplicando_config` (fixed × qtd ou percent × total)
+  - Preencher automaticamente o campo **Valor (R$)** (editável caso master queira ajustar)
+  - Mostrar resumo: "X vendas acumuladas — R$ Y"
+- Ao **criar a fatura**:
+  - Marcar todas as vendas usadas como `transaction_billed = true` e gravar `billed_invoice_id`
+  - Próxima abertura do modal voltará a zero até novas vendas
 
-1. **Capa e Sumário Executivo**
-   - Nome, posicionamento (SaaS multi-tenant para adegas/tabacarias)
-   - Valor estimado destacado
+### 3. Visão do comércio (anexo 2)
+- Nenhuma mudança estrutural: a fatura aparece em **Faturas e Cobranças** com valor, vencimento e status (já funciona via `commerce_notifications` + `invoices`).
+- Texto auxiliar: "Cobrança por transação — período X"
 
-2. **A Dor do Mercado**
-   - Adegas/tabacarias pagam 12–27% de comissão ao iFood
-   - Falta de PDV integrado com delivery próprio
-   - Sistemas legados caros (Linx, Consinco) custam R$ 800–3.000/mês
-   - Fragmentação: comerciante usa 4–5 ferramentas diferentes
+### 4. Cadastro do comércio (anexo 3) — `AuthModal.tsx`
+- **Remover** a lista de planos com checkbox.
+- Inserir bloco "Modelo de Cobrança" (somente leitura) buscando de `transaction_billing_config`:
+  - Mostra: "Você pagará **R$ 0,50 por venda** (ou **2% por venda**)"
+  - Checkbox obrigatório: "Li e concordo com o modelo de cobrança por transação"
+  - Botão "Avançar" desabilitado enquanto não marcado
+- **Remover** abertura do `RegistrationPaymentModal` no fim do cadastro — comércio entra direto no sistema (status `approved` automático ou conforme fluxo atual sem pagamento).
+- Remover dependência de `plan_id` no insert de `commerces` (deixar `null`).
 
-3. **Inventário Técnico do Mobdega** (baseado no código real)
-   - 3 níveis de acesso (Admin, Comércio, Cliente)
-   - 34+ tabelas no banco com RLS multi-tenant
-   - PDV com carrinho, caixa, sangria, suprimento
-   - Delivery próprio com zonas e taxas
-   - Sistema de comandas/mesas com QR Code
-   - Cupons, fidelização, fórum, notificações realtime
-   - Relatórios PDF, exportação CSV, dashboards
-   - PWA instalável, autenticação JWT, edge functions
-   - Stack moderna: React 18 + Vite + Supabase + Tailwind
+### 5. Telefone de suporte (anexo 4)
+Atualizar para **11951012933** em:
+- `src/components/commerce/CommerceSettings.tsx` (botão Suporte)
+- `src/components/commerce/InvoicePaymentModal.tsx` (botão Ajuda)
 
-4. **Comparativo de Mercado** (tabela)
-   | Solução | Mensalidade | Comissão | PDV | Delivery próprio | Multi-tenant |
-   |---|---|---|---|---|---|
-   | iFood | R$ 0 | 12-27% | Não | Não | — |
-   | Goomer | R$ 199-499 | 0% | Sim | Sim | Não |
-   | Anota AI | R$ 149-399 | 0% | Limitado | WhatsApp | Não |
-   | Cardápio Web | R$ 89-249 | 0% | Não | Sim | Não |
-   | Linx Big | R$ 800+ | 0% | Sim | Não | Não |
-   | **Mobdega** | **definir** | **0%** | **Sim** | **Sim** | **Sim** |
+---
 
-5. **Estimativa de Valuation**
-   - **Custo de replicação (build cost)**: ~R$ 280k–450k
-     (estimativa: 6–9 meses de squad com 2 devs sênior + 1 designer + PM)
-   - **Valuation por múltiplo SaaS**:
-     - Pré-receita / produto pronto: R$ 350k – 800k
-     - Com 50 clientes pagantes (R$ 199/mês): MRR R$ 9.950 → ARR R$ 119k → 4–8x ARR = R$ 480k – 950k
-     - Com 200 clientes: R$ 1.5M – 3.2M
-   - **Licenciamento white-label**: R$ 80k–150k por licença + royalty
+### Detalhes técnicos (migration)
 
-6. **Cenários de Monetização para o Comprador**
-   - Plano Starter R$ 99 / Pro R$ 249 / Enterprise R$ 499
-   - Projeção de receita em 12/24/36 meses
-   - Break-even estimado
+```sql
+-- 1. Configuração global da taxa
+CREATE TABLE public.transaction_billing_config (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  charge_type text NOT NULL DEFAULT 'fixed', -- 'fixed' | 'percent'
+  charge_value numeric NOT NULL DEFAULT 0,
+  min_invoice_amount numeric DEFAULT 0,
+  description text,
+  updated_at timestamptz DEFAULT now()
+);
+ALTER TABLE public.transaction_billing_config ENABLE ROW LEVEL SECURITY;
+-- SELECT público (anon) p/ exibir no cadastro; UPDATE/INSERT só master_admin.
 
-7. **Diferenciais Defensivos (moat)**
-   - Nicho específico (adegas/tabacarias) — concorrentes são genéricos
-   - Multi-tenant nativo permite operação como marketplace
-   - Código moderno, sem dívida técnica de legado
+-- 2. Marcar vendas já cobradas
+ALTER TABLE public.orders
+  ADD COLUMN transaction_billed boolean DEFAULT false,
+  ADD COLUMN billed_invoice_id uuid REFERENCES public.invoices(id);
+CREATE INDEX idx_orders_transaction_billed ON public.orders(commerce_id, transaction_billed);
 
-8. **Próximos Passos / Call to Action**
+-- 3. RPC para o admin obter o acumulado por comércio
+CREATE FUNCTION public.get_pending_transaction_billing(p_commerce_id uuid)
+RETURNS TABLE(orders_count int, total_sales numeric, calculated_amount numeric) ...
+```
 
-### Como será gerado
+- `AdminPlans.tsx`: removido do menu mas arquivo permanece (sem rota).
+- `RegistrationPaymentModal`: import removido do `AuthModal`; arquivo mantido.
+- Memória `mem://features/commerce/registration-onboarding-logic` será atualizada para refletir o novo fluxo sem pagamento upfront.
 
-- Script Python em `/tmp/` usando `reportlab` para montar o PDF
-- Paleta de cores baseada na identidade do projeto (extraída do `tailwind.config.ts` e `index.css`)
-- Tabelas comparativas com formatação clara
-- Tipografia profissional, capa com destaque visual
-- QA: converter cada página para imagem e revisar antes de entregar
-
-### Observação importante
-
-Os valores de **valuation são estimativas baseadas em benchmarks públicos** do mercado SaaS brasileiro (múltiplos de ARR, custo-hora de desenvolvimento, preços de concorrentes pesquisáveis). Não são uma avaliação contábil formal — servem como ferramenta de pitch comercial.
-
-### Arquivos
-
-- Saída: `/mnt/documents/Mobdega_Valuation_Report.pdf`
-- Sem alterações no código da aplicação
-
+### Fora de escopo
+- Migração retroativa de comércios já existentes em planos (continuam com `plan_id` antigo até serem editados manualmente).
+- Cobrança automática real (PIX/cartão) — segue manual via fatura.
