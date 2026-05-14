@@ -127,6 +127,7 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [paymentMethodsConfig, setPaymentMethodsConfig] = useState<PaymentMethodConfig[]>([]);
+  const [billingConfig, setBillingConfig] = useState<{ charge_type: 'fixed' | 'percent'; charge_value: number } | null>(null);
   // Usa função centralizada para evitar problemas de fuso horário UTC
   const getLocalToday = () => {
     const now = new Date();
@@ -196,6 +197,20 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
       );
     };
     fetchPaymentMethodsConfig();
+
+    const fetchBillingConfig = async () => {
+      const { data } = await supabase
+        .from('transaction_billing_config' as any)
+        .select('charge_type, charge_value')
+        .maybeSingle();
+      if (data) {
+        setBillingConfig({
+          charge_type: (data as any).charge_type,
+          charge_value: Number((data as any).charge_value) || 0,
+        });
+      }
+    };
+    fetchBillingConfig();
   }, [commerceId]);
 
   useEffect(() => {
@@ -782,19 +797,37 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
                     <span>-{formatCurrency(calculateFee(selectedOrder.payment_method, Number(selectedOrder.total)))}</span>
                   </div>
                 )}
+                {/* Mobdega platform transaction fee */}
+                {billingConfig && (() => {
+                  const platformFee = billingConfig.charge_type === 'percent'
+                    ? (Number(selectedOrder.total) * billingConfig.charge_value) / 100
+                    : billingConfig.charge_value;
+                  if (platformFee <= 0) return null;
+                  return (
+                    <div className="flex justify-between text-sm text-destructive">
+                      <span>
+                        Taxa Mobdega (transação)
+                        {billingConfig.charge_type === 'percent' && ` (${billingConfig.charge_value}%)`}
+                      </span>
+                      <span>-{formatCurrency(platformFee)}</span>
+                    </div>
+                  );
+                })()}
                 <div className="flex justify-between font-bold text-lg pt-2 border-t">
                   <span>Total Recebido</span>
                   <span>{formatCurrency(Number(selectedOrder.total))}</span>
                 </div>
                 {/* Lucro Líquido - using configured rates */}
-                {selectedOrder.payment_method && (
-                  <div className="flex justify-between font-bold text-lg text-primary">
-                    <span>Lucro Líquido (após taxas)</span>
-                    <span>{formatCurrency(
-                      Number(selectedOrder.total) - calculateFee(selectedOrder.payment_method, Number(selectedOrder.total))
-                    )}</span>
-                  </div>
-                )}
+                <div className="flex justify-between font-bold text-lg text-primary">
+                  <span>Lucro Líquido (após taxas)</span>
+                  <span>{formatCurrency(
+                    Number(selectedOrder.total)
+                      - (selectedOrder.payment_method ? calculateFee(selectedOrder.payment_method, Number(selectedOrder.total)) : 0)
+                      - (billingConfig ? (billingConfig.charge_type === 'percent'
+                          ? (Number(selectedOrder.total) * billingConfig.charge_value) / 100
+                          : billingConfig.charge_value) : 0)
+                  )}</span>
+                </div>
               </div>
 
               {selectedOrder.notes && (
