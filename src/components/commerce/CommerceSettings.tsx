@@ -235,7 +235,7 @@ const CommerceSettings = ({ commerce }: CommerceSettingsProps) => {
   };
 
   const handleWhatsAppSupport = () => {
-    window.open('https://wa.me/5511949830010?text=Olá! Preciso de suporte com meu comércio na Mobdega.', '_blank');
+    window.open('https://wa.me/5511951012933?text=Olá! Preciso de suporte com meu comércio na Mobdega.', '_blank');
   };
 
   const getStatusBadge = (status: string) => {

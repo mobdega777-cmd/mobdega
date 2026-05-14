@@ -278,7 +278,7 @@ const InvoicePaymentModal = ({ isOpen, onClose, invoice, commerceStats }: Invoic
             
             <Button 
               variant="outline" 
-              onClick={() => window.open(`https://wa.me/5511949830010?text=Olá! Preciso de ajuda com a fatura ${invoice.reference_month}`, '_blank')}
+              onClick={() => window.open(`https://wa.me/5511951012933?text=Olá! Preciso de ajuda com a fatura ${invoice.reference_month}`, '_blank')}
               className="w-full gap-2"
             >
               <MessageCircle className="w-4 h-4" />
