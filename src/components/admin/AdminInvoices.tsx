@@ -410,7 +410,13 @@ const AdminInvoices = () => {
                         </TableCell>
                         <TableCell className="text-center">
                           {counts.pending > 0 ? (
-                            <Badge variant="warning">{counts.pending}</Badge>
+                            <Badge
+                              variant="warning"
+                              className="cursor-pointer"
+                              onClick={() => setInvoicesDialogCommerce(commerce)}
+                            >
+                              {counts.pending}
+                            </Badge>
                           ) : (
                             <span className="text-muted-foreground text-sm">0</span>
                           )}
