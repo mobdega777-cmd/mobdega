@@ -1218,6 +1218,7 @@ export type Database = {
       }
       orders: {
         Row: {
+          billed_invoice_id: string | null
           commerce_id: string
           coupon_code: string | null
           coupon_discount: number | null
@@ -1239,10 +1240,12 @@ export type Database = {
           subtotal: number
           table_id: string | null
           total: number
+          transaction_billed: boolean
           updated_at: string
           user_id: string
         }
         Insert: {
+          billed_invoice_id?: string | null
           commerce_id: string
           coupon_code?: string | null
           coupon_discount?: number | null
@@ -1264,10 +1267,12 @@ export type Database = {
           subtotal: number
           table_id?: string | null
           total: number
+          transaction_billed?: boolean
           updated_at?: string
           user_id: string
         }
         Update: {
+          billed_invoice_id?: string | null
           commerce_id?: string
           coupon_code?: string | null
           coupon_discount?: number | null
@@ -1289,10 +1294,18 @@ export type Database = {
           subtotal?: number
           table_id?: string | null
           total?: number
+          transaction_billed?: boolean
           updated_at?: string
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "orders_billed_invoice_id_fkey"
+            columns: ["billed_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "orders_commerce_id_fkey"
             columns: ["commerce_id"]
@@ -1942,6 +1955,36 @@ export type Database = {
         }
         Relationships: []
       }
+      transaction_billing_config: {
+        Row: {
+          charge_type: string
+          charge_value: number
+          created_at: string
+          description: string | null
+          id: string
+          min_invoice_amount: number
+          updated_at: string
+        }
+        Insert: {
+          charge_type?: string
+          charge_value?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          min_invoice_amount?: number
+          updated_at?: string
+        }
+        Update: {
+          charge_type?: string
+          charge_value?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          min_invoice_amount?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -2127,6 +2170,14 @@ export type Database = {
           whatsapp: string
         }[]
       }
+      get_pending_transaction_billing: {
+        Args: { p_commerce_id: string }
+        Returns: {
+          calculated_amount: number
+          orders_count: number
+          total_sales: number
+        }[]
+      }
       get_profile_names: {
         Args: { p_user_ids: string[] }
         Returns: {
@@ -2204,6 +2255,10 @@ export type Database = {
       is_session_participant: {
         Args: { _session_id: string; _user_id: string }
         Returns: boolean
+      }
+      mark_orders_as_billed: {
+        Args: { p_commerce_id: string; p_invoice_id: string }
+        Returns: number
       }
     }
     Enums: {
