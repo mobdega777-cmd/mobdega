@@ -40,6 +40,7 @@ import AdminCustomization from "@/components/admin/AdminCustomization";
 import AdminSettings from "@/components/admin/AdminSettings";
 import AdminBillingConfig from "@/components/admin/AdminBillingConfig";
 import AdminPlans from "@/components/admin/AdminPlans";
+import AdminBilling from "@/components/admin/AdminBilling";
 import AdminCustomers from "@/components/admin/AdminCustomers";
 import AdminCoupons from "@/components/admin/AdminCoupons";
 import AdminTraining from "@/components/admin/AdminTraining";
@@ -73,7 +74,7 @@ const menuItems = [
   { id: "users" as AdminSection, label: "Usuários", icon: Users },
   { id: "commerces" as AdminSection, label: "Adegas/Tabacarias", icon: Store, badgeKey: 'commerces' as const },
   { id: "customers" as AdminSection, label: "Gestão de Clientes", icon: Users },
-  { id: "plans" as AdminSection, label: "Planos", icon: Crown },
+  { id: "plans" as AdminSection, label: "Cobrança", icon: Crown },
   { id: "coupons" as AdminSection, label: "Cupons", icon: Receipt },
   { id: "training" as AdminSection, label: "Treinamento", icon: BookOpen },
   { id: "database" as AdminSection, label: "Banco de Dados", icon: Database },
@@ -169,7 +170,7 @@ const AdminDashboard = () => {
       case "billing-config":
         return <AdminBillingConfig />;
       case "plans":
-        return <AdminPlans />;
+        return <AdminBilling />;
       case "coupons":
         return <AdminCoupons />;
       case "training":
