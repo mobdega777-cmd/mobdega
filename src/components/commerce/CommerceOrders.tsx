@@ -197,6 +197,20 @@ const CommerceOrders = ({ commerceId }: CommerceOrdersProps) => {
       );
     };
     fetchPaymentMethodsConfig();
+
+    const fetchBillingConfig = async () => {
+      const { data } = await supabase
+        .from('transaction_billing_config' as any)
+        .select('charge_type, charge_value')
+        .maybeSingle();
+      if (data) {
+        setBillingConfig({
+          charge_type: (data as any).charge_type,
+          charge_value: Number((data as any).charge_value) || 0,
+        });
+      }
+    };
+    fetchBillingConfig();
   }, [commerceId]);
 
   useEffect(() => {
